@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 
 export interface NormalizedProduct {
   externalId?: string;
+  organizationId?: string;
   title: string;
   description?: string;
   imageUrl?: string;
@@ -133,7 +134,7 @@ function labelOf(v: unknown): string | undefined {
   return toStr(first(o, ["name", "title", "label", "value", "description"]));
 }
 
-interface LomadeeProduct {
+export interface LomadeeProduct {
   organizationId?: string;
   id?: string;
   name?: string;
@@ -148,7 +149,7 @@ interface LomadeeProduct {
   }[];
 }
 
-function normalizeLomadeeProduct(p: LomadeeProduct): NormalizedProduct | null {
+export function normalizeLomadeeProduct(p: LomadeeProduct): NormalizedProduct | null {
   if (!p.url || !p.name) return null;
   const option = p.options?.[0];
   const pricing = option?.pricing?.[0];
@@ -156,6 +157,7 @@ function normalizeLomadeeProduct(p: LomadeeProduct): NormalizedProduct | null {
 
   return {
     externalId: p.organizationId && p.id ? `${p.organizationId}:${p.id}` : p.id,
+    organizationId: p.organizationId,
     title: p.name,
     description: p.description ? stripHtml(p.description) : undefined,
     imageUrl,
@@ -212,21 +214,6 @@ interface LomadeeChannel {
   shortUrls?: string[];
 }
 
-interface LomadeeCampaign {
-  id: string;
-  name?: string;
-  type?: string;
-  status?: string;
-  url?: string;
-  code?: string;
-  description?: string;
-  categories?: string[];
-  organizationId?: string;
-  channels?: LomadeeChannel[];
-  mediaKit?: { banners?: string[] | null; emailMarketing?: unknown } | null;
-  period?: { startAt?: string; endAt?: string } | null;
-}
-
 async function lomadeeGet<T>(
   apiKey: string,
   baseUrl: string,
@@ -258,6 +245,27 @@ async function lomadeeGet<T>(
   throw new Error(lastError);
 }
 
+export async function fetchLomadeeBrandsPage(
+  apiKey: string,
+  baseUrl: string,
+  page: number,
+): Promise<{ items: LomadeeBrand[]; totalPages: number }> {
+  const json = await lomadeeGet<{
+    data?: { id: string; name: string; logo?: string; site?: string }[];
+    meta?: { totalPages?: number };
+    pagination?: { totalPages?: number };
+  }>(apiKey, baseUrl, "/affiliate/brands", { page, limit: 20 });
+  return {
+    items: (json.data ?? []).map((b) => ({
+      id: b.id,
+      name: b.name,
+      logo: b.logo,
+      site: b.site,
+    })),
+    totalPages: json.pagination?.totalPages ?? json.meta?.totalPages ?? page,
+  };
+}
+
 export async function fetchLomadeeBrands(
   apiKey: string,
   baseUrl = "https://api.lomadee.com.br",
@@ -265,43 +273,101 @@ export async function fetchLomadeeBrands(
   const map = new Map<string, LomadeeBrand>();
   let page = 1;
   for (;;) {
-    const json = await lomadeeGet<{
-      data?: { id: string; name: string; logo?: string; site?: string }[];
-      meta?: { totalPages?: number };
-      pagination?: { totalPages?: number };
-    }>(apiKey, baseUrl, "/affiliate/brands", { page, limit: 20 });
-    for (const b of json.data ?? []) {
-      map.set(b.id, { id: b.id, name: b.name, logo: b.logo, site: b.site });
-    }
-    const totalPages = json.pagination?.totalPages ?? json.meta?.totalPages;
-    if (!totalPages || page >= totalPages) break;
+    const { items, totalPages } = await fetchLomadeeBrandsPage(
+      apiKey,
+      baseUrl,
+      page,
+    );
+    for (const b of items) map.set(b.id, b);
+    if (page >= totalPages) break;
     page++;
     await new Promise((r) => setTimeout(r, 300)); // rate limit: 60 req/min
   }
   return map;
 }
 
+export interface AffiliatedOrgInfo {
+  organizationId: string;
+  name?: string;
+}
+
+export interface LomadeeCampaign {
+  id: string;
+  name?: string;
+  type?: string;
+  status?: string;
+  url?: string;
+  code?: string;
+  description?: string;
+  categories?: string[];
+  organizationId?: string;
+  channels?: LomadeeChannel[];
+  mediaKit?: { banners?: string[] | null; emailMarketing?: unknown } | null;
+  period?: { startAt?: string; endAt?: string } | null;
+}
+
+// Normaliza uma campanha em oferta; retorna null se nao for exibivel
+export function normalizeLomadeeCampaign(
+  c: LomadeeCampaign,
+  brand?: LomadeeBrand,
+): { product: NormalizedProduct; org?: AffiliatedOrgInfo } | null {
+  if (c.status !== "onTime") return null;
+  const shortUrl = c.channels?.flatMap((ch) => ch.shortUrls ?? [])[0];
+  if (!shortUrl) return null;
+
+  return {
+    product: {
+      externalId: `camp:${c.id}`,
+      title: c.name ?? "Oferta",
+      description:
+        [c.description, c.code ? `Cupom: ${c.code}` : null]
+          .filter(Boolean)
+          .join("\n\n") || undefined,
+      imageUrl: c.mediaKit?.banners?.[0] ?? brand?.logo,
+      category: c.categories?.[0],
+      merchant: brand?.name,
+      url: shortUrl,
+      affiliateUrl: shortUrl,
+      couponCode: c.code,
+      endsAt: c.period?.endAt ? new Date(c.period.endAt) : undefined,
+    },
+    org: c.organizationId
+      ? { organizationId: c.organizationId, name: brand?.name }
+      : undefined,
+  };
+}
+
+export async function fetchLomadeeCampaignsPage(
+  apiKey: string,
+  baseUrl: string,
+  page: number,
+): Promise<{ items: LomadeeCampaign[]; totalPages: number }> {
+  const json = await lomadeeGet<{
+    data?: LomadeeCampaign[];
+    meta?: { totalPages?: number };
+  }>(apiKey, baseUrl, "/affiliate/campaigns", { page, limit: 20 });
+  return {
+    items: json.data ?? [],
+    totalPages: json.meta?.totalPages ?? page,
+  };
+}
+
 export async function fetchLomadeeCampaigns(
   apiKey: string,
   baseUrl = "https://api.lomadee.com.br",
   brands?: Map<string, LomadeeBrand>,
-): Promise<NormalizedProduct[]> {
+): Promise<{ items: NormalizedProduct[]; orgs: AffiliatedOrgInfo[] }> {
   const products: NormalizedProduct[] = [];
+  const orgs = new Map<string, AffiliatedOrgInfo>();
   let page = 1;
   let totalPages = Infinity;
   let consecutiveFailures = 0;
 
   for (;;) {
-    let json: {
-      data?: LomadeeCampaign[];
-      meta?: { totalPages?: number };
-    };
+    let result: { items: LomadeeCampaign[]; totalPages: number };
     try {
-      json = await lomadeeGet(apiKey, baseUrl, "/affiliate/campaigns", {
-        page,
-        limit: 20,
-      });
-    } catch (e) {
+      result = await fetchLomadeeCampaignsPage(apiKey, baseUrl, page);
+    } catch {
       // Paginas especificas da API retornam 500 de forma consistente;
       // pula a pagina em vez de abortar o sync inteiro
       console.warn(`Pagina ${page} de campanhas falhou, pulando.`);
@@ -310,30 +376,16 @@ export async function fetchLomadeeCampaigns(
       continue;
     }
     consecutiveFailures = 0;
-    if (json.meta?.totalPages) totalPages = json.meta.totalPages;
-    const items = json.data ?? [];
+    totalPages = result.totalPages;
 
-    for (const c of items) {
-      if (c.status !== "onTime") continue;
-      const shortUrl = c.channels?.flatMap((ch) => ch.shortUrls ?? [])[0];
-      if (!shortUrl) continue;
+    for (const c of result.items) {
       const brand = c.organizationId ? brands?.get(c.organizationId) : undefined;
-
-      products.push({
-        externalId: `camp:${c.id}`,
-        title: c.name ?? "Oferta",
-        description:
-          [c.description, c.code ? `Cupom: ${c.code}` : null]
-            .filter(Boolean)
-            .join("\n\n") || undefined,
-        imageUrl: c.mediaKit?.banners?.[0] ?? brand?.logo,
-        category: c.categories?.[0],
-        merchant: brand?.name,
-        url: shortUrl,
-        affiliateUrl: shortUrl,
-        couponCode: c.code,
-        endsAt: c.period?.endAt ? new Date(c.period.endAt) : undefined,
-      });
+      const normalized = normalizeLomadeeCampaign(c, brand);
+      if (!normalized) continue;
+      products.push(normalized.product);
+      if (normalized.org && !orgs.has(normalized.org.organizationId)) {
+        orgs.set(normalized.org.organizationId, normalized.org);
+      }
     }
 
     if (page >= totalPages) break;
@@ -341,7 +393,28 @@ export async function fetchLomadeeCampaigns(
     await new Promise((r) => setTimeout(r, 300)); // rate limit: 60 req/min
   }
 
-  return products;
+  return { items: products, orgs: [...orgs.values()] };
+}
+
+// Busca uma pagina do catalogo de produtos (para exibicao ao vivo no site)
+export async function fetchLomadeeProductsPage(
+  apiKey: string,
+  baseUrl = "https://api.lomadee.com.br",
+  page = 1,
+  limit = 48,
+): Promise<{ items: NormalizedProduct[]; count: number }> {
+  const json = await lomadeeGet<{
+    data?: LomadeeProduct[];
+    count?: number;
+  }>(apiKey, baseUrl, "/affiliate/products", {
+    page,
+    limit,
+    isAvailable: "true",
+  });
+  const items = (json.data ?? [])
+    .map(normalizeLomadeeProduct)
+    .filter((p): p is NormalizedProduct => p !== null);
+  return { items, count: json.count ?? items.length };
 }
 
 export async function fetchFeed(url: string): Promise<NormalizedProduct[]> {

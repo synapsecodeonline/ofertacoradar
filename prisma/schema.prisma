@@ -15,9 +15,11 @@ model Product {
   imageUrl     String?
   price        Float?
   oldPrice     Float?
+  discountPct  Float?
   currency     String   @default("BRL")
   category     String?
   merchant     String?
+  organizationId String?
   url          String
   affiliateUrl String?
   couponCode   String?
@@ -30,6 +32,36 @@ model Product {
 
   @@index([category])
   @@index([active])
+}
+
+model Brand {
+  id   String  @id
+  name String
+  logo String?
+  site String?
+}
+
+model SyncState {
+  key          String    @id
+  phase        String    @default("brands")
+  page         Int       @default(1)
+  lastCycleAt  DateTime?
+  busyAt       DateTime?
+  orgsCleared  Boolean   @default(false)
+}
+
+model AffiliatedOrg {
+  organizationId String   @id
+  name           String?
+  updatedAt      DateTime @updatedAt
+}
+
+model TrackedLink {
+  id             Int      @id @default(autoincrement())
+  sourceUrl      String   @unique
+  organizationId String
+  shortUrl       String
+  createdAt      DateTime @default(now())
 }
 
 model Click {

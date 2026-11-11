@@ -3,70 +3,84 @@ import Image from "next/image";
 import type { Product } from "@prisma/client";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
+import { IconArrowRight, IconTag } from "@/components/Icons";
 
 export default function ProductCard({ product }: { product: Product }) {
-  const discount = discountPercent(product.price, product.oldPrice);
+  const discount = product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const urgent = urgencyLabel(product.endsAt);
+  const hasPrice = product.price != null;
 
   return (
     <Link
       href={`/produto/${product.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-600/10 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-800"
     >
-      <div className="relative aspect-square bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900">
+      {/* Imagem */}
+      <div className="relative aspect-square bg-zinc-50 dark:bg-zinc-950">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt={product.title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain p-3 transition-transform group-hover:scale-105"
+            className="object-contain p-4 transition-transform duration-500 ease-out group-hover:scale-[1.06]"
             unoptimized
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-zinc-400">
-            sem imagem
+          <div className="flex h-full items-center justify-center text-zinc-300 dark:text-zinc-700">
+            <IconTag className="h-10 w-10" />
           </div>
         )}
-        <div className="absolute left-2 top-2 flex flex-col gap-1">
-          {discount !== null && (
-            <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-extrabold text-white shadow">
-              -{discount}%
-            </span>
-          )}
-          {urgent && (
-            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow">
-              {urgent}
-            </span>
-          )}
-        </div>
+
+        {/* Badge de desconto */}
+        {discount !== null && (
+          <span className="absolute left-2.5 top-2.5 rounded-lg bg-gradient-to-br from-red-500 to-red-600 px-2.5 py-1 text-xs font-extrabold text-white shadow-md">
+            -{discount}%
+          </span>
+        )}
+        {urgent && (
+          <span className="absolute right-2.5 top-2.5 rounded-lg bg-zinc-900/85 px-2 py-1 text-[11px] font-bold text-amber-300 shadow backdrop-blur-sm dark:bg-white/90 dark:text-amber-600">
+            {urgent}
+          </span>
+        )}
+
+        {/* Cupom */}
         {product.couponCode && (
-          <span className="absolute bottom-2 left-2 rounded-md bg-zinc-900/90 px-2 py-1 font-mono text-xs font-bold text-amber-300">
+          <span className="absolute bottom-2.5 left-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-md border border-dashed border-amber-400/60 bg-zinc-900/90 px-2 py-1 font-mono text-[11px] font-bold tracking-wide text-amber-300 backdrop-blur-sm">
             {product.couponCode}
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
+
+      {/* Conteúdo */}
+      <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-snug text-zinc-900 transition-colors group-hover:text-emerald-700 dark:text-zinc-100 dark:group-hover:text-emerald-400">
           {product.title}
         </h3>
         {product.merchant && (
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             {product.merchant}
           </span>
         )}
-        <div className="mt-auto flex items-baseline gap-2 pt-1">
-          {product.price != null && (
-            <span className="text-base font-extrabold text-emerald-600">
-              {formatPrice(product.price, product.currency)}
-            </span>
-          )}
-          {product.oldPrice != null &&
-            product.oldPrice > (product.price ?? 0) && (
-              <span className="text-xs text-zinc-400 line-through">
-                {formatPrice(product.oldPrice, product.currency)}
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+          <div className="flex flex-col">
+            {hasPrice ? (
+              <span className="text-lg font-extrabold leading-none text-emerald-600 dark:text-emerald-400">
+                {formatPrice(product.price, product.currency)}
               </span>
+            ) : (
+              <span className="text-sm font-bold text-zinc-500">Ver oferta</span>
             )}
+            {product.oldPrice != null &&
+              product.oldPrice > (product.price ?? 0) && (
+                <span className="mt-1 text-xs text-zinc-400 line-through">
+                  {formatPrice(product.oldPrice, product.currency)}
+                </span>
+              )}
+          </div>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950 dark:text-emerald-400 dark:group-hover:bg-emerald-500 dark:group-hover:text-white">
+            <IconArrowRight className="h-4 w-4" />
+          </span>
         </div>
       </div>
     </Link>

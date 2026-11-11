@@ -11,3 +11,7 @@ export function discountPercent(price?: number | null, oldPrice?: number | null)
   if (!price || !oldPrice || oldPrice <= price) return null;
   return Math.round((1 - price / oldPrice) * 100);
 }
+
+export function discountPctOf(p: { price?: number | null; oldPrice?: number | null }) {
+  return discountPercent(p.price, p.oldPrice);
+}

@@ -47,6 +47,15 @@ const CATEGORY_PT: Record<string, string> = {
   animals: "Pets e Animais",
   "beauty-and-fashion": "Beleza e Moda",
   health: "Saúde",
+  womens_clothing: "Roupas Femininas",
+  mens_clothing: "Roupas Masculinas",
+  kids_clothing: "Roupas Infantis",
+  bags_accessories: "Bolsas e Acessórios",
+  fashion_accessories: "Acessórios de Moda",
+  decor_items: "Decoração",
+  perfumes: "Perfumes e Fragrâncias",
+  technology_digital: "Tecnologia",
+  home_utilities: "Utilidades Domésticas",
 };
 
 export function categoryLabel(slug: string): string {

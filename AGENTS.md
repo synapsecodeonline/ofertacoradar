@@ -12,9 +12,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - `npm run dev` — dev server
 - `npm run build` / `npm run start` — build e produção
-- `npm run sync` — importa o feed de ofertas (URL em `FEED_URL` no `.env`) para o banco SQLite via Prisma
-- `npm run db:push` — aplica mudanças do `prisma/schema.prisma`
-- Banco: SQLite em `prisma/dev.db` (Prisma 6, `prisma-client-js`)
+- `npm run sync` — importa ofertas para o Postgres via Prisma
+- `npm run db:push` — aplica mudanças do `prisma/schema.prisma` (pode travar no Supabase pooler; alternativa: `ALTER TABLE` via `$executeRawUnsafe`)
+- Banco: PostgreSQL no Supabase (`DATABASE_URL`), Prisma 6 `prisma-client-js`
+- `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 
 ## Notas
 
@@ -24,4 +25,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - API Lomadee: limite de 20 itens/página em brands/campaigns, rate limit 60 req/min, 500 intermitente em algumas páginas (sync pula e segue). Paginação: campaigns/orders usam `meta`, brands usa `pagination`, products usa `count`.
 - Feed XML: campos mapeados de forma tolerante (title/name, price/preco, link/url, image/imagem etc.).
 - Atenção: API de produtos retorna URL direta da loja; link comissionado pode exigir feed XML lomadeezado ou shortener (`POST /affiliate/shortener/url`).
-- Redirect de afiliado: `/ir/[id]` registra clique e redireciona para `affiliateUrl` (ou `url`).
+- Redirect de afiliado: `/ir/[id]` registra clique e redireciona para `affiliateUrl` (ou `url`; produtos `prod:` sem affiliateUrl geram `lmdee.link` via shortener, cacheado em `TrackedLink`).
+- `Product.discountPct` — % de desconto calculado no sync (alimenta ordenação "Maior desconto" e relacionadas). Manter atualizado em `scripts/sync.ts` e `src/lib/syncer.ts`.
+- Home tem abas/ordenação/filtros via query params: `aba`, `q`, `categoria`, `loja`, `ordem` (desconto|recentes|terminando|populares), `pagina`. URLs `/ir/` ficam fora do sitemap e são `Disallow` no robots.
