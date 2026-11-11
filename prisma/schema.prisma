@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  externalId   String?  @unique
+  title        String
+  description  String?
+  imageUrl     String?
+  price        Float?
+  oldPrice     Float?
+  currency     String   @default("BRL")
+  category     String?
+  merchant     String?
+  url          String
+  affiliateUrl String?
+  couponCode   String?
+  endsAt       DateTime?
+  active       Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  clicks Click[]
+
+  @@index([category])
+  @@index([active])
+}
+
+model Click {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  referer   String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}

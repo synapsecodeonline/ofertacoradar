@@ -1,0 +1,59 @@
+const CATEGORY_PT: Record<string, string> = {
+  "home-and-decoration": "Casa e Decoração",
+  "home-appliances": "Eletrodomésticos",
+  electronics: "Eletrônicos",
+  "cell-phones": "Celulares",
+  computers: "Informática",
+  fashion: "Moda",
+  "women-clothing": "Roupas Femininas",
+  "men-clothing": "Roupas Masculinas",
+  shoes: "Calçados",
+  bags: "Bolsas e Mochilas",
+  jewelry: "Joias e Relógios",
+  beauty: "Beleza",
+  "health-and-personal-care": "Saúde e Cuidados Pessoais",
+  "sports-and-leisure": "Esportes e Lazer",
+  toys: "Brinquedos",
+  "baby-and-kids": "Bebês e Crianças",
+  pets: "Pet Shop",
+  automotive: "Automotivo",
+  books: "Livros",
+  games: "Games",
+  supermarket: "Mercado",
+  "food-and-beverages": "Alimentos e Bebidas",
+  stationery: "Papelaria",
+  "industry-and-commerce": "Indústria e Comércio",
+  services: "Serviços",
+  travel: "Viagens",
+  "tickets-and-events": "Ingressos e Eventos",
+  software: "Software",
+  "cell-phone-accessories": "Acessórios para Celular",
+  tv: "TV e Áudio",
+  cameras: "Câmeras e Foto",
+  instruments: "Instrumentos Musicais",
+  tools: "Ferramentas",
+  construction: "Construção e Reforma",
+  garden: "Jardim e Piscina",
+  kitchen: "Cozinha",
+  furniture: "Móveis",
+  sports: "Esportes",
+  shopping: "Compras",
+  "tourism-and-leisure": "Turismo e Lazer",
+  "auto-and-accessories": "Automotivo e Acessórios",
+  promotions: "Promoções",
+  wellness: "Bem-estar",
+  "books-and-literature": "Livros",
+  "art-and-culture": "Arte e Cultura",
+  animals: "Pets e Animais",
+  "beauty-and-fashion": "Beleza e Moda",
+  health: "Saúde",
+};
+
+export function categoryLabel(slug: string): string {
+  if (CATEGORY_PT[slug]) return CATEGORY_PT[slug];
+  // fallback: transforma "home-and-decor" em "Home And Decor"
+  return slug
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
