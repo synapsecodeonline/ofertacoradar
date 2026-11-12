@@ -14,7 +14,9 @@ import CountdownTimer from "@/components/CountdownTimer";
 import ProductCard from "@/components/ProductCard";
 import { IconArrowRight, IconCheck, IconFlame, IconShield, IconTag } from "@/components/Icons";
 import ShareButtons from "@/components/ShareButtons";
+import InstagramCaption from "@/components/InstagramCaption";
 import BackButton from "@/components/BackButton";
+import { instagramCaption } from "@/lib/instagram";
 
 export const dynamic = "force-dynamic";
 
@@ -379,6 +381,21 @@ export default async function ProductPage({
                 Imagem p/ story
               </a>
             </div>
+            <InstagramCaption
+              caption={instagramCaption(
+                {
+                  title: product.title,
+                  price: product.price,
+                  oldPrice: product.oldPrice,
+                  currency: product.currency,
+                  merchant: product.merchant,
+                  couponCode: product.couponCode,
+                  discountPct: product.discountPct,
+                  category: product.category,
+                },
+                `${siteUrl()}/produto/${product.id}`,
+              )}
+            />
           </div>
 
           {/* Como usar o cupom */}
