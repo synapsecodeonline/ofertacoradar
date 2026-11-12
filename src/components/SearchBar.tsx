@@ -39,7 +39,7 @@ export default function SearchBar({
           name="q"
           defaultValue={params.get("q") ?? ""}
           placeholder="Buscar produtos, lojas ou cupons..."
-          className="h-11 w-full rounded-xl bg-zinc-50 pl-10 pr-4 text-sm outline-none transition-colors placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/40 dark:bg-zinc-950 dark:focus:bg-zinc-900"
+          className="h-11 w-full rounded-xl bg-zinc-50 pl-10 pr-4 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/40 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:bg-zinc-900"
         />
       </div>
       {merchants.length > 1 && (
@@ -52,7 +52,7 @@ export default function SearchBar({
             else p.delete("loja");
             go(p);
           }}
-          className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-medium outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950"
+          className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
           aria-label="Filtrar por loja"
         >
           <option value="">Todas as lojas</option>
