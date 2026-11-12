@@ -18,7 +18,7 @@ function hueOf(slug: string): number {
 }
 
 export default function CategoryNav({ items }: { items: CategoryItem[] }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const active = items.find((i) => i.active);
