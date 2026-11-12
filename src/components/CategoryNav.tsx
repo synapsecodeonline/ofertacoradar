@@ -21,17 +21,11 @@ export default function CategoryNav({ items }: { items: CategoryItem[] }) {
   const [open, setOpen] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const lastY = useRef(0);
   const active = items.find((i) => i.active);
 
   useEffect(() => {
     const onScroll = () => {
-      const y = window.scrollY;
-      setScrolled(y > 8);
-      // Abre no topo; desce -> fecha; volta ao topo -> reabre
-      if (y <= 8) setOpen(true);
-      else if (y > lastY.current && y > 160) setOpen(false);
-      lastY.current = y;
+      setScrolled(window.scrollY > 8);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
