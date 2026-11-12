@@ -3,12 +3,24 @@ import Image from "next/image";
 import type { Product } from "@prisma/client";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
-import { IconArrowRight, IconTag } from "@/components/Icons";
+import { IconArrowRight, IconFlame, IconTag } from "@/components/Icons";
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+  clicks,
+}: {
+  product: Product;
+  clicks?: number;
+}) {
   const discount = product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const urgent = urgencyLabel(product.endsAt);
   const hasPrice = product.price != null;
+  const saving =
+    product.price != null &&
+    product.oldPrice != null &&
+    product.oldPrice > product.price
+      ? product.oldPrice - product.price
+      : null;
 
   return (
     <Link
@@ -62,6 +74,12 @@ export default function ProductCard({ product }: { product: Product }) {
             {product.merchant}
           </span>
         )}
+        {clicks != null && clicks >= 3 && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-orange-500 dark:text-orange-400">
+            <IconFlame className="h-3 w-3" />
+            {clicks} {clicks === 1 ? "pessoa aproveitou" : "pessoas aproveitaram"}
+          </span>
+        )}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <div className="flex flex-col">
             {hasPrice ? (
@@ -77,6 +95,11 @@ export default function ProductCard({ product }: { product: Product }) {
                   {formatPrice(product.oldPrice, product.currency)}
                 </span>
               )}
+            {saving !== null && saving >= 10 && (
+              <span className="mt-0.5 text-[11px] font-bold leading-tight text-emerald-600 dark:text-emerald-400">
+                Economize {formatPrice(saving, product.currency)}
+              </span>
+            )}
           </div>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950 dark:text-emerald-400 dark:group-hover:bg-emerald-500 dark:group-hover:text-white">
             <IconArrowRight className="h-4 w-4" />

@@ -81,7 +81,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm transition-transform group-hover:scale-105">
                 <IconTag className="h-4.5 w-4.5" />
               </span>
-              Oferta<span className="text-emerald-600">ço</span>
+              Ofertaço <span className="text-emerald-600">Radar</span>
             </Link>
             <div className="flex items-center gap-2">
               <nav className="flex items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70">
@@ -97,6 +97,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 Ofertas e Cupons
               </Link>
+              <Link
+                href="/#relampago"
+                className="hidden rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-amber-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800 sm:inline-block"
+              >
+                ⚡ Relâmpago
+              </Link>
               </nav>
               <ThemeToggle />
             </div>
@@ -110,7 +116,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
                   <IconTag className="h-4 w-4" />
                 </span>
-                Oferta<span className="text-emerald-600">ço</span>
+                Ofertaço <span className="text-emerald-600">Radar</span>
               </p>
               <p className="text-xs leading-relaxed text-zinc-400">
                 {SITE_NAME} é um site de ofertas com links de parceiro

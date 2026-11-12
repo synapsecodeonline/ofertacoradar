@@ -7,5 +7,5 @@ export function siteUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
-export const SITE_NAME = "Ofertaço";
+export const SITE_NAME = "Ofertaço Radar";
 export const SITE_TAGLINE = "Cupons e ofertas com desconto";

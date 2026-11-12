@@ -7,12 +7,14 @@ import { prisma } from "@/lib/db";
 import { maybeSync } from "@/lib/syncer";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
-import { categoryLabel } from "@/lib/categories";
+import { categoryLabel, canonicalCategory } from "@/lib/categories";
 import { siteUrl, SITE_NAME } from "@/lib/site";
 import CopyCoupon from "@/components/CopyCoupon";
 import CountdownTimer from "@/components/CountdownTimer";
 import ProductCard from "@/components/ProductCard";
-import { IconArrowRight, IconCheck, IconShield, IconTag } from "@/components/Icons";
+import { IconArrowRight, IconCheck, IconFlame, IconShield, IconTag } from "@/components/Icons";
+import ShareButtons from "@/components/ShareButtons";
+import BackButton from "@/components/BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +58,37 @@ export default async function ProductPage({
   after(() => maybeSync().catch(() => {}));
 
   const discount = discountPercent(product.price, product.oldPrice);
+  const saving =
+    product.price != null &&
+    product.oldPrice != null &&
+    product.oldPrice > product.price
+      ? product.oldPrice - product.price
+      : null;
   const urgent = urgencyLabel(product.endsAt);
   const showCountdown =
     // eslint-disable-next-line react-hooks/purity -- pagina e dinamica (force-dynamic)
     product.endsAt && product.endsAt.getTime() - Date.now() < 7 * 86_400_000;
+
+  // Prova social real: cliques registrados em /ir/[id]
+  const totalClicks = await prisma.click.count({
+    where: { productId: product.id },
+  });
+
+  // Razoes objetivas para comprar por aqui (todas derivadas de dados reais)
+  const reasons: string[] = [];
+  if (discount !== null && discount >= 10)
+    reasons.push(`${discount}% de desconto em relação ao preço original`);
+  if (saving !== null && saving >= 1)
+    reasons.push(`Economia de ${formatPrice(saving, product.currency)} agora`);
+  if (product.couponCode)
+    reasons.push(`Cupom ${product.couponCode} exclusivo para copiar`);
+  // eslint-disable-next-line react-hooks/purity -- pagina e dinamica (force-dynamic)
+  if (product.endsAt && product.endsAt.getTime() - Date.now() < 48 * 3_600_000)
+    reasons.push("Oferta termina nas próximas 48 horas");
+  if (product.merchant)
+    reasons.push(`Compra direta e segura na ${product.merchant}`);
+  if (totalClicks >= 3)
+    reasons.push(`${totalClicks} pessoas já aproveitaram esta oferta`);
 
   const prefix = product.externalId?.startsWith("camp:")
     ? "camp:"
@@ -134,7 +163,7 @@ export default async function ProductPage({
         {product.category ? (
           <>
             <Link
-              href={`/?categoria=${encodeURIComponent(product.category)}`}
+              href={`/?categoria=${encodeURIComponent(canonicalCategory(product.category))}`}
               className="transition-colors hover:text-emerald-600"
             >
               {categoryLabel(product.category)}
@@ -144,6 +173,9 @@ export default async function ProductPage({
         ) : null}
         <span className="max-w-56 truncate text-zinc-500">{product.title}</span>
       </nav>
+      <div className="-mt-3">
+        <BackButton />
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2 md:gap-10">
         <div className="relative aspect-square overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -175,7 +207,7 @@ export default async function ProductPage({
           <div className="flex flex-col gap-2.5">
           {product.category && (
             <Link
-              href={`/?categoria=${encodeURIComponent(product.category)}`}
+              href={`/?categoria=${encodeURIComponent(canonicalCategory(product.category))}`}
               className="w-fit rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
             >
               {categoryLabel(product.category)}
@@ -215,6 +247,20 @@ export default async function ProductPage({
             </div>
           )}
 
+          {saving !== null && saving >= 1 && (
+            <p className="w-fit rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              💰 Você economiza {formatPrice(saving, product.currency)}
+              {discount !== null ? ` (${discount}%)` : ""} com esta oferta
+            </p>
+          )}
+
+          {totalClicks >= 3 && (
+            <p className="flex w-fit items-center gap-1.5 text-sm font-bold text-orange-600 dark:text-orange-400">
+              <IconFlame className="h-4 w-4" />
+              {totalClicks} pessoas já aproveitaram esta oferta
+            </p>
+          )}
+
           {/* eslint-disable-next-line react-hooks/purity -- pagina e dinamica (force-dynamic) */}
           {product.endsAt && product.endsAt.getTime() > Date.now() && (
             <div className="flex flex-col gap-1.5">
@@ -246,6 +292,26 @@ export default async function ProductPage({
             </p>
           )}
           </div>
+
+          {/* Por que aproveitar agora */}
+          {reasons.length > 0 && (
+            <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+              <p className="mb-2.5 text-xs font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                Por que aproveitar agora
+              </p>
+              <ul className="flex flex-col gap-2">
+                {reasons.map((r) => (
+                  <li
+                    key={r}
+                    className="flex items-start gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                  >
+                    <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* CTA */}
           <div className="flex flex-col gap-3">
@@ -284,6 +350,37 @@ export default async function ProductPage({
               Link de parceiro — podemos receber comissão pela compra, sem custo
               extra para você.
             </p>
+            <ShareButtons
+              url={`${siteUrl()}/produto/${product.id}`}
+              title={product.title}
+            />
+            <div className="flex items-center gap-2">
+              <a
+                href={`/api/card/${product.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition-all hover:border-pink-300 hover:text-pink-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-pink-700"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-pink-500" aria-hidden>
+                  <rect x="3" y="3" width="18" height="18" rx="5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
+                Imagem p/ feed
+              </a>
+              <a
+                href={`/api/card/${product.id}?size=story`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition-all hover:border-pink-300 hover:text-pink-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-pink-700"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-pink-500" aria-hidden>
+                  <rect x="7" y="2" width="10" height="20" rx="2.5" />
+                  <path d="M11 18h2" />
+                </svg>
+                Imagem p/ story
+              </a>
+            </div>
           </div>
 
           {/* Como usar o cupom */}
@@ -323,7 +420,7 @@ export default async function ProductPage({
             </h2>
             {product.category && (
               <Link
-                href={`/?categoria=${encodeURIComponent(product.category)}`}
+                href={`/?categoria=${encodeURIComponent(canonicalCategory(product.category))}`}
                 className="text-sm font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
               >
                 Ver todas →

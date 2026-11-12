@@ -1,5 +1,6 @@
 import { prisma } from "../src/lib/db";
 import { discountPctOf } from "../src/lib/format";
+import { resolveCategory } from "../src/lib/categories";
 import {
   fetchFeed,
   fetchLomadeeBrands,
@@ -75,6 +76,11 @@ async function main() {
   let processed = 0;
   let failed = 0;
 
+  // Nome da organizacao afiliada serve de merchant quando a fonte nao informa
+  const orgNames = new Map(
+    orgs.filter((o) => o.name).map((o) => [o.organizationId, o.name!]),
+  );
+
   const upsertOne = async (p: (typeof products)[number]) => {
     const data = {
       title: p.title,
@@ -83,8 +89,8 @@ async function main() {
       price: p.price,
       oldPrice: p.oldPrice,
       discountPct: discountPctOf(p),
-      category: p.category,
-      merchant: p.merchant,
+      category: resolveCategory(p.category, p.title),
+      merchant: p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null,
       organizationId: p.organizationId ?? null,
       url: p.url,
       affiliateUrl: override ?? p.affiliateUrl ?? null,

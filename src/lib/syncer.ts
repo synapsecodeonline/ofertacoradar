@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { discountPctOf } from "./format";
+import { resolveCategory } from "./categories";
 import {
   fetchLomadeeBrandsPage,
   fetchLomadeeCampaignsPage,
@@ -20,7 +21,10 @@ const LOCK_STALE_MS = 3 * 60_000; // trava expira se o worker morrer
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function upsertByExternalId(p: NormalizedProduct) {
+async function upsertByExternalId(
+  p: NormalizedProduct,
+  merchantFallback?: string,
+) {
   const data = {
     title: p.title,
     description: p.description,
@@ -28,8 +32,8 @@ async function upsertByExternalId(p: NormalizedProduct) {
     price: p.price,
     oldPrice: p.oldPrice,
     discountPct: discountPctOf(p),
-    category: p.category,
-    merchant: p.merchant,
+    category: resolveCategory(p.category, p.title),
+    merchant: p.merchant ?? merchantFallback ?? null,
     organizationId: p.organizationId ?? null,
     url: p.url,
     affiliateUrl: p.affiliateUrl ?? null,
@@ -130,7 +134,10 @@ async function runCycle(apiKey: string, baseUrl: string) {
       const brand = c.organizationId ? brands.get(c.organizationId) : undefined;
       const n = normalizeLomadeeCampaign(c, brand);
       if (!n || !n.product.imageUrl) continue;
-      await upsertByExternalId(n.product).catch(() => {});
+      await upsertByExternalId(
+        n.product,
+        n.org?.organizationId ? brands.get(n.org.organizationId)?.name : undefined,
+      ).catch(() => {});
       if (n.org) {
         await prisma.affiliatedOrg
           .upsert({
@@ -161,6 +168,16 @@ async function runCycle(apiKey: string, baseUrl: string) {
     (await prisma.affiliatedOrg.findMany({ select: { organizationId: true } }))
       .map((o) => o.organizationId),
   );
+  // Nome da org afiliada vira merchant quando o catalogo nao informa
+  const orgNames = new Map(
+    (
+      await prisma.affiliatedOrg.findMany({
+        select: { organizationId: true, name: true },
+      })
+    )
+      .filter((o) => o.name)
+      .map((o) => [o.organizationId, o.name!]),
+  );
   if (orgIds.size === 0) {
     phase = "done";
     await prisma.syncState.update({
@@ -181,11 +198,14 @@ async function runCycle(apiKey: string, baseUrl: string) {
       ) {
         continue;
       }
-      await upsertByExternalId({
-        ...p,
-        externalId: `prod:${p.externalId}`,
-        affiliateUrl: undefined,
-      }).catch(() => {});
+      await upsertByExternalId(
+        {
+          ...p,
+          externalId: `prod:${p.externalId}`,
+          affiliateUrl: undefined,
+        },
+        p.organizationId ? orgNames.get(p.organizationId) : undefined,
+      ).catch(() => {});
     }
     if (items.length < 100) {
       phase = "done";
