@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["ofertacoradar"]
 }
 
 model Product {
@@ -32,6 +34,7 @@ model Product {
 
   @@index([category])
   @@index([active])
+  @@schema("ofertacoradar")
 }
 
 model Brand {
@@ -39,6 +42,8 @@ model Brand {
   name String
   logo String?
   site String?
+
+  @@schema("ofertacoradar")
 }
 
 model SyncState {
@@ -48,12 +53,16 @@ model SyncState {
   lastCycleAt  DateTime?
   busyAt       DateTime?
   orgsCleared  Boolean   @default(false)
+
+  @@schema("ofertacoradar")
 }
 
 model AffiliatedOrg {
   organizationId String   @id
   name           String?
   updatedAt      DateTime @updatedAt
+
+  @@schema("ofertacoradar")
 }
 
 model TrackedLink {
@@ -62,6 +71,8 @@ model TrackedLink {
   organizationId String
   shortUrl       String
   createdAt      DateTime @default(now())
+
+  @@schema("ofertacoradar")
 }
 
 model Click {
@@ -73,4 +84,5 @@ model Click {
   createdAt DateTime @default(now())
 
   @@index([productId])
+  @@schema("ofertacoradar")
 }
