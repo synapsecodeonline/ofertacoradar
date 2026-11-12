@@ -57,7 +57,7 @@ export async function GET(
 
   const fonts = await getFont().catch(() => []);
 
-  return new ImageResponse(
+  const image = new ImageResponse(
     (
       <div
         style={{
@@ -231,4 +231,11 @@ export async function GET(
       fonts: fonts.length ? fonts : undefined,
     },
   );
+
+  const headers = new Headers(image.headers);
+  headers.set(
+    "Content-Disposition",
+    `attachment; filename="oferta-${product.id}-${size}.png"`,
+  );
+  return new Response(image.body, { status: 200, headers });
 }
