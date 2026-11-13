@@ -25,6 +25,8 @@ async function upsertByExternalId(
   p: NormalizedProduct,
   merchantFallback?: string,
 ) {
+  const merchant = p.merchant ?? merchantFallback ?? null;
+  const category = resolveCategory(p.category, p.title, merchant);
   const data = {
     title: p.title,
     description: p.description,
@@ -32,9 +34,9 @@ async function upsertByExternalId(
     price: p.price,
     oldPrice: p.oldPrice,
     discountPct: discountPctOf(p),
-    category: resolveCategory(p.category, p.title),
-    subtype: resolveSubtype(resolveCategory(p.category, p.title), p.title),
-    merchant: p.merchant ?? merchantFallback ?? null,
+    category,
+    subtype: resolveSubtype(category, p.title),
+    merchant,
     organizationId: p.organizationId ?? null,
     url: p.url,
     affiliateUrl: p.affiliateUrl ?? null,

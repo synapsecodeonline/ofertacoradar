@@ -82,6 +82,9 @@ async function main() {
   );
 
   const upsertOne = async (p: (typeof products)[number]) => {
+    const merchant =
+      p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
+    const category = resolveCategory(p.category, p.title, merchant);
     const data = {
       title: p.title,
       description: p.description,
@@ -89,9 +92,9 @@ async function main() {
       price: p.price,
       oldPrice: p.oldPrice,
       discountPct: discountPctOf(p),
-      category: resolveCategory(p.category, p.title),
-      subtype: resolveSubtype(resolveCategory(p.category, p.title), p.title),
-      merchant: p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null,
+      category,
+      subtype: resolveSubtype(category, p.title),
+      merchant,
       organizationId: p.organizationId ?? null,
       url: p.url,
       affiliateUrl: override ?? p.affiliateUrl ?? null,

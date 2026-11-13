@@ -32,23 +32,31 @@ const esc = (s: string | null | undefined) =>
 async function main() {
   const products: {
     id: number; title: string; category: string | null; subtype: string | null;
+    merchant: string | null; organizationId: string | null;
   }[] = [];
   const PAGE = 2000;
   for (let off = 0; ; off += PAGE) {
     const rows = await sql(
-      `SELECT id, title, category, subtype FROM "ofertacoradar"."Product" ORDER BY id LIMIT ${PAGE} OFFSET ${off}`
+      `SELECT id, title, category, subtype, merchant, "organizationId" FROM "ofertacoradar"."Product" ORDER BY id LIMIT ${PAGE} OFFSET ${off}`
     );
     products.push(...rows);
     if (rows.length < PAGE) break;
   }
   console.log(`${products.length} produtos\n`);
 
+  const orgs = (await sql(
+    `SELECT "organizationId", name FROM "ofertacoradar"."AffiliatedOrg" WHERE name IS NOT NULL`
+  )) as { organizationId: string; name: string | null }[];
+  const orgNames = new Map(orgs.map((o) => [o.organizationId, o.name!]));
+  const merchantOf = (p: (typeof products)[number]) =>
+    p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
+
   // 1) Divergencias: valor gravado != valor recomputado pelo classificador atual
   const diffs: { id: number; title: string; cat: string; newCat: string; sub: string | null; newSub: string | null }[] = [];
   const nullSubByCat = new Map<string, number>();
   const totalByCat = new Map<string, number>();
   for (const p of products) {
-    const cat = resolveCategory(p.category, p.title) ?? "outros";
+    const cat = resolveCategory(p.category, p.title, merchantOf(p)) ?? "outros";
     const sub = resolveSubtype(cat, p.title);
     totalByCat.set(cat, (totalByCat.get(cat) ?? 0) + 1);
     if (!sub) nullSubByCat.set(cat, (nullSubByCat.get(cat) ?? 0) + 1);
@@ -75,7 +83,7 @@ async function main() {
   console.log("\n=== Amostras por categoria/subtipo ===");
   const byKey = new Map<string, string[]>();
   for (const p of products) {
-    const cat = resolveCategory(p.category, p.title) ?? "outros";
+    const cat = resolveCategory(p.category, p.title, merchantOf(p)) ?? "outros";
     const sub = resolveSubtype(cat, p.title);
     if (!sub) continue;
     const k = `${cat}/${sub}`;
@@ -83,7 +91,7 @@ async function main() {
     if (arr.length < 4) arr.push(p.title);
     byKey.set(k, arr);
   }
-  const cats = [...new Set(products.map((p) => resolveCategory(p.category, p.title) ?? "outros"))]
+  const cats = [...new Set(products.map((p) => resolveCategory(p.category, p.title, merchantOf(p)) ?? "outros"))]
     .sort((a, b) => (totalByCat.get(b) ?? 0) - (totalByCat.get(a) ?? 0))
     .slice(0, 20);
   for (const cat of cats) {

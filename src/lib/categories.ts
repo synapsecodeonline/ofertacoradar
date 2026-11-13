@@ -756,16 +756,90 @@ export function subtypeLabel(category: string, slug: string): string {
   return subtypesFor(category).find((d) => d.slug === slug)?.label ?? slug;
 }
 
+// ===== Lojas de vertical única =====
+// Para lojas que só vendem um tipo de produto, a vertical da loja é um
+// prior mais forte que palavras ambíguas do título ("aparador", "base",
+// "tênis"). Títulos de campanha ("Black November", "Cupom 10%") continuam
+// indo para "ofertas".
+const MERCHANT_NORM = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const MERCHANT_CATEGORY: Record<string, string> = {
+  "moveis carraro": "moveis",
+  "sofa na caixa": "moveis",
+  mobly: "moveis",
+  madeiramadeira: "moveis",
+  "anhanguera ferramentas": "ferramentas",
+  "ferramentas kennedy": "ferramentas",
+  "lojao dos esportes": "esporte-lazer",
+  "lauri esporte": "esporte-lazer",
+  decathlon: "esporte-lazer",
+  soulier: "calcados",
+  "seralle calcados": "calcados",
+  balaroti: "calcados",
+  "kidy calcados": "calcados-infantil",
+  "up kids": "moda-infantil",
+  brinox: "cozinha",
+  "mundo vem": "cozinha",
+  terabyte: "informatica",
+  pcyes: "informatica",
+  pichau: "informatica",
+  "xiaomi brasil": "celulares",
+  "moto br": "pecas-veiculos",
+  "vinicola jolimont": "alimentos-bebidas",
+  "china in box": "alimentos-bebidas",
+  "vapza alimentos": "alimentos-bebidas",
+  biovittare: "saude",
+  "cirurgica sinete": "saude",
+  eles: "saude",
+  "buddha spa": "beleza",
+  "revest acabamentos": "construcao",
+  "amakha paris": "perfumaria",
+  "camisaria colombo": "blusas",
+};
+
+export function merchantCategory(merchant?: string | null): string | null {
+  if (!merchant) return null;
+  const mn = MERCHANT_NORM(merchant);
+  if (!mn) return null;
+  const exact = MERCHANT_CATEGORY[mn];
+  if (exact) return exact;
+  // "BioVittare Farmácia de Manipulação" casa com a chave "biovittare"
+  for (const [k, slug] of Object.entries(MERCHANT_CATEGORY)) {
+    if (mn.startsWith(k + " ")) return slug;
+  }
+  return null;
+}
+
 // Resolve uma categoria de origem para a canonica; se desconhecida,
 // tenta classificar pelo titulo; fallback "outros".
-// A classificação por titulo vem PRIMEIRO para refinar categorias
-// amplas da fonte em filhas especificas.
-export function resolveCategory(raw: string | undefined | null, title?: string): string {
+// Loja de vertical única tem prioridade sobre o título; sem ela, a
+// classificação por titulo refina categorias amplas da fonte.
+export function resolveCategory(
+  raw: string | undefined | null,
+  title?: string,
+  merchant?: string | null,
+): string {
+  let titleSlug: string | null = null;
   if (title) {
     for (const [re, slug] of KEYWORDS) {
-      if (re.test(title)) return slug;
+      if (re.test(title)) {
+        titleSlug = slug;
+        break;
+      }
     }
   }
+  const mc = merchantCategory(merchant);
+  if (mc) {
+    if (titleSlug === "ofertas") return "ofertas";
+    return mc;
+  }
+  if (titleSlug) return titleSlug;
   if (raw) {
     const key = norm(raw);
     if (ALIAS[key]) return ALIAS[key];

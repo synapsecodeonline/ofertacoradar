@@ -57,10 +57,10 @@ async function main() {
 
   const updates: { id: number; category: string; subtype: string | null; merchant: string | null }[] = [];
   for (const p of products) {
-    const category = resolveCategory(p.category, p.title) ?? "outros";
-    const subtype = resolveSubtype(category, p.title);
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
+    const category = resolveCategory(p.category, p.title, merchant) ?? "outros";
+    const subtype = resolveSubtype(category, p.title);
     if (category !== p.category || subtype !== (p.subtype ?? null) || merchant !== p.merchant) {
       updates.push({ id: p.id, category, subtype, merchant });
     }
