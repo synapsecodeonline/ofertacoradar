@@ -17,7 +17,10 @@ export default function LoginForm() {
     setLoading(true);
     const supabase = createClient();
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
       if (error) {
         setError(error.message || "E-mail ou senha incorretos.");
       } else {
