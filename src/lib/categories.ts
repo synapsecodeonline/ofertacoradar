@@ -230,7 +230,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(c[aâ]mera|camera|gopro|filmadora|lente|drone|stabilizador|trip[eé]|monop[eé]|carregador de c[aâ]mera|bolsa de c[aâ]mera|selfie stick|gimbal|microfone de lapela|microfone shotgun|microfone condenser)\b/i, "fotografia"],
   [/\b(notebook|laptop|pc gamer|computador|monitor|teclado|mouse|ssd|hd externo|processador|placa de v[ií]deo|placa de som|placa de rede|placa de captura|placa m[aã]e|gabinete|all in one|macbook|chromebook|nobreak|no break|fonte atx|fonte 80 plus|cooler|water cooler|tablet|ipad|surface|perif[eé]ricos|webcam|headset|fone gamer|teclado mec[aâ]nico|mouse gamer|mouse sem fio|mouse bluetooth|monitor gamer|mem[oó]ria (ram|ddr)|placa de som|placa de rede)\b/i, "informatica"],
   [/\b(playstation|ps[45]|xbox|nintendo|switch|steam|jogo (ps|xbox|nintendo|de videogame|de console)|videogame|video game|controle (ps|xbox|nintendo|dualshock|dualsense|sem fio|bluetooth|usb|gamer|wireless|de videogame|de console|ps4|ps5)|joy-?con|dualshock|dualsense|cadeira gamer|mesa gamer|streaming|stream deck|capture card|elgato)\b/i, "games"],
-  [/\b(software|aplicativo|licen[cç]a|assinatura|plano|curso online|e-book|livro digital|template|wordpress|windows (10|11|7|8|server|pro|lt)|office 365|microsoft office|antiv[ií]rus|vpn|adobe|photoshop|illustrator|premiere pro|after effects|lightroom|indesign|autocad|solidworks|revit|sketchup|cinema 4d|blender 3d)\b/i, "software"],
+  [/\b(software|aplicativo|curso online|e-book|livro digital|template|wordpress|windows (10|11|7|8|server|pro|lt)|office 365|microsoft office|antiv[ií]rus|vpn|adobe|photoshop|illustrator|premiere pro|after effects|lightroom|indesign|autocad|solidworks|revit|sketchup|cinema 4d|blender 3d|licen[cç]a.{0,15}(windows|office|software|autocad|adobe|antiv[ií]rus|microsoft)|assinatura.{0,15}(anual|mensal|software|digital)|plano.{0,15}(assinatura|software))\b/i, "software"],
   [/\b(jogo de bingo|bingo|ludo|domin[oó]|domino|baralho|uno\b|trivial|impostor|catan|jogo de tabuleiro|jogos de tabuleiro|roleta|action figure|boneco|barbie|hot wheels|lego|playmobil|nerf|slime|massinha|brinquedo educativo|puzzle|rompecabezas|imaginext|baby alive|lol surprise|pokemon|yu-gi-oh|trading card|figura de a[cç][aã]o|funko|pop vinyl|bobblehead|chaveiro|quebra-cabe[cç]a|jogo de tabuleiro|brinquedo|pel[uú]cia)\b/i, "brinquedos"],
 
   // ===== Papelaria (cedo: mochila/estojo escolar etc.) =====
@@ -344,6 +344,7 @@ export const KEYWORDS: [RegExp, string][] = [
 
   // ===== Outros / genéricos =====
   [/\b(mala de viagem|mochila de viagem|mala de m[aã]o|bagagem|necessaire de viagem|passagem a[eé]rea|passagem aerea|hotel|pacote de viagem|resort|pousada|airbnb|cruzeiro|travesseiro de pesco[cç]o|travesseiro de viagem|neck pillow|capa de assento|organizador de mala|etiqueta de mala|cadeado de mala)\b/i, "viagem"],
+  [/\b(assinatura|plano (de assinatura|familiar|premium)|mensalidade|tag (de ped[aá]gio|de estacionamento)|sem parar|conectcar|veloe|auto [eé]dgetag|loca[cç][aã]o de carro|aluguel de carro|guincho|revis[aã]o (de|do|da|para)|manuten[cç][aã]o|instala[cç][aã]o|configura[cç][aã]o|suporte t[eé]cnico|assist[eê]ncia t[eé]cnica|formatura|cerimonial|buffet|decora[cç][aã]o de eventos|aula particular|aulas? particulares?|pacote de internet|plano de internet|fibra [oó]ptica)\b/i, "servicos"],
   [/\b(ingresso para show|show|festival|teatro|cinema|ingresso|ingressos|evento|evento online|congresso|workshop|stand up|com[eé]dia)\b/i, "eventos"],
   [/\b(instrumento musical|viol[aã]o|guitarra|teclado musical|microfone|caixa de som|mesa de som|interface de [aá]udio|violino|baixo|cajon|pandeiro|surdo|tamborim|reco-reco|agogo|tri[aâ]ngulo|cântaro)\b/i, "eletronicos"],
 ];
@@ -807,6 +808,7 @@ const MERCHANT_NORM = (s: string) =>
 const MERCHANT_CATEGORY: Record<string, string> = {
   "moveis carraro": "moveis",
   "sofa na caixa": "moveis",
+  "sem parar": "servicos",
   mobly: "moveis",
   madeiramadeira: "moveis",
   "anhanguera ferramentas": "ferramentas",
