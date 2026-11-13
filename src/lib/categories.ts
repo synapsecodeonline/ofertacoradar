@@ -242,14 +242,14 @@ export const KEYWORDS: [RegExp, string][] = [
   // ===== Química / fixação (cedo: termos específicos que aparecem em títulos de casa) =====
   [/\b(forma|assadeira|molde|esp[aá]tula|p[aá]|luva|tapete|escorredor|porta|copo|tigela|bowl|caneca|pote|frasco|recipiente) de silicone\b/i, "cozinha"],
   [/\b(adesivo|selante|resina|ep[oó]xi|loctite|silicone|cola|vedacit|desengripante|removedor|thinner|lubrificante|graxa|[oó]leo lubrificante|[oó]leo mineral|[oó]leo sintético|[oó]leo vegetal|[oó]leo de corte|anel de veda[cç][aã]o|vedante|gaxeta)\b/i, "quimica-industrial"],
-  [/\b(parafuso|porca|arruela|rebite|grampo|abra[cç]adeira|barra roscad[ao]?|barra rosquead[ao]?|chumbador|pino|trava|bucha|cavilha|espiral|tirante|parafuso sextavado|porca sextada|flange|pino cônico|pino c[oô]nico|pino paralelo|pino el[aá]stico|pino r[ií]gido|pino de press[aã]o|pino de reten[cç][aã]o|anel de reten[cç][aã]o|anilha|arruela de press[aã]o|arruela lisa|arruela dentada|arruela grower|arruela de segurança|arruela de pressão|bloco padr[aã]o|bloco de a[cç]o|bloco em a[cç]o|arame|arame farpado|bloco em v|bloco magn[eé]tico)\b/i, "fixacao-metalica"],
+  [/\b(parafuso|porca|arruela|rebite|grampo|abra[cç]adeira|barra roscad[ao]?|barra rosquead[ao]?|chumbador|pino|trava|bucha|cavilha|espiral|tirante|parafuso sextavado|porca sextada|flange|pino cônico|pino c[oô]nico|pino paralelo|pino el[aá]stico|pino r[ií]gido|pino de press[aã]o|pino de reten[cç][aã]o|anel de reten[cç][aã]o|anilha|arruela de press[aã]o|arruela lisa|arruela dentada|arruela grower|arruela de segurança|arruela de pressão|bloco padr[aã]o|bloco de a[cç]o|bloco em a[cç]o|arame|arame farpado|bloco em v|bloco magn[eé]tico|acoplamento|acoplador|engate r[aá]pido|conex[aã]o r[aá]pida|conex[aã]o pneumatica|fitting)\b/i, "fixacao-metalica"],
 
   // ===== Bateria por contexto (antes do fallback veicular) =====
   [/\bbateria (externa|port[aá]til|solar|estacion[aá]ria|lifepo|de lit[ií]o|selada|para camping|de camping)\b/i, "camping"],
   [/\bbateria (de|para|do|da) (c[aâ]mera|camera|drone|gopro)\b/i, "fotografia"],
   [/\bbateria (de|para|do|da) (celular|smartphone|fone|headset|smartwatch|fone bluetooth)\b/i, "celulares"],
   [/\bbateria (de|para|do|da) (notebook|tablet|controle|console|video ?game|videogame|pc|computador)\b/i, "informatica"],
-  [/\bbateria\b/i, "pecas-veiculos"],
+  [/\bbateria (automotiv|de carro|de moto|de caminh[aã]o|veicular|selada|estacion[aá]ria|de partida|de igni[cç][aã]o)|bateria \d{2,3}\s?(ah|volts?)|bateria (moura|heliar|willard|energit|aze|nok|yuasa|motobatt|shoto|nobreak)\b/i, "pecas-veiculos"],
 
   // ===== Promoções puras (banners) =====
   // ===== Banners ST_Network_Lomadee: a categoria vem em inglês no título =====
@@ -270,7 +270,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/lomadee.{0,40}\b(home|decor|kitchen)\b/i, "casa-decoracao"],
   [/lomadee.{0,40}\b(phones?|cellphones?|smartphones?)\b/i, "celulares"],
   [/lomadee.{0,40}\b(computers?|notebooks?|electronics?)\b/i, "informatica"],
-  [/\b(flash sale|% ?off|off em todo|tudo com at[eé]|liquida[cç][aã]o|queima de estoque|black friday|cyber monday|oferta rel[aâ]mpago|oferta do dia|promo[cç][aã]o rel[aâ]mpago|dia do cliente|dia das m[aã]es|dia dos pais|dia dos namorados|leve mais pague menos|novidade!|_lomadee|network_lomadee|\bbanner\b|cole[cç][aã]o (de|nova)|at[eé] \d{1,2}%)\b/i, "ofertas"],
+  [/\b(flash sale|% ?off|off em todo|tudo com at[eé]|liquida[cç][aã]o|queima de estoque|black friday|cyber monday|oferta rel[aâ]mpago|oferta do dia|promo[cç][aã]o rel[aâ]mpago|dia do cliente|dia das m[aã]es|dia dos pais|dia dos namorados|leve mais pague menos|novidade!|_lomadee|network_lomadee|\bbanner\b|cole[cç][aã]o (de|nova)|at[eé] \d{1,2}%|\bcupom\b|desconto|a partir de|frete gr[aá]tis|\bbazar\b|imperd[ií]vel|black (november|on black)|compre.{0,12}e ganhe|leve \d+ pague \d+)\b/i, "ofertas"],
 
   // ===== Moda =====
   [/\b(t[eê]nis de mesa|ping.?pong)\b/i, "esporte-lazer"],
@@ -282,10 +282,10 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(bola|bolas|raquete|raquetes|rede|campo|cancha|quadro|caneleira|apito|suporte|carro|cesto|tube|pressurizador|bomba).{0,20}t[eê]nis\b|\bt[eê]nis de (mesa|campo|cancha|duplas?|simples?|competi[cç][aã]o)\b|\bbola de t[eê]nis\b/i, "esporte-lazer"],
   [/\b(t[eê]nis|sapato|sand[aá]lia|sapat[eê]nis|scarpin|salto|rasteira|chinelo|papete|mocassim|loafer|oxford|dockside|sapatilha|tamanco|bota|coturno|botina|galocha|slipper|rasteirinha|anabela|cal[cç]ado|calcado|t[eê]nises?|sapatos?|sand[aá]lias?|sapat[eê]nises?|scarpins?|saltos?|rasteiras?|chinelos?|papetes?|mocassins?|loafers?|oxfords?|dockside|sapatilhas?|tamancos?|botas?|coturnos?|botinas?|galochas?|slippers?|rasteirinhas?|cal[cç]ados?)\b/i, "calcados"],
   [/\b(bolsa|mochila|pasta executiva|carteira|necessaire|pochete|riñonera|rinonera|crossbody|tiracolo|bolsas|mochilas|carteiras|necessaires|pochetes|riñoneras|rinoneras|pastas executivas|crossbodys|tiracolos)\b/i, "bolsas-mochilas"],
-  [/\b(joia|semi joia|semi-joia|rel[oó]gio|relogio|ter[cç]o|ros[aá]rio|amuleto|medalha|escapul[aá]rio|imagem religiosa|pingente|berloque|colar de ouro|brinco de ouro|anel de ouro|pulseira de ouro|joias|semi joias|rel[oó]gios|relogios|ter[cç]os|ros[aá]rios|amuletos|medalhas|escapul[aá]rios|pingentes|berloques)\b/i, "joias-relogios"],
+  [/\b(joia|semi joia|semi-joia|rel[oó]gio(?!\s+comparador)|relogio(?!\s+comparador)|ter[cç]o|ros[aá]rio|amuleto|medalha|escapul[aá]rio|imagem religiosa|pingente|berloque|colar de ouro|brinco de ouro|anel de ouro|pulseira de ouro|joias|semi joias|rel[oó]gios?(?!\s+comparador)|relogios(?!\s+comparador)|ter[cç]os|ros[aá]rios|amuletos|medalhas|escapul[aá]rios|pingentes|berloques)\b/i, "joias-relogios"],
   // Sinais fortes de bebê primeiro: "babador/bandana" não pode cair em acessórios de moda
   [/\b(babador|mamadeira|chupeta|fralda|fraldas|ber[cç]o|mois[eé]s|andador|sling|carrinho de beb[eê]|berço|bebe comfort|cercadinho|cercado|mamadeiras|chupetas|babadores|esterilizador|esterilizadora|tetina|bab[aá] eletr[oô]nica|bicos? anti-?c[oó]lica)\b/i, "bebe"],
-  [/\b(brinco|colar|pulseira|anel|piercing|tiara|presilha|grampos|amarrador de cabelo|scrunchie|cinto|chap[eé]u|bones?\b|chapeu|riñonera|rinonera|tornozeleira|broche|bijuteria|adere[cç]o|adereco|acess[oó]rio|acessorio|brincos|colares|pulseiras|aneis|piercings|tiaras|presilhas|amarradores de cabelo|scrunchies|cintos|chap[eé]us|bones|chapeus|riñoneras|rinoneras|tornozeleiras|broches|bijuterias|adere[cç]os|aderecos|acess[oó]rios|acessorios|bon[eé]|bandana|gorro|meia|meias|len[cç]o|lenco|cachecol|viseira|headband)\b/i, "acessorios-moda"],
+  [/\b(brinco|colar|pulseira|anel(?!\s+padr[aã]o)|piercing|tiara|presilha|grampos|amarrador de cabelo|scrunchie|cinto|chap[eé]u|bones?\b|chapeu|riñonera|rinonera|tornozeleira|broche|bijuteria|adere[cç]o|adereco|acess[oó]rio|acessorio|brincos|colares|pulseiras|aneis(?!\s+padr[aã]o)|piercings|tiaras|presilhas|amarradores de cabelo|scrunchies|cintos|chap[eé]us|bones|chapeus|riñoneras|rinoneras|tornozeleiras|broches|bijuterias|adere[cç]os|aderecos|acess[oó]rios|acessorios|bon[eé]|bandana|gorro|meia|meias|len[cç]o|lenco|cachecol|viseira|headband)\b/i, "acessorios-moda"],
   [/\b([oó]culos|oculos|lente de contato|oculos de sol|oculos de grau|oculos escuros)\b/i, "oculos"],
   [/\b(frada\b|fralda|mamadeira|chupeta|ber[cç]o|mois[eé]s|sling|andador|bab[aá] eletr[oô]nica|baba eletronica|esterilizador|esterilizadora|bico anti-?c[oó]lica|tetina|babador|copo de transi[cç][aã]o|copo de transicao|prato infantil|talher infantil|absorvente|fraldas|mamadeiras|chupetas|ber[cç]os|mois[eé]s|slinks|andadores|bab[aá]s eletr[oô]nicas|babes eletronicas|esterilizadores|esterilizadoras|tetinas|babadores|copos de transi[cç][aã]o|copos de transicao|pratos infantis|talheres infantis|absorbentes)\b/i, "bebe"],
   [/\b(feminino|feminina|woman|women|mo[cç]a|senhora|senhorita|femininos|femininas)\b/i, "moda-feminina"],
@@ -305,9 +305,9 @@ export const KEYWORDS: [RegExp, string][] = [
   // ===== Casa / eletro =====
   [/\b(ar.?condicionado|ar condicionado|split|ventilador|torre de ventila|aquecedor|climatizador|purificador de ar|umidificador|desumidificador|exaustor|circulador de ar|frio port[aá]til)\b/i, "climatizacao"],
   [/\b(air ?fryer|airfryer|fritadeira el[eé]trica|liquidificador|batedeira|cafeteira|micro.?ondas|cooktop|forno el[eé]trico|forno de embutir|panela de press[aã]o el[eé]trica|panela el[eé]trica|sorveteira|processador de alimentos|grill|sanduicheira|m[aá]quina de caf[eé]|m[aá]quina de espresso|nespresso|torradeira|juicer|extrator de suco|pipoqueira|churrasqueira el[eé]trica|grelhador|galeteira|panificadora|m[aá]quina de macarr[aã]o|chocolateira)\b/i, "eletro-cocina"],
-  [/\b(aspirador|lava.?lou[cç]as|ferro de passar|ferro el[eé]trico|lava roupas|m[aá]quina de lavar|secadora de roupas|mop el[eé]trico|vassoura el[eé]trica|aspirador rob[oô]|robo aspirador|escova el[eé]trica|cortador de grama|m[aá]quina de costura|overlock|m[aá]quina de bordar|seladora a v[aá]cuo|umidificador)\b/i, "eletro-limpeza"],
+  [/\b(aspirador|lava.?lou[cç]as|ferro de passar|ferro el[eé]trico|lava roupas|m[aá]quina de lavar|secadora de roupas|mop el[eé]trico|vassoura el[eé]trica|aspirador rob[oô]|robo aspirador|escova el[eé]trica|cortador de grama|m[aá]quina de costura|overlock|m[aá]quina de bordar|seladora a v[aá]cuo|umidificador|agitador para lava|pe[cç]a para lava)\b/i, "eletro-limpeza"],
   [/\b(lumin[aá]rias?|l[aâ]mpadas?|lustres?|arandelas?|spots?|plafons?|abajures?|fitas? de led|refletores?|painel de led|lumin[aá]ria de mesa|lumin[aá]ria de piso|lumin[aá]ria de teto|kit led|perfil de led|sensor de presen[cç]a|interruptor com sensor|dimmer|varais?|varal de ch[aã]o|tendedouros?)\b/i, "iluminacao"],
-  [/\b(jogo de cama|len[cç][oó]is?|fronhas?|travesseiros?|edredons?|cobertores?|mantas?|toalha de banho|toalhas?|tapetes?|cortinas?|persianas?|almofadas?|jogos? americanos?|guardanapos?|ta[cç]as?|copos?|canecas?|pires?|bule|leiteiras?|a[cç][uú]careras?|porta tempero|porta talheres|cestos?|capa de mesa|jogo de toalha|organizadora de cozinha|organizadoras de cozinha|porta guardanapo|portas? retrato|boleira|individual|americanas|a[cç]ucareir)\b/i, "textil-cama"],
+  [/\b(jogo de cama|len[cç][oó]is?|fronhas?|travesseiros?(?!\s+de\s+pesco)|edredons?|cobertores?|mantas?|toalha de banho|toalhas?|tapetes?|cortinas?|persianas?|almofadas?|jogos? americanos?|guardanapos?|ta[cç]as?|copos?|canecas?|pires?|bule|leiteiras?|a[cç][uú]careras?|porta tempero|porta talheres|cestos?|capa de mesa|jogo de toalha|organizadora de cozinha|organizadoras de cozinha|porta guardanapo|portas? retrato|boleira|individual|americanas|a[cç]ucareir|travesseiros?(?!\s+de\s+pesco))/i, "textil-cama"],
   [/\b(organizador|organizadora|prateleira|nicho|cesto organizador|caixa organizadora|sapateira|closet|porta chaves|porta documentos|caixa de ferramentas|maleta de ferramentas|mala de ferramentas|estojo de ferramentas)\b/i, "organizacao"],
   [/\b(sof[aá]s?|poltronas?|mesas? de (jantar|centro|lateral)|cama box|colch[oõ]es?|guarda-roupas?|arm[aá]rios?|c[oô]modas?|estantes?|racks?|painel para tv|painel para televis[aã]o|escrivaninhas?|cadeiras?|cadeira de escrit[oó]rio|cadeira gamer|sof[aá] retr[aá]til|puffs?|banquetas?|bancos?|balc[aã]o|aparador(es)?|bufet|buf[eê]|criados? mudo|cabeceiras?|ber[cç]os?|bercos?|mois[eé]s|bebe comfort|balan[cç]os?|cadeira de balan[cç]o|redinhas?|playgrounds?|cercadinhos?|cercados?|tapetes? para beb[eê]|carrinhos? de beb[eê]|a[eé]reo de canto|mesa de canto|aereo de canto)\b/i, "moveis"],
   [/\b(quadros?|vasos? decorativos?|terr[aá]rios?|enfeites?|decora[cç][aã]o|decorativos?|candlesticks?|lousas?|espelhos? decorativos?|quadros? decorativos?|telas? decorativas?|sanfonados?|cordas?|sininhos? decorativos?|cestinhas?|cestos? decorativos?|suporte para plantas|cachep[oô]s?|arranjos? florais?|bico de papagaio|flores? artificiais?|galhos? decorativos?|pedras? decorativas?|portas? retrato|arvore de natal|árvore de natal|pres[ée]pios?|bandeiras?|banderinhas?|crisantemos?|rosas|girassois?|tulipas?|orqu[ií]deas?|astromelias?|margaridas?|cravos?|jasmim|lavandas?|hort[eê]nsias?|pe[oô]nias?|d[áa]lias?|l[ií]rios?|costela de ad[aã]o|suculentas?|cactos? artificiais?|painel decorativo|quadro decorativo|ampulheta|ampulhetas)\b/i, "decoracao"],
@@ -316,7 +316,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(panelas?|jogo de panelas|frigideiras?|assadeiras?|forma de bolo|utens[ií]lios?|talheres?|jogos? americanos?|garrafa t[eé]rmica|potes? herm[eé]ticos?|lixeiras?|dispensadores?|escorredores?|t[aá]buas? de corte|churrasqueiras?|descascadores?|rala queijos?|espremedores?|facas?|jogo de facas|tabuas?|t[aá]buas?|potes?|recipientes?|marmitas?|lancheiras?|garrafas?|squeezes?|canudos?|copos? americanos?|copos? de whisky|ta[cç]as? de vinho|jogo de vinho|coolers?|caixas? t[eé]rmicas?|bolsas? t[eé]rmicas?|kits? churrasco|espetos?|grelhas?|formas?|ramequins?|tigelas?|saladeiras?|travessas?|aparelho de jantar|jogo de jantar|malga|cestos? de p[aã]o|panificadora|p[aã]o de queijo|bandejas?|baldes?|abridor|abridor de latas|descascador de legumes|ralador|ralador de queijo|cortador|fatiador|cortador de frios|saca.?rolha|abridor de garrafas|escorredor de massa|passa legumes|ralador de alimentos|bicos? dosadores?|dosador(es)? (de|para) (vinagre|[oó]leo|molho|l[ií]quido|[aá]gua))\b/i, "cozinha"],
   [/\b(cama|colch[oõ]es?|guarda-roupas?|arm[aá]rios?|c[oô]modas?|estantes?|racks?|painel para tv|painel para televis[aã]o|escrivaninhas?|sof[aá]s?|poltronas?|mesas? de (jantar|centro|lateral)|cadeiras?|puffs?|banquetas?|bancos?|balc[aã]o|aparador(es)?|bufet|buf[eê]|criados? mudo|cabeceiras?|ber[cç]os?|bercos?|mois[eé]s|bebe comfort|balan[cç]os?|playgrounds?|cercadinhos?|cercados?)\b/i, "moveis"],
   [/\b(espelhos?|quadros?|lumin[aá]rias?|l[aâ]mpadas?|cortinas?|tapetes?|almofadas?|jogo de cama|toalhas?|organizador|vasos?|decorativo|decorac[aã]o|candlestick|terr[aá]rio|enfeite|portas? retrato)\b/i, "casa-decoracao"],
-  [/\b(fog[aã]o|geladeira|freezer|micro.?ondas|airfryer|liquidificador|batedeira|cafeteira|lavadora|secadora|aspirador|purificador|umidificador|ventilador|ar condicionado|aquecedor|ferro de passar|climatizador|torre de ventila|desumidificador|circulador de ar|exaustor|frio port[aá]til|boiler|bebedouro|refrigerador|frigor[ií]fico)\b/i, "eletrodomesticos"],
+  [/\b(fog[aã]o|geladeira|freezer|micro.?ondas|airfryer|liquidificador|batedeira|cafeteira|lavadora|secadora|aspirador|purificador|umidificador|ventilador|ar condicionado|aquecedor|ferro de passar|climatizador|torre de ventila|desumidificador|circulador de ar|exaustor|frio port[aá]til|boiler|bebedouro|refrigerador|frigor[ií]fico|abastecedor de gelo|dispensador de [aá]gua)\b/i, "eletrodomesticos"],
 
   // ===== Esportes =====
   [/\b(bicicleta ergom[eé]trica|esteira|halter|halteres|anilha|el[aá]stico|kit treino|corda de pular|abdominal|crossfit|gin[aá]stica|yoga|pilates|peso|barra de peso|banco de supino|supino|rosca|extensora|mesa flexora|leg press|leg extension|leg curl|crossover|puxada|remada|crucifixo|desenvolvimento|panturrilha|stiff|afundo|avanco|agachamento|terra|hip thrust|gluteo|gl[uú]teo|costas|b[ií]ceps|tr[ií]ceps|ombro|peito|abdomen|core|circuito|treino|fitness|academia|gym|bodybuilding|muscula[cç][aã]o|suplemento|whey|creatina|bcaa|glutamina|pr[eé]-treino|termog[eê]nico|col[aá]geno|beta alanina|cafe[ií]na|hipercal[oó]rico|albumina|zma|magn[eé]sio|melatonina|5-htp|dmha|vitaminas e minerais|agilidade|argola de agilidade|bola de agilidade|escada de agilidade|kit agilidade|barra fixa|barra de porta|espaldeira)\b/i, "fitness"],
@@ -334,16 +334,16 @@ export const KEYWORDS: [RegExp, string][] = [
   // ===== Industrial / construção =====
   [/\b(disjuntor|contator|rel[eé]|sinaleiro|borne|cabo el[eé]trico|fio (el[eé]trico|de cobre|de alum[ií]nio|flex[ií]vel)|fios? el[eé]tricos?|fita isolante|interruptor|tomada|dr|varistor|capacitor|resistor|transformador|fonte (12v|24v|48v|chaveada|atx|at)|balizador|dimmer|fotoc[eé]lula)\b/i, "eletrica"],
   [/\b(bomba|motor|compressor|motobomba|pressurizador|atuador|soprador|motor el[eé]trico|motor trif[aá]sico|motor monof[aá]sico|motor de indu[cç][aã]o|motor s[ií]ncrono|motor ass[ií]ncrono|motor de corrente contínua|motor de corrente alternada)\b/i, "bombas-motores"],
-  [/\b(paqu[ií]metro|micr[oô]metro|rel[oó]gio comparador|comparador|trena digital|mult[ií]metro|amper[ií]metro|volt[ií]metro|dinam[oô]metro|balan[cç]a de precis[aã]o|instrumento de medi[cç][aã]o|n[ií]vel digital|n[ií]vel a laser|n[ií]vel de bolha|anem[oô]metro|anemometro|watt[ií]metro|wattimetro|meg[oô]hmetro|megohmetro|alicate amper[ií]metro|alicate.{0,20}(amp|amper|mult[ií]metro|terr[oô]metro|trena)|medidor de (energia|vaz[aã]o|press[aã]o))\b/i, "medicao-precisao"],
+  [/\b(paqu[ií]metros?|micr[oô]metros?|rel[oó]gio comparador|comparador|trena digital|mult[ií]metros?|amper[ií]metros?|volt[ií]metros?|dinam[oô]metros?|balan[cç]as? de precis[aã]o|instrumentos? de medi[cç][aã]o|n[ií]veis? (digital|a laser|de bolha)|inclin[oô]metros?|esquadros?|anem[oô]metros?|anemometros?|watt[ií]metros?|wattimetros?|meg[oô]hmetros?|megohmetros?|alicate amper[ií]metro|alicates?.{0,20}(amp|amper|mult[ií]metro|terr[oô]metro|trena)|medidores? de (energia|vaz[aã]o|press[aã]o)|blocos? padr[aã]o|blocos? padrao|an[eé]l(is|es)?\s+padr[aã]o|aneis?\s+padrao|gabaritos?|analisador de gases|detector de (g[aá]s|gas)|alavanca.{0,20}comparador|aferidor|r[ée]guas? de a[cç]o|r[ée]guas? de aco)\b/i, "medicao-precisao"],
   [/\b(tinta|tinta spray|pincel|rolo de pintura|verniz|massa corrida|selador|impermeabilizante|corante|tinta acr[ií]lica|tinta l[aá]tex|thinner|tinta ep[oó]xi|tinta poliuretano)\b/i, "tinta-pintura"],
-  [/\b(tinta|pincel|rolo de pintura|massa corrida|selador|impermeabilizante|cimento|argamassa|telha|tijolo|drywall|gesso|verniz|resina ep[oó]xi|assento.{0,25}(sanit|vaso|bacia|termofixo|soft.?close)|vaso sanit[aá]rio|vaso sanitario|bacia|lou[cç]as?|metais? sanit[aá]rios|caixa de descarga|ducha|hidraulica|hidr[aâ]ulica|torneira|misturador|chuveiro|cubas?|janelas?|esquadria|blindex|porta de correr|engate espiga|adaptador.{0,20}mangueira|adaptador.{0,10}compress[aã]o|conex[aã]o.{0,10}compress[aã]o|abastecedor de gelo|agitador para lava|bloco de (espuma|concreto|cimento|areia))\b/i, "construcao"],
+  [/\b(tinta|pincel|rolo de pintura|massa corrida|selador|impermeabilizante|cimento|argamassa|telha|tijolo|drywall|gesso|verniz|resina ep[oó]xi|assento.{0,25}(sanit|vaso|bacia|termofixo|soft.?close)|vaso sanit[aá]rio|vaso sanitario|bacia|lou[cç]as?|metais? sanit[aá]rios|caixa de descarga|ducha|hidraulica|hidr[aâ]ulica|torneira|misturador|chuveiro|cubas?|janelas?|esquadria|blindex|porta de correr|engate espiga|adaptador.{0,20}mangueira|adaptador.{0,10}compress[aã]o|conex[aã]o.{0,10}compress[aã]o|bloco de (espuma|concreto|cimento|areia))\b/i, "construcao"],
   [/\b(planta|vaso de planta|terra vegetal|semente|regador|mangueira|grama|adubo|rede de descanso|rede de dormir|cortador de grama|piscina)\b/i, "jardim"],
   [/\b(furadeira|parafusadeira|serra|chave de fenda|trena|n[ií]vel|betoneira|compressor|solda|ferramenta|jogo de chaves|alicate|martelo|lima|arquivos?|banco de trabalho|bancada|torno|fresa|broca|escareador|reamer|macho|tarraxa|cossinete|morsa|bigorna|marreta|amolador|chaira|esmeril|esmerilhadeira|ma[cç]arico|ma[cç]arico de corte|ma[cç]arico de solda|ma[cç]arico de corte plasma|ma[cç]arico de corte oxicorte|ma[cç]arico de solda mig|ma[cç]arico de solda tig|ma[cç]arico de solda eletrodo|ma[cç]arico de solda arco|biseladora|curvador de (tubo|cano)|desentupidor|bedame|a[cç]o r[aá]pido|bico de limpeza|bico.{0,15}(extratora|lava jato))\b/i, "ferramentas"],
   [/\b(instrumento musical|viol[aã]o|guitarra|teclado musical|microfone|caixa de som|mesa de som|interface de [aá]udio)\b/i, "eletronicos"],
   [/\b(ind[uú]stria|equipamento industrial|m[aá]quina industrial|componente eletr[oô]nico|placa de circuito|sensor|motor el[eé]trico|motor industrial|motor trif[aá]sico|motor monof[aá]sico|motor de indu[cç][aã]o|motor s[ií]ncrono|motor ass[ií]ncrono|motor de corrente contínua|motor de corrente alternada)\b/i, "industria"],
 
   // ===== Outros / genéricos =====
-  [/\b(mala de viagem|mochila de viagem|mala de m[aã]o|bagagem|necessaire de viagem|passagem a[eé]rea|passagem aerea|hotel|pacote de viagem|resort|pousada|airbnb|cruzeiro)\b/i, "viagem"],
+  [/\b(mala de viagem|mochila de viagem|mala de m[aã]o|bagagem|necessaire de viagem|passagem a[eé]rea|passagem aerea|hotel|pacote de viagem|resort|pousada|airbnb|cruzeiro|travesseiro de pesco[cç]o|travesseiro de viagem|neck pillow|capa de assento|organizador de mala|etiqueta de mala|cadeado de mala)\b/i, "viagem"],
   [/\b(ingresso para show|show|festival|teatro|cinema|ingresso|ingressos|evento|evento online|congresso|workshop|stand up|com[eé]dia)\b/i, "eventos"],
   [/\b(instrumento musical|viol[aã]o|guitarra|teclado musical|microfone|caixa de som|mesa de som|interface de [aá]udio|violino|baixo|cajon|pandeiro|surdo|tamborim|reco-reco|agogo|tri[aâ]ngulo|cântaro)\b/i, "eletronicos"],
 ];
@@ -370,6 +370,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "saias", label: "Saias", re: /saia|saias|skirt/i },
   ],
   calcados: [
+    { slug: "inserts-ortopedicos", label: "Inserts e Ortopédicos", re: /apoio plantar|palmilha|insole|ortop|joelheira|cotoveleira|tornozeleira|protetor de (joelho|cotovelo|tornozelo)/i },
     { slug: "tenis", label: "Tênis", re: /t[eê]nis|sneaker|runner|sport|skate|chunky/i },
     { slug: "sandalias-chinelos", label: "Sandálias e Chinelos", re: /sand[aá]lia|chinelo|papete|rasteira|flatform|anabela|havaianas|ipanema|slipper|mule/i },
     { slug: "sapatos-social", label: "Sapatos Sociais", re: /sapato|scarpin|oxford|mocassim|loafer|peep|salto|stiletto|social|escrit[oó]rio|anabela|sand[aá]lia de salto/i },
@@ -400,6 +401,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "looks-acessorios", label: "Looks e Acessórios", re: /look|outfit|moda|fashion|estampad|listrad|roupa|vestuario|confec/i },
   ],
   "moda-feminina": [
+    { slug: "bodies-pijamas", label: "Bodies e Pijamas", re: /\bbody\b|pijama|camisola|neglige|shorty|calcinha|suti[aã]|top cropped/i },
     { slug: "social-formal", label: "Social e Formal", re: /social|formatura|casamento|elegante|sofisticado|executivo/i },
     { slug: "casual-cotidiano", label: "Casual e Cotidiano", re: /casual|dia a dia|confort|b[aá]sico|essential|essential/i },
     { slug: "moda-praia", label: "Moda Praia", re: /praia|biqu[ií]ni|sunga|canga|ver[aã]o|verao/i },
@@ -455,6 +457,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "limpeza-skincare", label: "Limpeza e Máscaras", re: /micelar|demaquilante|gel de limpeza|m[aá]scara|sheet mask|sleeping mask|balsamo|limpeza/i },
   ],
   perfumaria: [
+    { slug: "decants-miniaturas", label: "Decants e Miniaturas", re: /insp\.?|inspirad|decant|miniatura|refil|travel size|\b\d{2,3}\s?ml\b/i },
     { slug: "masculino", label: "Masculino", re: /masculino|col[oô]nia masculina|desodorante masculino/i },
     { slug: "feminino", label: "Feminino", re: /feminino|col[oô]nia feminina|desodorante feminino|body splash/i },
     { slug: "importados-nicho", label: "Importados e Nicho", re: /[aá]rabe|oud|[aá]mbar|vetiver|moschino|importado|nicho|frag[aâ]ncia/i },
@@ -477,6 +480,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "primeiros-socorros", label: "Primeiros Socorros", re: /curativo|gaze|soro fisiol[oó]gico|compressa|banda|bandagem|kit primeiros socorros|antiss[eé]ptico|protetor|epi\b/i },
     { slug: "monitoramento", label: "Monitoramento", re: /term[oô]metro|glicos[ií]metro|press[aã]o|ox[ií]metro|gravidez|monitor|frequ[eê]ncia/i },
     { slug: "higiene-saude", label: "Higiene e Saúde", re: /higiene|absorbente|protetor|higi[eê]nico|limpeza|desinfetante/i },
+    { slug: "fitoterapicos-supplements", label: "Fitoterápicos e Suplementos", re: /magn[eé]sio|probiótico|probiotico|lactobacilo|gaba|melatonina|col[aá]geno|ashwagandha|rhodiola|cordyceps|tribulus|long jack|zembrin|panax|ginseng|alecrim|passiflora|valeriana|infus[aã]o|c[aá]psula|capsula|sache|sticks?|por por[cç][aã]o|ansiedade|estresse|libido|fadiga mental/i },
   ],
   suplementos: [
     { slug: "whey-proteina", label: "Whey e Proteína", re: /whey|prote[ií]na|protein|albumina|mass gainer|hipercal[oó]rico/i },
@@ -494,11 +498,13 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
   ],
   cozinha: [
     { slug: "panelas-assadeiras", label: "Panelas e Assadeiras", re: /panela|frigideira|assadeira|forma de bolo|leiteira|wok|grill|ca[cç]arola|panela de press[aã]o/i },
-    { slug: "utensilios-talheres", label: "Utensílios e Talheres", re: /utens[ií]lio|talher|faca|tabua|descascador|ralador|espremedor|abridor|saca.?rolha|fatiador|cortador|passa legumes|escorredor|colher|pegador|esp[aá]tula|dosador|aerador|batedor|bandeja|peneira|coador|funil|medidor|bico dosador|ralo|porta papel|porta guardanapo/i },
+    { slug: "utensilios-talheres", label: "Utensílios e Talheres", re: /utens[ií]lio|talher|faca|tabua|descascador|ralador|espremedor|abridor|saca.?rolha|fatiador|cortador|passa legumes|escorredor|colher|pegador|esp[aá]tula|dosador|aerador|batedor|bandeja|peneira|coador|funil|medidor|bico dosador|ralo|porta papel|porta guardanapo|amassador|ramequins?|espremedor de batata|ralador de legumes|cortador de frios|escorredor de massa|kit cozinha/i },
+    { slug: "descansos-trivets", label: "Descansos e Trivets", re: /almofada|descanso|trivet|jogo americano|individual|americanas|tapete de silicone|forro de silicone|jogo de silicone|base de silicone/i },
     { slug: "copos-taças", label: "Copos e Taças", re: /copo|ta[cç]a|caneca|x[ií]cara|xicara|jarra|garrafa (t[eé]rmica|de vidro|de vinho|para vinho)|squeeze|cooler|copo americano|kit copos|pires|bule/i },
     { slug: "organizacao-cozinha", label: "Organização", re: /organizador|porta|dispensador|lixeira|cesto|cabide|porta tempero|porta talheres|organizadora|balde|porta papel|porta guardanapo/i },
   ],
   "eletrodomesticos": [
+    { slug: "bebedouros-agua", label: "Bebedouros e Água", re: /bebedouro|boiler|purificador de [aá]gua|dispensador de [aá]gua|[aá]gua mineral|garraf[aã]o|abastecedor de gelo|m[aá]quina de gelo/i },
     { slug: "refrigeracao", label: "Refrigeração", re: /geladeira|freezer|frigor[ií]fico|frigo|refrigerador/i },
     { slug: "lavanderia", label: "Lavanderia", re: /lavadora|secadora|lavar|tanquinho|m[aá]quina de lavar/i },
     { slug: "cozinha-eletro", label: "Cozinha Elétrica", re: /fog[aã]o|fogao|cozinha|forno|cooktop|micro-?ondas|airfryer|fritadeira/i },
@@ -513,7 +519,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
   ],
   "eletro-limpeza": [
     { slug: "aspiradores", label: "Aspiradores", re: /aspirador|robo aspirador|vassoura el[eé]trica|mop el[eé]trico|escova el[eé]trica/i },
-    { slug: "lavagem", label: "Lavagem", re: /lava.?lou[cç]as|lava roupas|m[aá]quina de lavar|secadora/i },
+    { slug: "lavagem", label: "Lavagem", re: /lava.?lou[cç]as|lava roupas|m[aá]quina de lavar|secadora|agitador|pe[cç]a para lava/i },
     { slug: "costura-passadoria", label: "Costura e Passadoria", re: /m[aá]quina de costura|overlock|m[aá]quina de bordar|ferro de passar|ferro el[eé]trico|central de passar/i },
     { slug: "selagem-outros", label: "Selagem e Outros", re: /seladora|umidificador|desumidificador|cortador de grama/i },
   ],
@@ -592,10 +598,15 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
   ],
   // --- Esportes ---
   "esporte-lazer": [
+    { slug: "torcidas-fandom", label: "Torcidas e Fandom", re: /bandeira|banderinha|torcida|time|futebol club|flamengo|corinthians|palmeiras|s[aã]o paulo|vasco|gr[eê]mio|gremio|internacional|atl[eé]tico|atletico|cruzeiro|santos|bahia|fortaleza|chapecoense|sport recife|cuiab[aá]|juventude|ponte preta|vila nova|camisa de time|faixa|barrinha|torcedor|fandom|manto|escudo/i },
+    { slug: "moda-esportiva", label: "Moda Esportiva", re: /blus[aã]o|blusao|bermuda|cal[cç]a jogger|shorts|camisa|regata|legging|jaqueta|corta vento|agasalho|uniforme|moletom|conjunto|look|body|suti[aã]|calcinha|top\b|bermudas/i },
+    { slug: "arbitragem", label: "Arbitragem", re: /apito|cart[aã]o|cartao|bandeirinha|arbitragem|cron[oô]metro|cronometro/i },
+    { slug: "lazer-jogos", label: "Jogos e Lazer", re: /bingo|jogo de tabuleiro|domin[oó]|domino|baralho|roleta|dardo|sinuca|bilhar|cassino|p[oô]quer|poker|truco|xadrez|jogo/i },
+    { slug: "equipamentos-ginastica", label: "Equipamentos", re: /agulha de bomba|bomba de ar|man[oô]metro|manometro|press[aã]o de bola|pressao de bola|anel tonificador|tonificador|argola|escada|kit agilidade|cones?|pratos?|estacas?|discos?|colchonete|abdominal|step|banco|suporte/i },
     { slug: "bolas", label: "Bolas", re: /bola|bolas|futebol|basquete|v[oô]lei|handebol|t[eê]nis|badminton|squash|frescobol/i },
     { slug: "raquetes", label: "Raquetes e Mesa", re: /raquete|t[eê]nis de mesa|ping.?pong|badminton|squash|frescobol|t[eê]nis/i },
     { slug: "patins-skate", label: "Patins e Skate", re: /patins|skate|longboard|penny|hoverboard|patinete|monociclo|casco/i },
-    { slug: "boxe-martial", label: "Boxe e Artes Marciais", re: /boxe|muay thai|jiu-?jitsu|karat[eê]|jud[oô]|taekwondo|luva de boxe|bandagem|protetor bucal|shin guard|canel[eê]ira/i },
+    { slug: "boxe-martial", label: "Boxe e Artes Marciais", re: /boxe|muay thai|jiu-?jitsu|karat[eê]|jud[oô]|taekwondo|luva de boxe|bandagem|protetor bucal|shin guard|canel[eê]ira|aparador de (soco|chute|punct)|saco de pancada|speed bag|heavy bag|pun[cç]h|chuteira|luva de muay|protetor de canela/i },
     { slug: "academia-rua", label: "Academia de Rua", re: /halter|anilha|barra|crossfit|calistenia|street workout|banco de supino|el[aá]stico|corda de pular|abdominal|kit treino|yoga|pilates/i },
   ],
   "esporte-infantil": [
@@ -627,7 +638,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "eletrica-auto", label: "Elétrica Automotiva", re: /bateria|alternador|motor de arranque|sinaleiro|rel[eé]|filtro|sensor|bobina|igni[cç][aã]o|sonda lambda|sensor de oxig[eê]nio|vela de igni[cç][aã]o/i },
     { slug: "carroceria-exterior", label: "Carroceria e Exterior", re: /parachoque|para-choque|farol|lanterna|retrovisor|radiador|grade|cap[oô]|para-lama|espelho|protetor de (motor|tanque|carenagem|quadro|carroceria)|quebra vento|capa de moto|hitch|engate.{0,25}(reboque|trailer|carro|moto|implemento|carreta)|reboque/i },
     { slug: "pneus-rodas", label: "Pneus e Rodas", re: /pneu|pneus|aro|roda|calota|estepe|macaco|tri[aâ]ngulo|cubo de roda|rodado/i },
-    { slug: "acessorios-moto", label: "Acessórios de Moto", re: /bagageiro|bauleto|ba[uú]leto|alforje|top.?case|mala para moto|protetor de carenagem|protetor de quadro|capa de moto|protetor de tanque|bolsa|bag|maleta/i },
+    { slug: "acessorios-moto", label: "Acessórios de Moto", re: /bagageiro|bauleto|ba[uú]leto|alforje|alforge|top.?case|mala para moto|protetor de carenagem|protetor de quadro|capa de moto|protetor de tanque|bolsa|bag|maleta|cavalete|guid[aã]o|guidao|antena|afogador|afastador|ampliador|al[cç]a (esportiva|lateral|traseira|para moto|de moto)|sissy|estaca|corta linha|linha pipa|aranha trançada|aranha trancada|rede el[aá]stica|pedaleira|protetor de (moto|quadro|tanque|carenagem|escapamento|motor|para-?lama)|quebra vento|bolsa t[eé]rmica|mochila t[eé]rmica|suporte de celular|suporte para celular|caixa de ferramentas|kit ferramentas/i },
   ],
   automotivo: [
     { slug: "cuidados-limpeza", label: "Cuidados e Limpeza", re: /cera|polidor|shampoo|detalhante|limpador|shampoo automotivo|couro|cheiro|odorizador|lavagem|selante|silicone|adesivo/i },
@@ -635,6 +646,10 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "seguranca-tecnologia", label: "Segurança e Tecnologia", re: /c[aâ]mera|sensor|alarme|rastreador|multim[ií]dia|tela|som|central|receptor|antena|desemba[cç]ador|cerca|alarme/i },
   ],
   ferramentas: [
+    { slug: "adesivos-selantes", label: "Adesivos e Selantes", re: /adesivo|cola|loctite|ep[oó]xi|poxy|silicone|vedacit|selante|trava rosca|cianoacrilato|vedação|vedacao/i },
+    { slug: "fixacao-conectores", label: "Fixação e Conectores", re: /abra[cç]adeira|conector|adaptador|engate|bucha|parafuso|rebite|grampo|perfil|chapa|terminal|bornes?|conex[aã]o|conexao|flange|abrazadeira/i },
+    { slug: "aplicadores", label: "Aplicadores", re: /agulha|aplicador|bico aplicador|cartucho|seringa|pistola aplicadora/i },
+    { slug: "consumiveis", label: "Consumíveis", re: /disco|lixa|ponta|bits?|l[aâ]mina|lamina|palheta|esponja|estopa|arame|solda|flange|disco de corte|disco de desbaste|bit\b/i },
     { slug: "acessorios-ferramentas", label: "Acessórios", re: /broca|disco|lixa|ponta|bits?|acess[oó]rio|maleta|estojo|organizador/i },
     { slug: "furadeiras-parafusadeiras", label: "Furadeiras e Parafusadeiras", re: /furadeira|parafusadeira|impacto|martelo|furadeira de impacto/i },
     { slug: "serras-cortes", label: "Serras e Cortes", re: /serra|serra circular|serrote|cut-?off|sabre|rec[ií]proca|jigsaw|biseladora|desentupidor|bedame|a[cç]o r[aá]pido/i },
@@ -672,8 +687,8 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "balancas-medidores", label: "Balanças e Medidores", re: /balan[cç]a de precis[aã]o|dinam[oô]metro|medidor|anem[oô]metro|medidor de energia|medidor de vaz[aã]o|medidor de press[aã]o|man[oô]metro/i },
   ],
   construcao: [
-    { slug: "materiais", label: "Materiais de Construção", re: /cimento|argamassa|telha|tijolo|drywall|gesso|bloco|areia|brita|concreto|impermeabilizante/i },
-    { slug: "loucas-sanitarias", label: "Louças e Metais Sanitários", re: /assento|bacia|vaso sanit[aá]rio|vaso sanitario|dec[aá]l|docol|tupan|lou[cç]a|sanit[aá]rio|chuveiro|torneira|misturador|registro|v[aá]lvula|valvula|monocomando|ralo|caixa de descarga|ducha|bid[eê]|pia|cubas?|metais sanit[aá]rios|griferia|acabamento.{0,25}(chuveiro|torneira|registro|v[aá]lvula|valvula|monocomando|sanit[aá]rio)/i },
+    { slug: "materiais", label: "Materiais de Construção", re: /cimento|argamassa|telha|tijolo|drywall|gesso|bloco|areia|brita|concreto|impermeabilizante|pisos?|porcelanato|cer[aâ]mica|revestimento|pavifloor|azulejo|porcelanas?/i },
+    { slug: "loucas-sanitarias", label: "Louças e Metais Sanitários", re: /assento|bacia|vaso sanit[aá]rio|vaso sanitario|dec[aá]l|docol|tupan|lou[cç]a|sanit[aá]rio|chuveiro|torneira|misturador|registro|v[aá]lvula|valvula|monocomando|ralo|caixa de descarga|ducha|bid[eê]|pia|cubas?|metais sanit[aá]rios|griferia|acabamento.{0,30}(cromado|universal|metais|sanit)|metais? (coloridos?|sanit)/i },
     { slug: "hidraulica", label: "Hidráulica", re: /cano|tubo|joelho|luva|registro|torneira|adaptador|sif[aã]o|caixa d'?[aá]gua|reservat[oó]rio/i },
     { slug: "acabamento", label: "Acabamento", re: /massa corrida|selador|verniz|impermeabilizante|resina ep[oó]xi|cola para azulejo|rejunte|argamassa|textura|tinta|acr[ií]lico|suvinil|ripado|painel|forro|sanca|moldura|rodap[eé]|rodape/i },
   ],
@@ -703,6 +718,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
     { slug: "conservas", label: "Conservas", re: /conserva|atum|sardinha|palmito|milho|ervilha|vagem|nhoque|ravioli|sorvete|picol[eé]/i },
   ],
   "alimentos-bebidas": [
+    { slug: "mercearia-pantry", label: "Mercearia", re: /arroz|feij[aã]o|a[cç][uú]car|batata|[oó]leo|sal\b|farinha|macarr[aã]o|caf[eé]|ch[aá]|temper|condimento|molho|extrato de tomate|milho|ervilha|atum|sardinha|conserva|enlatado|azeite|vinagre|pimenta|or[eé]gano|manjeric[aã]o|cominho|louro|colorau|shoyu|tempero/i },
     { slug: "cervejas", label: "Cervejas", re: /cerveja|chopp|pilsen|ipa|stout|craft|cerveja artesanal/i },
     { slug: "vinhos-licores", label: "Vinhos e Licores", re: /vinho|espumante|licor|destilado|whisky|vodka|gin|rum|cacha[cç]a|tequila|champagne|prosecco|sake|saqu[eê]|bourbon|scotch|mezcal|raicilla|sotol|bacanora|agave|vinho tinto/i },
     { slug: "refrigerantes-sucos", label: "Refrigerantes e Sucos", re: /refrigerante|suco|energ[eé]tico|[aá]gua|cerveja artesanal|kit churrasco|espumante|destilado|licor|rum|cacha[cç]a|tequila|champagne|prosecco|sake|saqu[eê]|bourbon|scotch|mezcal|raicilla|sotol|bacanora|agave/i },
@@ -721,6 +737,7 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
   ],
   // --- Outros ---
   papelaria: [
+    { slug: "livros", label: "Livros", re: /livro|romance|biografia|autobiografia|literatura|edi[cç][aã]o|isbn|autor|editora|s[eé]rie|volume \d|capa dura|brochura|romance/i },
     { slug: "cadernos-blocos", label: "Cadernos e Blocos", re: /caderno|bloco|agenda|planner|caderno inteligente|sketchbook/i },
     { slug: "canetas-material", label: "Canetas e Material", re: /caneta|marca-texto|lapiseira|borracha|apontador|corretivo|regua|tesoura|cola branca|silicone escolar/i },
     { slug: "mochilas-estojos", label: "Mochilas e Estojos", re: /mochila|estojo|lancheira|pasta|mala direta|mochila escolar|lancheira escolar/i },
@@ -852,6 +869,21 @@ export function merchantCategory(merchant?: string | null): string | null {
 
 // Resolve uma categoria de origem para a canonica; se desconhecida,
 // tenta classificar pelo titulo; fallback "outros".
+// Categorias cujo sinal do título é inequívoco (produto concreto: bolsa,
+// livro, detergente, furadeira...). Nessas, uma palavra clara do título
+// vence a vertical da loja — evita que uma loja de calçados "arraste" uma
+// bolsa, um livro ou um adesivo industrial para Calçados.
+const TITLE_STRONG: ReadonlySet<string> = new Set([
+  "limpeza-higiene", "alimentos-bebidas", "supermercado", "mercearia",
+  "bebe", "brinquedos", "papelaria", "viagem", "eventos", "servicos",
+  "pets", "saude", "suplementos", "bolsas-mochilas", "oculos", "joias-relogios",
+  "eletronicos", "informatica", "celulares", "games", "fotografia",
+  "software", "tv-audio", "eletrodomesticos", "eletro-cocina",
+  "eletro-limpeza", "climatizacao",
+  "quimica-industrial", "fixacao-metalica", "eletrica", "medicao-precisao",
+  "bombas-motores", "construcao", "tinta-pintura", "ferramentas", "jardim",
+]);
+
 // Loja de vertical única tem prioridade sobre o título; sem ela, a
 // classificação por titulo refina categorias amplas da fonte.
 export function resolveCategory(
@@ -871,6 +903,9 @@ export function resolveCategory(
   const mc = merchantCategory(merchant);
   if (mc) {
     if (titleSlug === "ofertas") return "ofertas";
+    if (titleSlug && titleSlug !== mc && TITLE_STRONG.has(titleSlug)) {
+      return titleSlug;
+    }
     return mc;
   }
   if (titleSlug) return titleSlug;
