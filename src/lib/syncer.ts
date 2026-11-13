@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { discountPctOf } from "./format";
-import { resolveCategory } from "./categories";
+import { resolveCategory, resolveSubtype } from "./categories";
 import {
   fetchLomadeeBrandsPage,
   fetchLomadeeCampaignsPage,
@@ -33,6 +33,7 @@ async function upsertByExternalId(
     oldPrice: p.oldPrice,
     discountPct: discountPctOf(p),
     category: resolveCategory(p.category, p.title),
+    subtype: resolveSubtype(resolveCategory(p.category, p.title), p.title),
     merchant: p.merchant ?? merchantFallback ?? null,
     organizationId: p.organizationId ?? null,
     url: p.url,

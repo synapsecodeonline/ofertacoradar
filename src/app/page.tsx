@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { maybeSync } from "@/lib/syncer";
 import ProductCard from "@/components/ProductCard";
 import SearchBar from "@/components/SearchBar";
-import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor } from "@/lib/categories";
+import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypesFor } from "@/lib/categories";
 import {
   IconCheck,
   IconFlame,
@@ -66,10 +66,13 @@ export async function generateMetadata() {
 }
 
 export default async function Home({ searchParams }: PageProps<"/">) {
-  const { q, categoria, aba, pagina, ordem, loja } = await searchParams;
+  const { q, categoria, aba, pagina, ordem, loja, tipo } = await searchParams;
   const query = typeof q === "string" ? q : "";
   const rawCat = typeof categoria === "string" ? categoria : "";
   const category = rawCat ? canonicalCategory(rawCat) : "";
+  const rawSub = typeof tipo === "string" ? tipo : "";
+  const subDefs = subtypesFor(category);
+  const subtype = subDefs.some((d) => d.slug === rawSub) ? rawSub : "";
   const tab = aba === "ofertas" ? "ofertas" : "produtos";
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
@@ -99,6 +102,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       notExpired,
       { imageUrl: { not: null } },
       category ? { category: { in: rawSlugsFor(category) } } : {},
+      category && subtype ? { subtype } : {},
       merchant
         ? { merchant: { equals: merchant, mode: "insensitive" as const } }
         : {},
@@ -240,6 +244,37 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       (CATEGORY_ORDER.indexOf(a) + 1 || 999) -
       (CATEGORY_ORDER.indexOf(b) + 1 || 999),
   );
+
+  // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
+  const subtypeCounts = new Map<string, number>();
+  if (subDefs.length) {
+    const facets = await prisma.product.groupBy({
+      by: ["subtype"],
+      where: {
+        active: true,
+        subtype: { not: null },
+        AND: [
+          tab === "ofertas" ? isOffer : isCatalogProduct,
+          notZeroPrice,
+          notExpired,
+          { imageUrl: { not: null } },
+          { category: { in: rawSlugsFor(category) } },
+          merchant
+            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
+            : {},
+          searchFilter,
+        ],
+      },
+      _count: { _all: true },
+    });
+    for (const f of facets) {
+      if (f.subtype) subtypeCounts.set(f.subtype, f._count._all);
+    }
+  }
+  // Mostra so subtipos com itens; o subtipo ativo sempre aparece (mesmo zerado)
+  const visibleSubs = subDefs.filter(
+    (d) => (subtypeCounts.get(d.slug) ?? 0) > 0 || d.slug === subtype,
+  );
   const merchantList = merchants
     .map((m) => m.merchant)
     .filter((m): m is string => !!m)
@@ -250,6 +285,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     const p = new URLSearchParams();
     if (query) p.set("q", query);
     if (category) p.set("categoria", category);
+    if (category && subtype) p.set("tipo", subtype);
     if (merchant) p.set("loja", merchant);
     p.set("aba", tab);
     const defaultSort = tab === "ofertas" ? "desconto" : "recentes";
@@ -624,18 +660,66 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               {
                 slug: "",
                 label: "Todas",
-                href: qs({ categoria: "" }),
+                href: qs({ categoria: "", tipo: "" }) + "#catalogo",
                 active: !category,
               },
               ...categoryList.map((cat) => ({
                 slug: cat,
                 label: categoryLabel(cat),
-                href: qs({ categoria: cat }),
+                href: qs({ categoria: cat, tipo: "" }) + "#catalogo",
                 active: category === cat,
               })),
             ]}
           />
         </div>
+      )}
+
+      <div id="catalogo" className="scroll-mt-20">
+      {category && visibleSubs.length > 0 && (
+        <nav
+          aria-label="Tipos de produto"
+          className="mb-5 flex flex-wrap items-center gap-2"
+        >
+          <span className="text-[11px] font-extrabold uppercase tracking-widest text-zinc-400">
+            Tipo:
+          </span>
+          <Link
+            href={qs({ tipo: "" }) + "#catalogo"}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              !subtype
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-zinc-200 bg-white text-zinc-600 hover:border-emerald-400 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-emerald-400"
+            }`}
+          >
+            Todos
+          </Link>
+          {visibleSubs.map((d) => {
+            const count = subtypeCounts.get(d.slug) ?? 0;
+            const active = subtype === d.slug;
+            return (
+              <Link
+                key={d.slug}
+                href={qs({ tipo: d.slug }) + "#catalogo"}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:border-emerald-400 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-emerald-400"
+                }`}
+              >
+                {d.label}
+                <span
+                  className={`rounded-full px-1.5 py-px text-[10px] font-bold leading-none ${
+                    active
+                      ? "bg-white/25 text-white"
+                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}
+                >
+                  {count}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
       )}
 
       {items.length === 0 ? (
@@ -668,6 +752,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           </main>
         </>
       )}
+      </div>
 
       {tab === "produtos" && (page > 1 || hasNextPage) && (
         <nav className="flex items-center justify-center gap-4 pb-12 text-sm">

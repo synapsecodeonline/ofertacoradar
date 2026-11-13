@@ -1,6 +1,6 @@
 import { prisma } from "../src/lib/db";
 import { discountPctOf } from "../src/lib/format";
-import { resolveCategory } from "../src/lib/categories";
+import { resolveCategory, resolveSubtype } from "../src/lib/categories";
 import {
   fetchFeed,
   fetchLomadeeBrands,
@@ -90,6 +90,7 @@ async function main() {
       oldPrice: p.oldPrice,
       discountPct: discountPctOf(p),
       category: resolveCategory(p.category, p.title),
+      subtype: resolveSubtype(resolveCategory(p.category, p.title), p.title),
       merchant: p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null,
       organizationId: p.organizationId ?? null,
       url: p.url,

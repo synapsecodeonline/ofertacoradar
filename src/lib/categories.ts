@@ -327,6 +327,423 @@ const KEYWORDS: [RegExp, string][] = [
   [/\b(instrumento musical|viol[aã]o|guitarra|teclado musical|microfone|caixa de som|mesa de som|interface de [aá]udio|violino|baixo|cajon|pandeiro|surdo|tamborim|reco-reco|agogo|tri[aâ]ngulo|cântaro)\b/i, "eletronicos"],
 ];
 
+// ===== Subtipos: refino dentro de cada categoria canonica =====
+// Primeiro match vence; sem match -> null (aparece apenas em "Todos").
+export interface SubtypeDef {
+  slug: string;
+  label: string;
+  re: RegExp;
+}
+
+const SUBTYPES: Record<string, SubtypeDef[]> = {
+  // --- Moda ---
+  blusas: [
+    { slug: "jaquetas-casacos", label: "Jaquetas e Casacos", re: /jaqueta|casaco|parka|blazer|couro|corta vento|bomber|puffer|trench|blus[aã]o|\bover\b|\bcoat\b/i },
+    { slug: "moletom-tricot", label: "Moletom e Tricô", re: /moletom|hoodie|su[eé]ter|tricot|cardigan|canguru|mock/i },
+    { slug: "camisetas-blusas", label: "Camisetas e Blusas", re: /camiseta|regata|camisa|blusa|top|body|polera|t[uú]nica|cropped|decote/i },
+  ],
+  calcas: [
+    { slug: "jeans-denim", label: "Jeans e Denim", re: /jeans|denim|mom|wide leg|flare|bootcut|cargo|saruel|rasgado/i },
+    { slug: "leggings-pants", label: "Leggings e Pants", re: /legging|flare|capri|pantacourt|culotte|midi|palazzo|wide|reta|slim/i },
+    { slug: "shorts-bermudas", label: "Shorts e Bermudas", re: /shorts|bermuda|bermudas/i },
+    { slug: "saias", label: "Saias", re: /saia|saias|skirt/i },
+  ],
+  calcados: [
+    { slug: "tenis", label: "Tênis", re: /t[eê]nis|sneaker|runner|sport|skate|chunky/i },
+    { slug: "sandalias-chinelos", label: "Sandálias e Chinelos", re: /sand[aá]lia|chinelo|papete|rasteira|flatform|anabela|havaianas|ipanema|slipper|mule/i },
+    { slug: "sapatos-social", label: "Sapatos Sociais", re: /sapato|scarpin|oxford|mocassim|loafer|peep|salto|stiletto|social|escrit[oó]rio|anabela|sand[aá]lia de salto/i },
+    { slug: "botas", label: "Botas e Coturnos", re: /bota|coturno|botina|galocha|ankle|over knee/i },
+  ],
+  "calcados-infantil": [
+    { slug: "sandalias-tenis", label: "Sandálias e Tênis", re: /sand[aá]lia|t[eê]nis|sapatenis|sapat[eê]nis/i },
+    { slug: "sandalias-outros", label: "Outros Calçados", re: /chinelo|papete|bota|sapato|rasteirinha|sapatilha|tamanco|galocha/i },
+  ],
+  "moda-praia": [
+    { slug: "biquini-sunga", label: "Biquíni e Sunga", re: /biqu[ií]ni|sunga|cavada|mai[oô]|sa[ií]da de praia|canga/i },
+    { slug: "cover-ups", label: "Cover Ups e Acessórios", re: /cover|pare[oô]|t[uú]nica|camiseta de praia|sa[ií]da/i },
+  ],
+  "moda-praia-infantil": [
+    { slug: "biquini-sunga", label: "Biquíni e Sunga", re: /biqu[ií]ni|sunga|cavada|mai[oô]/i },
+    { slug: "roupas-praia", label: "Roupas de Praia", re: /bermuda|shorts|camiseta|body|cal[cç]a|sa[ií]da|praia/i },
+  ],
+  lingerie: [
+    { slug: "conjuntos", label: "Conjuntos", re: /conjunto|kit|lingerie/i },
+    { slug: "pijamas", label: "Pijamas e Sleeps", re: /pijama|camisola|sleepwear|descanso|moletom|negligee|baby doll/i },
+    { slug: "calcinhas-sutias", label: "Calcinhas e Sutiãs", re: /calcinha|sutia|body|short|hot pant|meia cal[cç]a|push up/i },
+  ],
+  "moda-infantil": [
+    { slug: "vestidos-conjuntos", label: "Vestidos e Conjuntos", re: /vestido|conjunto|macac[aã]o|jardineira|body|saia/i },
+    { slug: "calcas-shorts", label: "Calças e Shorts", re: /cal[cç]a|shorts|bermuda|legging|jeans|denim/i },
+    { slug: "blusas-camisetas", label: "Blusas e Camisetas", re: /blusa|camisa|camiseta|regata|moletom|hoodie|top|body|pijama|camisola/i },
+    { slug: "moda-praia", label: "Moda Praia", re: /biqu[ií]ni|sunga|praia|canga|mai[oô]/i },
+    { slug: "looks-acessorios", label: "Looks e Acessórios", re: /look|outfit|moda|fashion|estampad|listrad|roupa|vestuario|confec/i },
+  ],
+  "moda-feminina": [
+    { slug: "social-formal", label: "Social e Formal", re: /social|formatura|casamento|elegante|sofisticado|executivo/i },
+    { slug: "casual-cotidiano", label: "Casual e Cotidiano", re: /casual|dia a dia|confort|b[aá]sico|essential|essential/i },
+    { slug: "moda-praia", label: "Moda Praia", re: /praia|biqu[ií]ni|sunga|canga|ver[aã]o|verao/i },
+    { slug: "looks-estampados", label: "Looks e Estampados", re: /look|outfit|moda|fashion|estampad|listrad|xadrez|floral|confec|boutique|vestuario/i },
+  ],
+  "moda-masculina": [
+    { slug: "social-escritorio", label: "Social e Escritório", re: /social|escrit[oó]rio|formal|terno|suit|sarja|alfaiataria/i },
+    { slug: "casual-esporte", label: "Casual e Esporte", re: /casual|esporte|street|urban|jeans|denim|cargo|sarja/i },
+    { slug: "looks-moda", label: "Looks e Moda", re: /look|outfit|moda|fashion|estampad|listrad|confec|vestuario/i },
+  ],
+  vestidos: [
+    { slug: "por-ocasiao", label: "Por Ocasião", re: /casamento|formatura|festa|casual|anivers[aá]rio|cerim[oô]nia|boho|praia/i },
+    { slug: "estilo-caimento", label: "Estilo e Caimento", re: /midi|longuete|mini|m[aá]xi|maxi|rodado|flare|justo|solto|decote|al[cç]a|manga|tomara que caia|babado|assim[eé]trico/i },
+  ],
+  "bolsas-mochilas": [
+    { slug: "bolsas", label: "Bolsas", re: /bolsa|pochete|riñonera|rinonera|crossbody|tiracolo|necessaire|pasta executiva/i },
+    { slug: "mochilas", label: "Mochilas", re: /mochila|backpack|mochila escolar|mochila de viagem/i },
+    { slug: "carteiras-cases", label: "Carteiras e Cases", re: /carteira|porta documentos|porta-cart[oõ]es|case|porta celular/i },
+  ],
+  "acessorios-moda": [
+    { slug: "chapéus-bones", label: "Chapéus e Bones", re: /chap[eé]u|bone|bon[eé]|gorro|touca|viseira|bucket|fedora|panama|bucket/i },
+    { slug: "bijuterias", label: "Bijuterias", re: /brinco|colar|pulseira|anel|bijuteria|piercing|tiara|broche|grampos|scrunchie|amarrador|pingente/i },
+    { slug: "cintos-carteiras", label: "Cintos e Carteiras", re: /cinto|carteira|porta-cart[oõ]es|porta documentos|case|porta-chaves/i },
+    { slug: "lenços-cachecóis", label: "Lenços e Cachecóis", re: /len[cç]o|lenco|cachecol|bandana|xale|estola|gorro|meia|meias|headband/i },
+  ],
+  oculos: [
+    { slug: "sol", label: "Óculos de Sol", re: /sol|aviador|ray-?ban|wayfarer|espelhado|polarizado/i },
+    { slug: "grau", label: "Óculos de Grau", re: /grau|receita|filtro azul|anti-?reflexo|anti reflexo|progressivo|bifocal|fotochromic/i },
+  ],
+  "joias-relogios": [
+    { slug: "brincos-colares", label: "Brincos e Colares", re: /brinco|colar|pingente|berloque|choker|gargantilha|brincos|colares/i },
+    { slug: "aneis-pulseiras", label: "Anéis e Pulseiras", re: /anel|pulseira|tornozeleira|aneis|pulseiras/i },
+    { slug: "relogios", label: "Relógios", re: /rel[oó]gio|relogio|smartwatch|watch/i },
+    { slug: "terços-religiosos", label: "Terços e Religiosos", re: /ter[cç]o|terco|ros[aá]rio|rosario|amuleto|medalha|imagem religiosa|escapul[aá]rio/i },
+  ],
+  // --- Beleza ---
+  maquiagem: [
+    { slug: "labios", label: "Lábios", re: /batom|gloss|balm labial|protetor labial|lip/i },
+    { slug: "olhos", label: "Olhos", re: /r[ií]mel|delineador|sombra|c[ií]lios|lash|brow|sobrancelha|extensor/i },
+    { slug: "rosto", label: "Rosto", re: /base|corretivo|blush|iluminador|p[oó]|compacto|primer|fixador|contour|contorno|bb cream|protetor solar/i },
+    { slug: "unhas", label: "Unhas", re: /esmalte|vidro de unhas|top coat|base coat|removedor|cuticle|gel/i },
+    { slug: "kits-acessorios", label: "Kits e Acessórios", re: /kit|pincel|esponja|necessaire|makeup|make/i },
+  ],
+  cabelo: [
+    { slug: "shampoo-condicionador", label: "Shampoo e Condicionador", re: /shampoo|xampu|condicionador|creme para pentear/i },
+    { slug: "tratamentos", label: "Tratamentos", re: /m[aá]scara|progressiva|botox|cronograma|finalizador|[oó]leo capilar|hidratante|serum|leave in|tratamento/i },
+    { slug: "modeladores", label: "Modeladores", re: /chapinha|prancha|modelador|escova modeladora|babyliss|cachos/i },
+    { slug: "acessorios-cabelo", label: "Acessórios", re: /pente|escova|touca|el[aá]stico|presilha|grampos|gorros|tiara/i },
+  ],
+  skincare: [
+    { slug: "facial", label: "Facial", re: /s[eé]rum|hidratante|protetor solar|[aá]cido|vitamina c|niacinamida|retinol|t[oô]nico|ess[eê]ncia|bb cream|cc cream|dermocosm[eé]tico/i },
+    { slug: "corporal", label: "Corporal", re: /corporal|esfoliante|sabonete|creme corporal|protetor corporal/i },
+    { slug: "limpeza-skincare", label: "Limpeza e Máscaras", re: /micelar|demaquilante|gel de limpeza|m[aá]scara|sheet mask|sleeping mask|balsamo|limpeza/i },
+  ],
+  perfumaria: [
+    { slug: "masculino", label: "Masculino", re: /masculino|col[oô]nia masculina|desodorante masculino/i },
+    { slug: "feminino", label: "Feminino", re: /feminino|col[oô]nia feminina|desodorante feminino|body splash/i },
+    { slug: "importados-nicho", label: "Importados e Nicho", re: /[aá]rabe|oud|[aá]mbar|vetiver|moschino|importado|nicho|frag[aâ]ncia/i },
+    { slug: "colonias-desodorantes", label: "Colônias e Desodorantes", re: /col[oô]nia|colonia|desodorante|body splash|eau de|perfume/i },
+  ],
+  "beleza-infantil": [
+    { slug: "higiene", label: "Higiene e Banho", re: /sabonete|shampoo|higiene|banho|higi[eê]nico|wipes|toalha/i },
+    { slug: "skincare-corporal", label: "Skincare e Corporal", re: /creme|hidratante|protetor solar|repelente|pomada|dermatol[oó]gico/i },
+    { slug: "cabelo", label: "Cabelo", re: /cabelo|shampoo|condicionador|modelador|finalizador/i },
+  ],
+  saude: [
+    { slug: "remedios-otc", label: "Remédios e OTC", re: /rem[eé]dio|medicamento|antibi[oó]tico|anti-inflamat[oó]rio|analg[eé]sico|dorflex|anti-al[eé]rgico|anti-histam[ií]nico|antif[uú]ngico|gen[eé]rico|similar/i },
+    { slug: "primeiros-socorros", label: "Primeiros Socorros", re: /curativo|gaze|soro fisiol[oó]gico|compressa|banda|bandagem|kit primeiros socorros|antiss[eé]ptico|protetor|epi\b/i },
+    { slug: "monitoramento", label: "Monitoramento", re: /term[oô]metro|glicos[ií]metro|press[aã]o|ox[ií]metro|gravidez|monitor|frequ[eê]ncia/i },
+    { slug: "higiene-saude", label: "Higiene e Saúde", re: /higiene|absorbente|protetor|higi[eê]nico|limpeza|desinfetante/i },
+  ],
+  suplementos: [
+    { slug: "whey-proteina", label: "Whey e Proteína", re: /whey|prote[ií]na|protein|albumina|mass gainer|hipercal[oó]rico/i },
+    { slug: "creatina-bcaa", label: "Creatina e BCAA", re: /creatina|bcaa|glutamina|beta alanina|cafe[ií]na|pr[eé]-?treino/i },
+    { slug: "vitaminas-minerais", label: "Vitaminas e Minerais", re: /vitamina|multivitam[ií]nico|mineral|col[aá]geno|magn[eé]sio|zma|melatonina|5-htp/i },
+    { slug: "emagrecimento", label: "Emagrecimento e Queima", re: /termog[eê]nico|emagrecimento|apetite|akkerm|fibra|psyllium|dmha/i },
+  ],
+  // --- Casa ---
+  moveis: [
+    { slug: "sofa-poltrona", label: "Sofá e Poltrona", re: /sof[aá]|poltrona|puff|reclin[aá]vel|retr[aá]til/i },
+    { slug: "cama-colchao", label: "Cama e Colchão", re: /cama|colch[aã]o|colchao|box|beliche|solteiro|casal|ber[cç]o|berco|guarda-roupa|arm[aá]rio/i },
+    { slug: "mesa-cadeira", label: "Mesas e Cadeiras", re: /mesa|cadeira|escrivaninha|banco|banqueta|balc[aã]o|balcao|rack|home office/i },
+    { slug: "armario-estante", label: "Armários e Estantes", re: /arm[aá]rio|armario|guarda-roupa|closet|estante|aparador|buf[eê]|criado|c[oô]moda|comoda|rack/i },
+    { slug: "quarto-bebe", label: "Quarto de Bebê", re: /ber[cç]o|berco|mois[eé]s|cercadinho|carrinho de beb[eê]|bebe comfort|balan[cç]o|playground|redinha/i },
+  ],
+  cozinha: [
+    { slug: "panelas-assadeiras", label: "Panelas e Assadeiras", re: /panela|frigideira|assadeira|forma de bolo|leiteira|wok|grill|ca[cç]arola|panela de press[aã]o/i },
+    { slug: "utensilios-talheres", label: "Utensílios e Talheres", re: /utens[ií]lio|talher|faca|tabua|descascador|ralador|espremedor|abridor|saca.?rolha|fatiador|cortador|passa legumes|escorredor|colher|pegador|esp[aá]tula|dosador/i },
+    { slug: "copos-taças", label: "Copos e Taças", re: /copo|ta[cç]a|caneca|x[ií]cara|xicara|jarra|garrafa|squeeze|cooler|copo americano|kit copos|pires|bule/i },
+    { slug: "organizacao-cozinha", label: "Organização", re: /organizador|porta|dispensador|lixeira|cesto|cabide|porta tempero|porta talheres|organizadora/i },
+  ],
+  "eletrodomesticos": [
+    { slug: "refrigeracao", label: "Refrigeração", re: /geladeira|freezer|frigor[ií]fico|frigo|refrigerador/i },
+    { slug: "lavanderia", label: "Lavanderia", re: /lavadora|secadora|lavar|tanquinho|m[aá]quina de lavar/i },
+    { slug: "cozinha-eletro", label: "Cozinha Elétrica", re: /fog[aã]o|fogao|cozinha|forno|cooktop|micro-?ondas|airfryer|fritadeira/i },
+    { slug: "preparacao", label: "Preparo de Alimentos", re: /liquidificador|batedeira|processador|cafeteira|torradeira|pipoqueira|sorveteira|juicer/i },
+    { slug: "clima-conforto", label: "Clima e Conforto", re: /purificador|umidificador|desumidificador|aquecedor|ventilador|climatizador/i },
+  ],
+  "eletro-cocina": [
+    { slug: "fritadeiras", label: "Fritadeiras", re: /air ?fryer|airfryer|fritadeira|grelhador|grill|sandwichera|sanduicheira|panela el[eé]trica/i },
+    { slug: "preparacao", label: "Preparo de Alimentos", re: /liquidificador|batedeira|processador|juicer|extrator|pipoqueira|chocolateira|galeteira|sorveteira/i },
+    { slug: "cafes", label: "Cafés e Máquinas", re: /cafeteira|m[aá]quina de caf[eé]|m[aá]quina de espresso|nespresso|torradeira|chaleira/i },
+    { slug: "fornos-cooktops", label: "Fornos e Cooktops", re: /cooktop|forno|micro-?ondas|panela de press[aã]o el[eé]trica/i },
+  ],
+  "eletro-limpeza": [
+    { slug: "aspiradores", label: "Aspiradores", re: /aspirador|robo aspirador|vassoura el[eé]trica|mop el[eé]trico|escova el[eé]trica/i },
+    { slug: "lavagem", label: "Lavagem", re: /lava.?lou[cç]as|lava roupas|m[aá]quina de lavar|secadora/i },
+    { slug: "costura-passadoria", label: "Costura e Passadoria", re: /m[aá]quina de costura|overlock|m[aá]quina de bordar|ferro de passar|ferro el[eé]trico|central de passar/i },
+    { slug: "selagem-outros", label: "Selagem e Outros", re: /seladora|umidificador|desumidificador|cortador de grama/i },
+  ],
+  climatizacao: [
+    { slug: "ar-condicionado", label: "Ar-Condicionado", re: /ar.?condicionado|split|ar condicionado|polo|janela|hi wall/i },
+    { slug: "ventilacao", label: "Ventilação", re: /ventilador|torre de ventila|circulador|exaustor|ventoinha|ventilador de teto|coluna|parede/i },
+    { slug: "aquecimento", label: "Aquecimento", re: /aquecedor|climatizador|aquecedor a g[aá]s|aquecedor el[eé]trico|climatizador de ambiente/i },
+    { slug: "purificacao-umidade", label: "Purificação e Umidade", re: /purificador|umidificador|desumidificador|purificador de ar/i },
+  ],
+  "textil-cama": [
+    { slug: "jogos-cama", label: "Jogos de Cama", re: /jogo de cama|len[cç][oó]is|fronha|travesseiro|edredom|cobertor|manta|protetor de colch[aã]o/i },
+    { slug: "toalhas", label: "Toalhas", re: /toalha|lencol|toalha de banho|toalha de rosto|toalha de m[aã]o/i },
+    { slug: "cortinas-almofadas", label: "Cortinas e Almofadas", re: /cortina|persiana|almofada|capa de almofada|jogo americano|guardanapo|tapete/i },
+    { slug: "mesa-cozinha", label: "Mesa e Cozinha", re: /jogo de toalha|capa de mesa|porta tempero|porta talheres|a[cç]ucareira|leiteira|bule|pires|ta[cç]as|copos|canecas|cestos|organizador de cozinha/i },
+  ],
+  decoracao: [
+    { slug: "quadros-vasos", label: "Quadros e Vasos", re: /quadro|vaso decorativo|espelho|lousa|porta retrato|painel decorativo/i },
+    { slug: "flores-arranjos", label: "Flores e Arranjos", re: /flor|flores|arranjo|crisantemo|rosas?|girassol|tulipa|orqu[ií]dea|astrom[eé]lia|margarida|cravo|jasmim|lavanda|hort[eê]nsia|pe[oô]nia|d[áa]lia|l[ií]rio|costela de ad[aã]o|suculenta|cacto|bambu/i },
+    { slug: "enfeites-tematicos", label: "Enfeites", re: /enfeite|decora[cç][aã]o|decorativo|natal|pres[eé]pio|[aá]rvore|banderinha|sininho|vela|candlestick|terr[aá]rio|cachep[oô]|suporte para plantas/i },
+  ],
+  organizacao: [
+    { slug: "closet-guarda", label: "Closet e Guarda-Roupa", re: /sapateira|closet|porta.chaves|porta documentos|mala direta|cabide|organizador de closet/i },
+    { slug: "cozinha", label: "Cozinha", re: /organizador de cozinha|porta tempero|porta talheres|dispensador|lixeira|cesto organizador/i },
+    { slug: "escritorio", label: "Escritório", re: /organizador de mesa|porta canetas|suporte|caixa organizadora|organizador de gaveta|porta.monitor/i },
+    { slug: "caixas-gavetas", label: "Caixas e Gavetas", re: /caixa|gaveta|nicho|prateleira|sacola organizadora|organizador de sapato/i },
+  ],
+  iluminacao: [
+    { slug: "led", label: "LED e Fitas", re: /fita de led|perfil de led|kit led|painel de led|refletor led|l[aâ]mpada led|lampada led|sensor de presen[cç]a/i },
+    { slug: "lustres-pendentes", label: "Lustres e Pendentes", re: /lustre|pendente|lustre de cristal|lustre moderno/i },
+    { slug: "arandelas-spots", label: "Arandelas e Spots", re: /arandela|spot|plafon|abajur|lumin[aá]ria de mesa|lumin[aá]ria de piso|aplique/i },
+    { slug: "externos", label: "Externos e Jardim", re: /refletor|lumin[aá]ria externa|post top|solar|garden|jardim/i },
+    { slug: "interruptores-dimmers", label: "Interruptores e Dimmers", re: /interruptor|dimmer|sensor/i },
+  ],
+  "casa-decoracao": [
+    { slug: "textil-decor", label: "Têxtil Decorativo", re: /cortina|almofada|tapete|jogo americano|toalha|lencol|fronha|edredom|cobertor|manta/i },
+    { slug: "decorativo", label: "Decorativo", re: /quadro|vaso|espelho|enfeite|decora[cç][aã]o|decorativo|lumin[aá]ria|l[aâ]mpada|organizador|candlestick|terr[aá]rio/i },
+  ],
+  // --- Tecnologia ---
+  informatica: [
+    { slug: "notebooks", label: "Notebooks", re: /notebook|laptop|macbook|chromebook|notebook gamer/i },
+    { slug: "desktops-pc", label: "Desktops e PCs", re: /pc gamer|computador|desktop|all in one|torre|gabinete|\bpc\b/i },
+    { slug: "monitores-perifericos", label: "Monitores e Periféricos", re: /monitor|teclado|mouse|webcam|headset|perif[eé]ricos|mousepad|mouse sem fio|mouse bluetooth|monitor gamer/i },
+    { slug: "armazenamento-memoria", label: "Armazenamento e Memória", re: /ssd|hd externo|mem[oó]ria|ram|ddr|pendrive|cart[aã]o de mem[oó]ria|hd\b/i },
+    { slug: "componentes", label: "Componentes", re: /processador|placa de v[ií]deo|placa m[aã]e|fonte|cooler|water cooler|placa de som|placa de rede|nobreak|no break/i },
+  ],
+  celulares: [
+    { slug: "smartphones", label: "Smartphones", re: /celular|smartphone|iphone|galaxy|xiaomi|motorola|redmi|poco|realme|samsung|android|iphone/i },
+    { slug: "acessorios-celular", label: "Acessórios", re: /capinha|pel[ií]cula|case|suporte|carregador|cabo|fone|pulseira|capa|prote[cç][aã]o|kit celular|dock/i },
+  ],
+  games: [
+    { slug: "consoles", label: "Consoles", re: /playstation|ps[45]|xbox|nintendo|switch|console/i },
+    { slug: "jogos", label: "Jogos", re: /jogo|games|dlc|jogo digital|game|jogo de/i },
+    { slug: "acessorios-games", label: "Acessórios", re: /controle|headset|cadeira gamer|volante|joystick|dock|carregador|mesa gamer|stream/i },
+  ],
+  "tv-audio": [
+    { slug: "televisores", label: "Televisores", re: /\btv\b|televis[aã]o|smart tv|painel|tv 4k|tv\b/i },
+    { slug: "audio-casa", label: "Áudio para Casa", re: /caixa de som|soundbar|home theater|caixa de som bluetooth/i },
+    { slug: "fones", label: "Fones e Headsets", re: /fone|headset|fone bluetooth|fone sem fio|fone de ouvido|earbuds|airpods/i },
+    { slug: "projetores", label: "Projetores", re: /projetor|projetor led|home cinema/i },
+  ],
+  fotografia: [
+    { slug: "cameras", label: "Câmeras", re: /c[aâ]mera|camera|dslr|mirrorless|gopro|filmadora|c[aâ]mera digital/i },
+    { slug: "drones", label: "Drones", re: /drone|drones/i },
+    { slug: "lentes-acessorios", label: "Lentes e Acessórios", re: /lente|lentes|trip[eé]|gimbal|stabilizador|monop[eé]|microfone|carregador de c[aâ]mera|bolsa de c[aâ]mera|selfie stick|filme|memory card|cart[aã]o de mem[oó]ria/i },
+  ],
+  software: [
+    { slug: "sistemas-windows", label: "Sistemas", re: /windows|office|microsoft|antiv[ií]rus|vpn|licen[cç]a|assinatura/i },
+    { slug: "criativo-adobe", label: "Criativo e Adobe", re: /adobe|photoshop|illustrator|premiere|after effects|lightroom|indesign|autocad|solidworks|revit|sketchup|blender|cinema 4d/i },
+    { slug: "cursos-online", label: "Cursos e E-books", re: /curso|e-book|livro digital|template|wordpress|stock|assinatura/i },
+  ],
+  eletronicos: [
+    { slug: "som-audio", label: "Som e Áudio", re: /caixa de som|soundbar|home theater|fone|headset|microfone|caixa ac[uú]stica/i },
+    { slug: "acessorios-eletronicos", label: "Acessórios", re: /carregador|cabo|adaptador|capinha|pel[ií]cula|case|suporte|dock|base|prote[cç][aã]o/i },
+    { slug: "projetores-tv", label: "Projetores e TVs", re: /projetor|tv|televis[aã]o|smart tv|receptor|antena|hdmi/i },
+  ],
+  // --- Esportes ---
+  "esporte-lazer": [
+    { slug: "bolas", label: "Bolas", re: /bola|bolas|futebol|basquete|v[oô]lei|handebol|t[eê]nis|badminton|squash|frescobol/i },
+    { slug: "raquetes", label: "Raquetes e Mesa", re: /raquete|t[eê]nis de mesa|ping.?pong|badminton|squash|frescobol|t[eê]nis/i },
+    { slug: "patins-skate", label: "Patins e Skate", re: /patins|skate|longboard|penny|hoverboard|patinete|monociclo|casco/i },
+    { slug: "boxe-martial", label: "Boxe e Artes Marciais", re: /boxe|muay thai|jiu-?jitsu|karat[eê]|jud[oô]|taekwondo|luva de boxe|bandagem|protetor bucal|shin guard|canel[eê]ira/i },
+    { slug: "academia-rua", label: "Academia de Rua", re: /halter|anilha|barra|crossfit|calistenia|street workout|banco de supino|el[aá]stico|corda de pular|abdominal|kit treino|yoga|pilates/i },
+  ],
+  "esporte-infantil": [
+    { slug: "bolas", label: "Bolas", re: /bola|bolas|futebol|basquete|v[oô]lei|t[eê]nis/i },
+    { slug: "bicicletas", label: "Bicicletas", re: /bicicleta|bike|patinete|trenzinho|carrinho|velocipede/i },
+    { slug: "brinquedos-esporte", label: "Brinquedos Esportivos", re: /skate|patins|hoverboard|raquete|capacete|esporte|lazer|parque/i },
+  ],
+  fitness: [
+    { slug: "musculacao-pesos", label: "Musculação e Pesos", re: /halter|anilha|barra|supino|rosca|leg press|crossover|banco|peso|extensora|mesa flexora|leg extension|leg curl|puxada|remada|crucifixo|desenvolvimento|panturrilha|stiff|afundo|avanco|agachamento|terra|hip thrust|gluteo|gl[uú]teo|costas|b[ií]ceps|tr[ií]ceps|ombro|peito|abdomen|core/i },
+    { slug: "cardio", label: "Cardio", re: /esteira|bicicleta ergom[eé]trica|el[ií]ptico|remo|spinning|cardio/i },
+    { slug: "yoga-pilates-corpo", label: "Yoga, Pilates e Corpo", re: /yoga|pilates|tapete|corda de pular|abdominal|gin[aá]stica|alongamento|faixa el[aá]stica|kit treino|treino/i },
+    { slug: "agilidade", label: "Agilidade", re: /agilidade|argola|escada|kit agilidade|bola de agilidade|bateria de agilidade|bateria/i },
+  ],
+  ciclismo: [
+    { slug: "bicicletas", label: "Bicicletas", re: /bicicleta|bike|mtb|gravel|rodovi[aá]ria|mountain|speed|fixa|track|downhill|enduro|trail|xc|all mountain|fat bike|estrada|montanha|trilha|competição|lazer|cidade|passeio|trekking|adventure|bikepacking|aro/i },
+    { slug: "equipamentos", label: "Equipamentos", re: /capacete|pedal|guid[aã]o|selim|ciclista|kit|traje|luva|[oó]culos|calcado|sapato|t[eê]nis|bicicleta ergom[eé]trica|rolinho|suporte|rack|bolsa/i },
+  ],
+  camping: [
+    { slug: "barracas-sleeping", label: "Barracas e Sleeping Bags", re: /barraca|sleeping bag|saco de dormir|isolante|cama infl[aá]vel|colchonete|filtro de [aá]gua|purificador de [aá]gua|hydration/i },
+    { slug: "pesca", label: "Pesca", re: /pescaria|pesca|carretilha|molinete|vara de pescar|isca|anzol|linha de pesca|chumbada|boia/i },
+    { slug: "energia-iluminacao", label: "Energia e Iluminação", re: /lanterna|lampi[aã]o|bateria externa|power bank|carregador solar|painel solar|bateria solar|kit energia solar|gerador|inversor|controlador|bateria estacion[aá]ria|placa solar|placa fotovoltaica|mochila de camping|fogareiro|cantil|caneca t[eé]rmica|garrafa t[eé]rmica|manta t[eé]rmica/i },
+    { slug: "sobrevivencia-primeiros", label: "Sobrevivência", re: /kit sobreviv[eê]ncia|kit primeiros socorros|machete|bip|buzina|trilha|camping|acampamento/i },
+  ],
+  // --- Auto / Industrial ---
+  "pecas-veiculos": [
+    { slug: "motor-interno", label: "Motor e Internos", re: /motor|bomba|vela|correia|pist[aã]o|virabrequim|c[aá]rter|carter|compressor|tensionador|bico injetor|coxim|suporte de motor/i },
+    { slug: "freios-suspensao", label: "Freios e Suspensão", re: /pastilha|disco de freio|amortecedor|coxim|piv[oô]|terminal|bieleta|suspens[aã]o|molas|cubo de roda|ponta de eixo|cardan|semieixo|semi.?eixo|homocin[eé]tica/i },
+    { slug: "transmissao-cambio", label: "Transmissão e Câmbio", re: /c[aâ]mbio|cambio|embreagem|embreagem kit|embreagem|embreagem kit/i },
+    { slug: "eletrica-auto", label: "Elétrica Automotiva", re: /bateria|alternador|motor de arranque|sinaleiro|rel[eé]|filtro|sensor|bobina|igni[cç][aã]o|sonda lambda|sensor de oxig[eê]nio|vela de igni[cç][aã]o/i },
+    { slug: "carroceria-exterior", label: "Carroceria e Exterior", re: /parachoque|para-choque|farol|lanterna|retrovisor|radiador|grade|cap[oô]|para-lama|espelho|protetor de (motor|tanque|carenagem|quadro|carroceria)|quebra vento|capa de moto|hitch|engate|reboque/i },
+    { slug: "pneus-rodas", label: "Pneus e Rodas", re: /pneu|pneus|aro|roda|calota|estepe|macaco|tri[aâ]ngulo|cubo de roda|rodado/i },
+    { slug: "acessorios-moto", label: "Acessórios de Moto", re: /bagageiro|bauleto|ba[uú]leto|alforje|top.?case|mala para moto|protetor de carenagem|protetor de quadro|capa de moto|protetor de tanque/i },
+  ],
+  automotivo: [
+    { slug: "cuidados-limpeza", label: "Cuidados e Limpeza", re: /cera|polidor|shampoo|detalhante|limpador|shampoo automotivo|couro|cheiro|odorizador|lavagem|selante|silicone|adesivo/i },
+    { slug: "comodidade-conforto", label: "Comodidade e Conforto", re: /organizador|suporte|encosto|protetor|apoio|almofada|capa de banco|tapete automotivo|capa de volante|volante|porta objetos|porta-trecos|porta celulas/i },
+    { slug: "seguranca-tecnologia", label: "Segurança e Tecnologia", re: /c[aâ]mera|sensor|alarme|rastreador|multim[ií]dia|tela|som|central|receptor|antena|desemba[cç]ador|cerca|alarme/i },
+  ],
+  ferramentas: [
+    { slug: "furadeiras-parafusadeiras", label: "Furadeiras e Parafusadeiras", re: /furadeira|parafusadeira|impacto|martelo|furadeira de impacto/i },
+    { slug: "serras-cortes", label: "Serras e Cortes", re: /serra|serra circular|serrote|cut-?off|sabre|rec[ií]proca|jigsaw|biseladora|desentupidor|bedame|a[cç]o r[aá]pido/i },
+    { slug: "chaves-alicates", label: "Chaves e Alicates", re: /alicate|chave de|jogo de chaves|chave inglesa|chave combinada|chave fenda|philips|allen|torx|hex/i },
+    { slug: "solda-esmeril", label: "Solda e Esmeril", re: /solda|ma[cç]arico|esmeril|esmerilhadeira|rebarbadora|politriz|angle grinder/i },
+    { slug: "acessorios-ferramentas", label: "Acessórios", re: /broca|disco|lixa|ponta|acess[oó]rio|maleta|estojo|organizador|jogo de/i },
+  ],
+  "fixacao-metalica": [
+    { slug: "parafusos-porcas", label: "Parafusos e Porcas", re: /parafuso|porca|rebite|grampo|barra roscada|tirante|flange|pino/i },
+    { slug: "arruelas-anilhas", label: "Arruelas e Anilhas", re: /arruela|anilha|arruela de press[aã]o|grower|dentada|lisa/i },
+    { slug: "abraçadeiras-perfis", label: "Abraçadeiras e Perfis", re: /abra[cç]adeira|perfil|cantoneira|chapa|barra|perfilado|tipo u|tipo d|perfil/i },
+    { slug: "buchas-cavilhas", label: "Buchas e Cavilhas", re: /bucha|cavilha|chumbador|espiral|dowel|[aâ]ncora|ancora|trava|anel de reten[cç][aã]o|anel de vedação/i },
+  ],
+  "quimica-industrial": [
+    { slug: "adesivos-colas", label: "Adesivos e Colas", re: /adesivo|cola|loctite|super cola|cianoacrilato|ep[oó]xi|poxy|adesivo estrutural|trava rosca/i },
+    { slug: "lubrificantes", label: "Lubrificantes e Óleos", re: /lubrificante|graxa|[oó]leo|desengripante|penetrante|silicone lubrificante|removedor/i },
+    { slug: "selantes-massas", label: "Selantes e Massas", re: /selante|vedacit|massa|massa corrida|estopa|fita vedação|vedação|silicone|resina/i },
+    { slug: "quimicos-diversos", label: "Químicos Diversos", re: /qu[ií]mico|[aá]lcool|solvente|thinner|removedor|removedor de|desengordurante/i },
+  ],
+  eletrica: [
+    { slug: "disjuntores-componentes", label: "Disjuntores e Componentes", re: /disjuntor|contator|rel[eé]|sinaleiro|borne|varistor|capacitor|resistor|transformador|protetor/i },
+    { slug: "fios-cabos", label: "Fios e Cabos", re: /cabo el[eé]trico|fio el[eé]trico|fio de cobre|fio de alum[ií]nio|fio flex[ií]vel|cabo flex[ií]vel|fita isolante|isolante/i },
+    { slug: "tomadas-interruptores", label: "Tomadas e Interruptores", re: /tomada|interruptor|caixa de passagem|eletroduto|condu[ií]te/i },
+    { slug: "fontes-alimentacao", label: "Fontes e Alimentação", re: /fonte|fonte 12v|fonte 24v|fonte chaveada|fonte atx|fonte 80 plus|no break|nobreak/i },
+  ],
+  "bombas-motores": [
+    { slug: "bombas-agua", label: "Bombas de Água", re: /bomba|motobomba|pressurizador|bomba perif[eé]rica|bomba submersa|bomba de po[cç]o/i },
+    { slug: "motores", label: "Motores", re: /motor|motor el[eé]trico|motor trif[aá]sico|motor monof[aá]sico|motor de indu[cç][aã]o|motor s[ií]ncrono|motor ass[ií]ncrono|motor de corrente/i },
+    { slug: "compressores", label: "Compressores", re: /compressor|compressor de ar/i },
+    { slug: "atuadores-diversos", label: "Atuadores e Diversos", re: /atuador|soprador|motorreductor|redutor/i },
+  ],
+  "medicao-precisao": [
+    { slug: "paquimetros", label: "Paquímetros e Micrômetros", re: /paqu[ií]metro|micr[oô]metro|trena digital/i },
+    { slug: "multimetros", label: "Multímetros e Amperímetros", re: /mult[ií]metro|amper[ií]metro|volt[ií]metro|watt[ií]metro|meg[oô]hmetro|alicate amper[ií]metro|megger/i },
+    { slug: "niveis-inclinometros", label: "Níveis e Inclinômetros", re: /n[ií]vel|n[ií]vel digital|n[ií]vel a laser|n[ií]vel de bolha|inclin[oô]metro|esquadro/i },
+    { slug: "balancas-medidores", label: "Balanças e Medidores", re: /balan[cç]a de precis[aã]o|dinam[oô]metro|medidor|anem[oô]metro|medidor de energia|medidor de vaz[aã]o|medidor de press[aã]o|man[oô]metro/i },
+  ],
+  construcao: [
+    { slug: "materiais", label: "Materiais de Construção", re: /cimento|argamassa|telha|tijolo|drywall|gesso|bloco|areia|brita|concreto|impermeabilizante/i },
+    { slug: "hidraulica", label: "Hidráulica", re: /cano|tubo|joelho|luva|registro|torneira|adaptador|sif[aã]o|caixa d'?[aá]gua|reservat[oó]rio/i },
+    { slug: "acabamento", label: "Acabamento", re: /massa corrida|selador|verniz|impermeabilizante|resina ep[oó]xi|cola para azulejo|rejunte|argamassa|textura/i },
+  ],
+  "tinta-pintura": [
+    { slug: "tintas", label: "Tintas", re: /tinta|tinta l[aá]tex|tinta acr[ií]lica|tinta ep[oó]xi|tinta poliuretano|tinta spray|tinta para parede|tinta para madeira|tinta para ferro|tinta automotiva/i },
+    { slug: "ferramentas-pintura", label: "Ferramentas", re: /pincel|rolo de pintura|spray|bandeja|kit pintura|extensor|luva de pintura|mascara de pintura/i },
+    { slug: "preparacao", label: "Preparação e Massas", re: /massa corrida|selador|primer|fundo preparador|verniz|stain|corante|textura|massa acr[ií]lica/i },
+  ],
+  jardim: [
+    { slug: "plantas", label: "Plantas e Sementes", re: /planta|vaso de planta|semente|grama|adubo|muda|arbusto|cacto|suculenta/i },
+    { slug: "ferramentas-jardim", label: "Ferramentas", re: /regador|mangueira|cortador de grama|poda|tesoura de poda|enxada|ancinho|p[aá] de jardim/i },
+    { slug: "piscina-tratamento", label: "Piscina e Tratamento", re: /piscina|cloro|algicida|bomba de piscina|capa de piscina|tratamento de piscina/i },
+  ],
+  // --- Mercado ---
+  supermercado: [
+    { slug: "hortifruti", label: "Hortifruti", re: /fruta|verdura|legume|hortifruti|tomate|cebola|alho|batata|cenoura|alface|banana|ma[cç][aã]|laranja|ma[cç]a/i },
+    { slug: "acougue-laticinios", label: "Açougue e Laticínios", re: /carne|frango|peixe|lingui[cç]a|queijo|manteiga|margarina|iogurte|requeij[aã]o|leite|presunto|mortadela|salame|presunto/i },
+    { slug: "padaria-congelados", label: "Padaria e Congelados", re: /p[aã]o|pao|muffin|croissant|pizza|lasanha|empanado|nugget|hamb[uú]rguer|congelado/i },
+    { slug: "limpeza-higiene", label: "Limpeza e Higiene", re: /detergente|sab[aã]o|[aá]gua sanit[aá]ria|papel higi[eê]nico|limpador|desinfetante|esponja|vassoura|rodo/i },
+    { slug: "mercearia-seca", label: "Mercearia Seca", re: /arroz|feij[aã]o|a[cç][uú]car|sal|azeite|[oó]leo|massa|biscoito|farinha|amido|fub[aá]|aveia|cereal|conserva|atum|sardinha|palmito|milho|ervilha/i },
+  ],
+  mercearia: [
+    { slug: "cafe", label: "Café", re: /caf[eé]|caf[eé] torrado|caf[eé] mo[ií]do|caf[eé] em c[aá]psula|caf[eé] em gr[aã]o|caf[eé] sol[uú]vel|caf[eé] expresso|caf[eé] coado|caf[eé] v60|caf[eé] french press|caf[eé] aeropress|caf[eé] cold|caf[eé] gelado|caf[eé] frapp[eé]|caf[eé] frappe|caf[eé] latte|caf[eé] cappuccino|caf[eé] macchiato|caf[eé] espresso|caf[eé] ristretto|caf[eé] lungo|caf[eé] doppio|caf[eé] americano|caf[eé] mocha|caf[eé] flat white|caf[eé] cortado|caf[eé] pingado|caf[eé] carioca|caf[eé] mineiro|caf[eé] paulista|caf[eé] fluminense/i },
+    { slug: "massas-graos", label: "Massas e Grãos", re: /arroz|feij[aã]o|massa|farinha|fub[aá]|amido|aveia|muesli|cereais|mingau|granola/i },
+    { slug: "doces-snacks", label: "Doces e Snacks", re: /chocolate|bala|docinho|bombom|pirulito|chiclete|snack|pipoca|castanha|doce|geleia|mel|goma de mascar|droga|rem[eé]dio caseiro/i },
+    { slug: "laticinios", label: "Laticínios", re: /leite|manteiga|margarina|requeij[aã]o|requeijao|iogurte|queijo/i },
+    { slug: "conservas", label: "Conservas", re: /conserva|atum|sardinha|palmito|milho|ervilha|vagem|nhoque|ravioli|sorvete|picol[eé]/i },
+  ],
+  "alimentos-bebidas": [
+    { slug: "cervejas", label: "Cervejas", re: /cerveja|chopp|pilsen|ipa|stout|craft|cerveja artesanal/i },
+    { slug: "vinhos-licores", label: "Vinhos e Licores", re: /vinho|espumante|licor|destilado|whisky|vodka|gin|rum|cacha[cç]a|tequila|champagne|prosecco|sake|saqu[eê]|bourbon|scotch|mezcal|raicilla|sotol|bacanora|agave|vinho tinto/i },
+    { slug: "refrigerantes-sucos", label: "Refrigerantes e Sucos", re: /refrigerante|suco|energ[eé]tico|[aá]gua|cerveja artesanal|kit churrasco|espumante|destilado|licor|rum|cacha[cç]a|tequila|champagne|prosecco|sake|saqu[eê]|bourbon|scotch|mezcal|raicilla|sotol|bacanora|agave/i },
+    { slug: "kits-churrasco", label: "Kits Churrasco", re: /kit churrasco|churrasco|espeto|grelha|carv[aã]o|carvao|g[aá]s de cozinha|g[aá]s glp|g[aá]s p13|g[aá]s p45|g[aá]s industrial|g[aá]s medicinal|g[aá]s butano|g[aá]s propano|g[aá]s natural|g[aá]s lp/i },
+  ],
+  "limpeza-higiene": [
+    { slug: "limpeza-casa", label: "Limpeza da Casa", re: /detergente|sab[aã]o em p[oó]|[aá]gua sanit[aá]ria|alvejante|desinfetante|multiuso|limpador|desengordurante|amaciante|lava lou[cç]as|saco de lixo|vassoura|rodo/i },
+    { slug: "higiene-pessoal", label: "Higiene Pessoal", re: /papel higi[eê]nico|sabonete|shampoo|desodorante|absorvente|fralda|higiene|higi[eê]nico|wipes|esponja|pano/i },
+    { slug: "descartaveis", label: "Descartáveis", re: /papel toalha|guardanapo|copo descart[aá]vel|prato descart[aá]vel|len[cç]o umedecido|algod[aã]o|algod[aã]o hidrófilo|saco de lixo/i },
+  ],
+  pets: [
+    { slug: "cachorro", label: "Cachorro", re: /cachorro|c[aã]o|cao|racao cachorro|coleira|passeio para c[aã]o|areia para gato|arranhador/i },
+    { slug: "gato", label: "Gato", re: /gato|areia para gato|arranhador|gato/i },
+    { slug: "aquario", label: "Aquário", re: /aqu[aá]rio|aquario|filtro|aerador|termometro|termostato|ilumina[cç][aã]o|alga|antialga|peixe/i },
+    { slug: "higiene-racao", label: "Higiene e Ração", re: /shampoo|condicionador|banho|higiene|escova|pente|corte|unha|orelha|olho|dente|boca|gengiva|periodontal|t[aá]rtaro|placa|bacteria|fungo|parasita|verme|carrapato|pulga|piolho|[aá]caro|petisco|racao|guia|peitoral|cinto|transportadora|gaiola|cama para pet|brinquedo para pet|tosa|veterin[aá]rio/i },
+  ],
+  // --- Outros ---
+  papelaria: [
+    { slug: "cadernos-blocos", label: "Cadernos e Blocos", re: /caderno|bloco|agenda|planner|caderno inteligente|sketchbook/i },
+    { slug: "canetas-material", label: "Canetas e Material", re: /caneta|marca-texto|lapiseira|borracha|apontador|corretivo|regua|tesoura|cola branca|silicone escolar/i },
+    { slug: "mochilas-estojos", label: "Mochilas e Estojos", re: /mochila|estojo|lancheira|pasta|mala direta|mochila escolar|lancheira escolar/i },
+    { slug: "papel", label: "Papel", re: /papel|sulfite|offset|cartaz|pardo|kraft|seda|photocopy|papelaria/i },
+  ],
+  brinquedos: [
+    { slug: "action-figures", label: "Action Figures", re: /action figure|boneco|barbie|funko|pop vinyl|bobblehead|lol|baby alive|nerf|hot wheels|figura de a[cç][aã]o/i },
+    { slug: "jogos-tabuleiro", label: "Jogos de Tabuleiro", re: /jogo de tabuleiro|jogos de tabuleiro|bingo|ludo|domin[oó]|domino|baralho|uno\b|trivial|impostor|catan|roleta/i },
+    { slug: "pelucia", label: "Pelúcias", re: /pel[uú]cia|pel[uú]cias|pelucia/i },
+    { slug: "educativos", label: "Educativos", re: /brinquedo educativo|blocos|montessori|jogo educativo|puzzle|quebra-cabe[cç]a|slime|massinha|lego|playmobil|imaginext|pokemon|yu-gi-oh|trading card|chaveiro/i },
+  ],
+  viagem: [
+    { slug: "malas-bagagem", label: "Malas e Bagagem", re: /mala|mochila de viagem|bagagem|necessaire|mala de m[aã]o|mala carry on|mala de viagem/i },
+    { slug: "hospedagem-passagens", label: "Hospedagem e Passagens", re: /passagem|hotel|pacote|resort|cruzeiro|airbnb|pousada/i },
+    { slug: "acessorios-viagem", label: "Acessórios", re: /necessaire|adaptador|capa de assento|travesseiro de pesco[cç]o|organizador de mala|cadeado|etiqueta de mala|necessaire de viagem/i },
+  ],
+  eventos: [
+    { slug: "shows-festas", label: "Shows e Festas", re: /ingresso para show|show|festival|festa|ingresso|ingressos/i },
+    { slug: "cinema-teatro", label: "Cinema e Teatro", re: /cinema|teatro|sess[aã]o|filme|estreia|com[eé]dia|stand up/i },
+    { slug: "congressos-cursos", label: "Congressos e Cursos", re: /congresso|workshop|palestra|curso|evento online|confer[eê]ncia|semin[aá]rio|evento/i },
+  ],
+  servicos: [
+    { slug: "assinaturas-digitais", label: "Assinaturas Digitais", re: /assinatura|plano|streaming|netflix|spotify|amazon prime|hbo|disney|assinatura digital/i },
+    { slug: "cursos-educacao", label: "Cursos e Educação", re: /curso|aula|mentoria|capacita[cç][aã]o|treinamento|e-book|livro digital|template|pack/i },
+    { slug: "consultorias-servicos", label: "Consultorias e Serviços", re: /consultoria|assessoria|servi[cç]o|servico|assist[eê]ncia|assistencia/i },
+  ],
+  bebe: [
+    { slug: "fraldas-higiene", label: "Fraldas e Higiene", re: /fralda|fraldas|absorvente|pomada assadura|len[cç]o umedecido|higiene beb[eê]|higi[eê]nico/i },
+    { slug: "alimentacao-bebe", label: "Alimentação", re: /mamadeira|chupeta|babador|bab[aá] eletr[oô]nica|papinha|f[oó]rmula|formula|leite em p[oó]/i },
+    { slug: "mobilidade-bebe", label: "Mobilidade e Sono", re: /ber[cç]o|berco|mois[eé]s|andador|sling|carrinho de beb[eê]|bebe comfort|balan[cç]o|cadeira de balan[cç]o|playground|cercadinho|cercado|tapete para beb[eê]|redinha/i },
+    { slug: "banho-cuidado", label: "Banho e Cuidado", re: /banheira|shampoo baby|creme baby|higiene|toalha baby|esterilizador|esterilizadora|bico anti-?c[oó]lica|tetina/i },
+  ],
+};
+
+export function subtypesFor(category: string | null | undefined): SubtypeDef[] {
+  if (!category) return [];
+  return SUBTYPES[norm(category)] ?? [];
+}
+
+export function resolveSubtype(
+  category: string | null | undefined,
+  title: string | null | undefined,
+): string | null {
+  const defs = subtypesFor(category);
+  if (!defs.length || !title) return null;
+  for (const d of defs) if (d.re.test(title)) return d.slug;
+  return null;
+}
+
+export function subtypeLabel(category: string, slug: string): string {
+  return subtypesFor(category).find((d) => d.slug === slug)?.label ?? slug;
+}
+
 // Resolve uma categoria de origem para a canonica; se desconhecida,
 // tenta classificar pelo titulo; fallback "outros".
 // A classificação por titulo vem PRIMEIRO para refinar categorias

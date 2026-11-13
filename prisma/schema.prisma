@@ -20,6 +20,7 @@ model Product {
   discountPct  Float?
   currency     String   @default("BRL")
   category     String?
+  subtype      String?
   merchant     String?
   organizationId String?
   url          String
@@ -33,6 +34,7 @@ model Product {
   clicks Click[]
 
   @@index([category])
+  @@index([category, subtype])
   @@index([active])
   @@schema("ofertacoradar")
 }

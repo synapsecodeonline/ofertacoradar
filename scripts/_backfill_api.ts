@@ -1,7 +1,7 @@
 // Backfill de categorias via Supabase Management API (query endpoint).
 // Uso: SUPABASE_MGMT_TOKEN=sbp_... npx tsx scripts/_backfill_api.ts
 // Alternativa ao _backfill.ts quando a conexao direta ao pooler falha.
-import { resolveCategory } from "../src/lib/categories";
+import { resolveCategory, resolveSubtype } from "../src/lib/categories";
 
 const REF = "xrytewzoxoynrwxffqft";
 const TOKEN = process.env.SUPABASE_MGMT_TOKEN;
@@ -43,24 +43,26 @@ async function main() {
     category: string | null;
     merchant: string | null;
     organizationId: string | null;
+    subtype?: string | null;
   }[] = [];
   const PAGE = 1500;
   for (let off = 0; ; off += PAGE) {
     const rows = await sql(
-      `SELECT id, title, category, merchant, "organizationId" FROM "ofertacoradar"."Product" ORDER BY id LIMIT ${PAGE} OFFSET ${off}`,
+      `SELECT id, title, category, subtype, merchant, "organizationId" FROM "ofertacoradar"."Product" ORDER BY id LIMIT ${PAGE} OFFSET ${off}`,
     );
     products.push(...rows);
     if (rows.length < PAGE) break;
   }
   console.log(`${products.length} produtos`);
 
-  const updates: { id: number; category: string; merchant: string | null }[] = [];
+  const updates: { id: number; category: string; subtype: string | null; merchant: string | null }[] = [];
   for (const p of products) {
     const category = resolveCategory(p.category, p.title) ?? "outros";
+    const subtype = resolveSubtype(category, p.title);
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
-    if (category !== p.category || merchant !== p.merchant) {
-      updates.push({ id: p.id, category, merchant });
+    if (category !== p.category || subtype !== (p.subtype ?? null) || merchant !== p.merchant) {
+      updates.push({ id: p.id, category, subtype, merchant });
     }
   }
   console.log(`${updates.length} produtos para atualizar`);
@@ -70,11 +72,11 @@ async function main() {
   for (let i = 0; i < updates.length; i += BATCH) {
     const chunk = updates.slice(i, i + BATCH);
     const values = chunk
-      .map((u) => `(${u.id},${esc(u.category)},${esc(u.merchant)})`)
+      .map((u) => `(${u.id},${esc(u.category)},${esc(u.subtype)},${esc(u.merchant)})`)
       .join(",");
     await sql(
-      `UPDATE "ofertacoradar"."Product" p SET category = v.category, merchant = v.merchant
-       FROM (VALUES ${values}) AS v(id, category, merchant)
+      `UPDATE "ofertacoradar"."Product" p SET category = v.category, subtype = v.subtype, merchant = v.merchant
+       FROM (VALUES ${values}) AS v(id, category, subtype, merchant)
        WHERE p.id = v.id`,
     );
     done += chunk.length;
