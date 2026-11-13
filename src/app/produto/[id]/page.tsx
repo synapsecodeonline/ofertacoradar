@@ -17,6 +17,7 @@ import ShareButtons from "@/components/ShareButtons";
 import InstagramCaption from "@/components/InstagramCaption";
 import BackButton from "@/components/BackButton";
 import { instagramCaption } from "@/lib/instagram";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,16 @@ export default async function ProductPage({
   const { id } = await params;
   const product = await getProduct(Number(id));
   if (!product || !product.active) notFound();
+
+  // Cards para redes sociais: só para usuários logados
+  let isLoggedIn = false;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    isLoggedIn = Boolean(data.user);
+  } catch {
+    isLoggedIn = false;
+  }
 
   after(() => maybeSync().catch(() => {}));
 
@@ -356,10 +367,12 @@ export default async function ProductPage({
               url={`${siteUrl()}/produto/${product.id}`}
               title={product.title}
             />
-            <div className="flex items-center gap-2">
-              <a
-                href={`/api/card/${product.id}`}
-                download={`oferta-${product.id}-feed.png`}
+            {isLoggedIn && (
+              <>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/api/card/${product.id}`}
+                    download={`oferta-${product.id}-feed.png`}
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition-all hover:border-pink-300 hover:text-pink-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-pink-700"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-pink-500" aria-hidden>
@@ -393,9 +406,10 @@ export default async function ProductPage({
                   discountPct: product.discountPct,
                   category: product.category,
                 },
-                `${siteUrl()}/produto/${product.id}`,
               )}
             />
+              </>
+            )}
           </div>
 
           {/* Como usar o cupom */}

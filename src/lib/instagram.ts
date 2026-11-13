@@ -19,7 +19,7 @@ function tag(raw: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-export function instagramCaption(p: CaptionProduct, url: string): string {
+export function instagramCaption(p: CaptionProduct): string {
   const discount =
     p.discountPct ??
     (p.price != null && p.oldPrice != null && p.oldPrice > p.price
@@ -57,7 +57,7 @@ export function instagramCaption(p: CaptionProduct, url: string): string {
   lines.push("");
   lines.push("⏰ Oferta por tempo limitado — corre que é por pouco tempo!");
   lines.push("");
-  lines.push(`👉 Garanta a sua: ${url}`);
+  lines.push("👉 Link na bio!!! 🔗");
   lines.push(".");
   lines.push("");
 

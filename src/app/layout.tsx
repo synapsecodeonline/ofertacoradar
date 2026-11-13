@@ -5,6 +5,7 @@ import "./globals.css";
 import { SITE_NAME, SITE_TAGLINE, siteUrl } from "@/lib/site";
 import { IconTag } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
+import AuthButton from "@/components/AuthButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -104,6 +105,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 ⚡ Relâmpago
               </Link>
               </nav>
+              <AuthButton />
               <ThemeToggle />
             </div>
           </div>
