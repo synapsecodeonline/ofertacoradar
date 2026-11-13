@@ -473,27 +473,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       </section>
 
-      {categoryList.length > 0 && (
-        <div className="mt-6">
-          <CategoryNav
-            items={[
-              {
-                slug: "",
-                label: "Todas",
-                href: qs({ categoria: "" }),
-                active: !category,
-              },
-              ...categoryList.map((cat) => ({
-                slug: cat,
-                label: categoryLabel(cat),
-                href: qs({ categoria: cat }),
-                active: category === cat,
-              })),
-            ]}
-          />
-        </div>
-      )}
-
       {/* Ofertas relampago: terminam em ate 48h */}
       {flashDeals.length > 0 && (
         <CollapsibleSection
@@ -636,6 +615,27 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             })}
           </div>
         </CollapsibleSection>
+      )}
+
+      {categoryList.length > 0 && (
+        <div className="mt-4">
+          <CategoryNav
+            items={[
+              {
+                slug: "",
+                label: "Todas",
+                href: qs({ categoria: "" }),
+                active: !category,
+              },
+              ...categoryList.map((cat) => ({
+                slug: cat,
+                label: categoryLabel(cat),
+                href: qs({ categoria: cat }),
+                active: category === cat,
+              })),
+            ]}
+          />
+        </div>
       )}
 
       {items.length === 0 ? (
