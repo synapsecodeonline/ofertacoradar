@@ -6,35 +6,23 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setInfo(null);
     setLoading(true);
     const supabase = createClient();
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          setError("E-mail ou senha incorretos.");
-        } else {
-          router.push("/");
-          router.refresh();
-        }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError("E-mail ou senha incorretos.");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) {
-          setError(error.message);
-        } else {
-          setInfo("Conta criada! Se o e-mail de confirmação estiver ativo, confirme para entrar.");
-        }
+        router.push("/");
+        router.refresh();
       }
     } finally {
       setLoading(false);
@@ -58,32 +46,19 @@ export default function LoginForm() {
       <input
         type="password"
         required
-        minLength={6}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="senha (mín. 6 caracteres)"
+        placeholder="senha"
         className={inputCls}
-        autoComplete={mode === "login" ? "current-password" : "new-password"}
+        autoComplete="current-password"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {info && <p className="text-sm text-emerald-600">{info}</p>}
       <button
         type="submit"
         disabled={loading}
         className="h-11 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:opacity-60"
       >
-        {loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "login" ? "signup" : "login");
-          setError(null);
-          setInfo(null);
-        }}
-        className="text-sm text-zinc-500 underline-offset-2 hover:text-emerald-600 hover:underline"
-      >
-        {mode === "login" ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar"}
+        {loading ? "Aguarde…" : "Entrar"}
       </button>
     </form>
   );
