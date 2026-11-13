@@ -319,13 +319,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     : [];
   const clickMap = new Map(clickGroups.map((g) => [g.productId, g._count._all]));
 
-  // "Aproveitadas agora": produtos com mais cliques nas ultimas 48h
+  // "Aproveitadas agora": produtos com mais cliques nas ultimas 48h.
+  // Fallback: sem cliques recentes (ex.: banco recém-populado), mostra
+  // os maiores descontos ativos — dado real, e volta a ranquear por
+  // cliques assim que houver volume.
   const aproveitadasIds = topClicks
     .sort((a, b) => b._count._all - a._count._all)
     .map((g) => g.productId)
     .filter((id) => !flashIds.has(id))
     .slice(0, 12);
-  const aproveitadas = aproveitadasIds.length
+  const aproveitadasIsFallback = aproveitadasIds.length === 0;
+  let aproveitadas = aproveitadasIds.length
     ? await prisma.product.findMany({
         where: {
           active: true,
@@ -335,6 +339,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         },
       })
     : [];
+  if (!aproveitadas.length) {
+    aproveitadas = await prisma.product.findMany({
+      where: {
+        active: true,
+        imageUrl: { not: null },
+        discountPct: { gt: 0 },
+        AND: [notZeroPrice, notExpired, isOffer],
+      },
+      orderBy: { discountPct: "desc" },
+      take: 12,
+    });
+  }
   const aproveitadasCount = new Map(
     topClicks.map((g) => [g.productId, g._count._all]),
   );
@@ -601,7 +617,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           }
           meta={
             <span className="text-xs font-medium text-orange-600/80 dark:text-orange-500/80">
-              mais clicadas nas últimas 48h
+              {aproveitadasIsFallback
+                ? "maiores descontos ativos"
+                : "mais clicadas nas últimas 48h"}
             </span>
           }
         >
