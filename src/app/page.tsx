@@ -618,7 +618,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
 
       {categoryList.length > 0 && (
-        <div className="mt-4">
+        <div className="mb-8 mt-4">
           <CategoryNav
             items={[
               {
