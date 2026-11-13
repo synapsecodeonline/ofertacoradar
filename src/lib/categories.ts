@@ -228,13 +228,13 @@ export const KEYWORDS: [RegExp, string][] = [
   // ===== Tecnologia =====
   [/\b(smart tv|televis[aã]o|\btv\b|soundbar|home theater|caixa de som|caixinha de som|projetor|receiver|amplificador|[aá]udio|som automotivo|r[aá]dio|auto r[aá]dio|equalizador|turntable|vitrola|reproductor de m[uú]sica|antena (hdtv|digital|interna|externa|parab[oó]lica))\b/i, "tv-audio"],
   [/\b(c[aâ]mera|camera|gopro|filmadora|lente|drone|stabilizador|trip[eé]|monop[eé]|carregador de c[aâ]mera|bolsa de c[aâ]mera|selfie stick|gimbal|microfone de lapela|microfone shotgun|microfone condenser)\b/i, "fotografia"],
-  [/\b(notebook|laptop|pc gamer|computador|monitor|teclado|mouse|ssd|hd externo|processador|placa de v[ií]deo|placa de som|placa de rede|placa de captura|placa m[aã]e|gabinete|all in one|macbook|chromebook|nobreak|no break|fonte atx|fonte 80 plus|cooler|water cooler|tablet|ipad|surface|perif[eé]ricos|webcam|headset|fone gamer|teclado mec[aâ]nico|mouse gamer|mouse sem fio|mouse bluetooth|monitor gamer|mem[oó]ria (ram|ddr)|placa de som|placa de rede)\b/i, "informatica"],
+  [/\b(notebook|laptop|pc gamer|computador|monitores?|teclado|mouse|ssd|hd externo|processador|placa de v[ií]deo|placa de som|placa de rede|placa de captura|placa m[aã]e|gabinete|all in one|macbook|chromebook|nobreak|no break|fonte atx|fonte 80 plus|cooler|water cooler|tablet|ipad|surface|perif[eé]ricos|webcam|headset|fone gamer|teclado mec[aâ]nico|mouse gamer|mouse sem fio|mouse bluetooth|monitor gamer|mem[oó]ria (ram|ddr)|placa de som|placa de rede|monitores? gamer|monitores? de (jogo|gamer|pc))\b/i, "informatica"],
   [/\b(playstation|ps[45]|xbox|nintendo|switch|steam|jogo (ps|xbox|nintendo|de videogame|de console)|videogame|video game|controle (ps|xbox|nintendo|dualshock|dualsense|sem fio|bluetooth|usb|gamer|wireless|de videogame|de console|ps4|ps5)|joy-?con|dualshock|dualsense|cadeira gamer|mesa gamer|streaming|stream deck|capture card|elgato)\b/i, "games"],
   [/\b(software|aplicativo|curso online|e-book|livro digital|template|wordpress|windows (10|11|7|8|server|pro|lt)|office 365|microsoft office|antiv[ií]rus|vpn|adobe|photoshop|illustrator|premiere pro|after effects|lightroom|indesign|autocad|solidworks|revit|sketchup|cinema 4d|blender 3d|licen[cç]a.{0,15}(windows|office|software|autocad|adobe|antiv[ií]rus|microsoft)|assinatura.{0,15}(anual|mensal|software|digital)|plano.{0,15}(assinatura|software))\b/i, "software"],
   [/\b(jogo de bingo|bingo|ludo|domin[oó]|domino|baralho|uno\b|trivial|impostor|catan|jogo de tabuleiro|jogos de tabuleiro|roleta|action figure|boneco|barbie|hot wheels|lego|playmobil|nerf|slime|massinha|brinquedo educativo|puzzle|rompecabezas|imaginext|baby alive|lol surprise|pokemon|yu-gi-oh|trading card|figura de a[cç][aã]o|funko|pop vinyl|bobblehead|chaveiro|quebra-cabe[cç]a|jogo de tabuleiro|brinquedo|pel[uú]cia)\b/i, "brinquedos"],
 
   // ===== Papelaria (cedo: mochila/estojo escolar etc.) =====
-  [/\b(caderno|caneta|marca-texto|estojo|mochila escolar|lancheira escolar|agenda|planner|papelaria|bloco (de )?desenho|bloco (de )?anota[cç][oõ]es|caderno (de )?desenho|caderno (de )?anota[cç][oõ]es|bloco (de )?rascunho|papel sulfite|papel offset|papel cartaz|papel pardo|papel seda|papel verg[eê]|papel manga|papel kraft|post-it|apontador|livro|livros|romance|biografia|autobiografia)\b/i, "papelaria"],
+  [/\b(caderno|caneta|marca-texto|estojo|mochila escolar|lancheira escolar|agenda|planner|papelaria|bloco (de )?desenho|bloco (de )?anota[cç][oõ]es|caderno (de )?desenho|caderno (de )?anota[cç][oõ]es|bloco (de )?rascunho|bloco (criativo|atividades|de atividades|recibo|nota|de notas)|envelopes?|sacolas? personalizadas?|papel sulfite|papel offset|papel cartaz|papel pardo|papel seda|papel verg[eê]|papel manga|papel kraft|post-it|apontador|livro|livros|romance|biografia|autobiografia)\b/i, "papelaria"],
 
   // ===== Natal/decoração sazonal (antes de química: "resina" conflita) =====
   [/\b(arvore[^.\n]{0,40}natal|natal[^.\n]{0,40}arvore|árvore[^.\n]{0,40}natal|pres[ée]pio)\b/i, "decoracao"],
@@ -270,12 +270,21 @@ export const KEYWORDS: [RegExp, string][] = [
   [/lomadee.{0,40}\b(home|decor|kitchen)\b/i, "casa-decoracao"],
   [/lomadee.{0,40}\b(phones?|cellphones?|smartphones?)\b/i, "celulares"],
   [/lomadee.{0,40}\b(computers?|notebooks?|electronics?)\b/i, "informatica"],
+  [/lomadee.{0,40}\b(sports?|outdoors?)\b/i, "esporte-lazer"],
+  [/lomadee.{0,40}\b(tickets?|vouchers?|services?)\b/i, "servicos"],
+  [/lomadee.{0,40}\b(books?|magazines?)\b/i, "papelaria"],
+  [/lomadee.{0,40}\bhealth\b/i, "saude"],
+  [/lomadee.{0,40}\b(mobile|gadgets?)\b/i, "celulares"],
+  [/lomadee.{0,40}\bpets?\b/i, "pets"],
   // Título que é só URL, código de cupom ou banner de coleção -> oferta.
   // Ancorado em ^$: não casa com nomes de produto que só *contêm* essas palavras.
   [/^https?:\/\//i, "ofertas"],
   [/^(?!.*(?:IPHONE|SAMSUNG|GALAXY|XIAOMI|MOTOROLA|REDMI|POCO|IPAD|MACBOOK|NOTEBOOK|XBOX|NINTENDO|SWITCH|PLAYSTATION|SMART|AIRPODS?|WATCH|BAND|TV|NOTE|MOTO|REALME|HONOR|LOGITECH|JBL|SONY|BOSE|TRAMONTINA|CONSUL|BRASTEMP|ELETROLUX|CASIO|TIMEX|INTEL|NVIDIA))[A-Z0-9]{5,20}$/, "ofertas"],
   [/^(cole[cç][aã]o|nova cole[cç][aã]o|lan[cç]amento de cole[cç][aã]o|edi[cç][aã]o limitada)\b/i, "ofertas"],
-  [/\b(flash sale|% ?off|off em todo|tudo com|liquida[cç][aã]o|queima de estoque|black friday|cyber monday|oferta rel[aâ]mpago|oferta do dia|promo[cç][aã]o rel[aâ]mpago|dia do cliente|dia das m[aã]es|dia dos pais|dia dos namorados|leve mais pague menos|novidade!|_lomadee|network_lomadee|\bbanner\b|cole[cç][aã]o (de|nova)|at[eé] \d{1,2}%|\bcupom\b|cashback|desconto|a partir de|frete gr[aá]tis|\bbazar\b|imperd[ií]vel|black (november|on black)|compre.{0,12}e ganhe|leve \d+ pague \d+|11[./]?11|\bofertas?\b|brinde|primeira.?compra|boas.?vindas|bem.?vindo|clientevip|sald[aã]o|saldinho|lota[cç][aã]o|s[oó] (hoje|ontem)|unica vez|mega (oferta|sald)|oferta (da|do) (semana|m[eê]s)|em compras acima de|compras acima de|at[eé] r\$ ?\d+|r\$ ?\d+ ?off|pre[cç]o de black|\b(amigo|amiga) secret[oa]\b|\bcampanha\b|\bsele[cç][aã]o de\b|ltimos dias|\bfestivais?\b|\bpreview\b|\boutlet\b|\b(ver[aã]o|inverno|primavera|outono) \d{4}\b|tudo por)\b/i, "ofertas"],
+  // Padrões terminados em caractere não-palavra (%, !) não podem ficar no
+  // regex com \b final — não existe word boundary depois de "%"/"!".
+  [/\b(at[eé] \d{1,2}%|menos \d+%|\bpix.{0,5}\d+%|\d+%.{0,5}(no |de )?pix|novidade!)/i, "ofertas"],
+  [/\b(flash sale|% ?off|off em todo|tudo com|liquida[cç][aã]o|queima de estoque|black friday|cyber monday|oferta rel[aâ]mpago|oferta do dia|promo[cç][aã]o rel[aâ]mpago|dia do cliente|dia das m[aã]es|dia dos pais|dia dos namorados|leve mais pague menos|_lomadee|network_lomadee|\bbanner\b|cole[cç][aã]o (de|nova)|at[eé] \d{1,2}%|\bcupo[mn]s?\b|cashback|descontos?|a partir de|frete gr[aá]tis|\bbazars?\b|imperd[ií]ve(?:l|is)|black (november|on black)|compre.{0,12}e ganhe|leve \d+ pague \d+|11[./]?11|\bofertas?\b|brindes?|primeira.?compra|boas.?vindas|bem.?vindo|clientevip|sald[aã]o|sald[oõ]es|saldinho|saldinhos|lota[cç][aã]o|lota[cç][oõ]es|s[oó] (hoje|ontem)|unica vez|mega (oferta|sald)|oferta (da|do) (semana|m[eê]s)|em compras acima de|compras acima de|at[eé] r\$ ?\d+|r\$ ?\d+ ?off|pre[cç]o de black|\b(amigo|amiga) secret[oa]\b|\bcampanhas?\b|\bsele[cç][aã]o de\b|\bsele[cç][oõ]es de\b|ltimos dias|\bfestivais?\b|\bpreviews?\b|\boutlets?\b|\bpromo[cç][aã]o\b|\bpromo[cç][oõ]es\b|\blinha festa\b|\bblack (dos )?sonhos\b|\b(ver[aã]o|inverno|primavera|outono) \d{4}\b|tudo por)\b/i, "ofertas"],
 
   // ===== Infantil primeiro =====
   // Sinais de "infantil/kids/bebê" no título mantêm o produto fora das
@@ -288,7 +297,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(acess[oó]rios?|pe[cç]as?|cabe[cç]otes?).{0,25}(medidor|paqu[ií]metro|micr[oô]metro|trena|mult[ií]metro|volt[ií]metro|amper[ií]metro|comparador|instrumento|medição|medicao)\b|\b(medidor|paqu[ií]metro|micr[oô]metro|trena|mult[ií]metro|comparador|instrumento).{0,25}acess[oó]rios?\b/i, "medicao-precisao"],
   // Marcas de instrumentos de medição vencem tudo — "Anel 0.5mm Série 511
   // MITUTOYO" é peça de relógio comparador, não bijuteria.
-  [/\b(mitutoyo|digimess|digi mess)\b|\bs[eé]rie ?\d{3,}\b/i, "medicao-precisao"],
+  [/\b(mitutoyo|digimess|digi mess|testo|fluke|bosch (measurement|professional))\b|\bs[eé]rie ?\d{3,}\b/i, "medicao-precisao"],
   // Anel/vedação hidráulica não é bijuteria nem fixação — é construção
   [/\ban[eé](?:l|is?).{0,20}(compress[aã]o|veda[cç][aã]o|passatubo|registro|gaveta|press[aã]o|met[aá]lico)\b/i, "construcao"],
   // Bandeira de árbitro/torcida é esporte, não decoração de festa
@@ -300,7 +309,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(vestido|vestidos)\b/i, "vestidos"],
   [/\b(cal[cç]a|pantalona|legging|saia|shorts|bermuda|macac[aã]o|jardineira|culotte|bootcut|mom jeans|wide leg|cargo|saruel|jeans|denim|cal[cç]as|saias|bermudas)\b/i, "calcas"],
   [/\b(blusa|blus[aã]o|camisa|camiseta|regata|cropped|moletom|hoodie|su[eé]ter|cardigan|jaqueta|casaco|parka|blazer|tricot|polera|polerinha|t[uú]nica|tunica|colete|corta vento|canguru|body (manga|de|para|gestante|longo|curto|fitness|academia|dança|dan[aç]a)|top (cropped|b[aá]sico|fitness|academia|yoga)|conjunto (feminino|masculino|infantil|i?ntimo|de banho|de praia|de academia|de gin[aá]stica|de yoga|de pilates|de corrida|de ciclismo|de trilha|de camping|de festa|de casamento)|blusas|camisas|camisetas|regatas|moletoms|hoodies|su[eé]teres|cardigans|jaquetas|casacos|parkas|blazers|tricots|poleras|polerinhas|t[uú]nicas|coletes|corta ventos|cangurus)\b/i, "blusas"],
-  [/\b(suti[aã]|calcinha|lingerie|pijama|pijamas|conjunto i?ntimo|corset|cueca|bermuda i?ntima|short lingerie|top lingerie|suti[aã]s|calcinhas|lingeries|corsets|cuecas)\b/i, "lingerie"],
+  [/\b(suti[aã]|calcinha|lingerie|pijama|pijamas|conjunto i?ntimo|corset|cueca|bermuda i?ntima|short lingerie|top lingerie|shapewear|linha invisible|modelador(a|es)? (corporal|de corpo|invis[ií]vel)|suti[aã]s|calcinhas|lingeries|corsets|cuecas)\b/i, "lingerie"],
   [/\b(bola|bolas|raquete|raquetes|rede|campo|cancha|quadro|caneleira|apito|suporte|carro|cesto|tube|pressurizador|bomba).{0,20}t[eê]nis\b|\bt[eê]nis de (mesa|campo|cancha|duplas?|simples?|competi[cç][aã]o)\b|\bbola de t[eê]nis\b/i, "esporte-lazer"],
   [/\b(t[eê]nis|sapato|sand[aá]lia|sapat[eê]nis|scarpin|salto|rasteira|chinelo|papete|mocassim|loafer|oxford|dockside|sapatilha|tamanco|bota|coturno|botina|galocha|slipper|rasteirinha|anabela|apoio plantar|palmilha|insole|ortop[eé]dico|cal[cç]ado|calcado|t[eê]nises?|sapatos?|sand[aá]lias?|sapat[eê]nises?|scarpins?|saltos?|rasteiras?|chinelos?|papetes?|mocassins?|loafers?|oxfords?|dockside|sapatilhas?|tamancos?|botas?|coturnos?|botinas?|galochas?|slippers?|rasteirinhas?|cal[cç]ados?)\b/i, "calcados"],
   [/\b(bolsa|bolsinha|mochila|pasta executiva|carteira|necessaire|pochete|riñonera|rinonera|crossbody|tiracolo|portamoedas|porta.?moedas|card.?holder|porta.?cart[aã]o|porta.?cartao|bolsas|mochilas|carteiras|necessaires|pochetes|riñoneras|rinoneras|pastas executivas|crossbodys|tiracolos)\b/i, "bolsas-mochilas"],
@@ -313,7 +322,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(feminino|feminina|woman|women|mo[cç]a|senhora|senhorita|femininos|femininas)\b/i, "moda-feminina"],
   [/\b(masculino|masculina|masculin|homem|senhor|garoto|boy|masculinos|masculinas)\b/i, "moda-masculina"],
   [/\b(infantil|menino|menina|beb[eê]|kids|juvenil|crianca|crian[cç]a|adolescente|jovem|kid|toddler|teen|infantis|meninos|meninas|beb[eê]s|juvenis|criancas|crian[cç]as|adolescentes|jovens|toddlers|teens|bata|batas|roup[aã]o|roupao|macac[aã]ozinho|macacaozinho)\b/i, "moda-infantil"],
-  [/\b(traje|look|outfit|moda|fashion|estampad[ao]|listrad[ao]|xadrez|floral|confec[cç][aã]o|confeccao|boutique|vestu[aá]rio|vestuario|roupa (feminina|masculina|infantil|de)|roupas)\b/i, "moda-feminina"],
+  [/\b(traje|looks?|outfit|moda|fashion|estampad[ao]|listrad[ao]|xadrez|floral|confec[cç][aã]o|confeccao|boutique|vestu[aá]rio|vestuario|roupa (feminina|masculina|infantil|de)|roupas)\b/i, "moda-feminina"],
 
   // ===== Beleza / saúde =====
   [/\b(mascara de c[ií]lios|cilios posticos|batom|base facial|r[ií]mel|delineador|sombra|blush|iluminador|corretivo|compacto|maquiagem|\bmake\b|kit maquiagem|kit make|esmalte|vidro de unhas|top coat|base coat|removedor de esmalte|gloss labial|balm labial|protetor labial|primer|fixador de maquiagem|setting spray|esponja de maquiagem|pincel de maquiagem|corretivo|contour|contorno|brow|sobrancelha|lash|extensor de c[ií]lios)\b/i, "maquiagem"],
@@ -322,7 +331,7 @@ export const KEYWORDS: [RegExp, string][] = [
   [/\b(perfume|colonia|eau de|fragr[aâ]ncia|desodorante|body splash|perfume masculino|perfume feminino|perfume importado|perfume nacional|perfume [aá]rabe|oud|[aá]mbar|vetiver|moschino|perfumaria|perfumeria)\b/i, "perfumaria"],
   [/\b(whey|creatina|glutamina|bcaa|suplemento|pr[eé]-treino|termog[eê]nico|multivitam[ií]nico|col[aá]geno|magn[eé]sio|zma|protein|prote[ií]na|hipercal[oó]rico|mass gainer|albumina|beta alanina|cafe[ií]na|melatonina|5-htp|dmha|vitaminas e minerais|massa muscular|hipertrofia|defini[cç][aã]o|emagrecimento|akkermat|controle do apetite|libido|desempenho sexual|pot[eê]ncia sexual)\b/i, "suplementos"],
   [/\b(rem[eé]dio|medicamento|vitamina|suplemento|protetor|term[oô]metro|glicos[ií]metro|aparelho de press[aã]o|teste de gravidez|antibi[oó]tico|anti-inflamat[oó]rio|dorflex|analg[eé]sico|anti-al[eé]rgico|anti-histam[ií]nico|antif[uú]ngico|antiss[eé]ptico|curativo|gaze|soro fisiol[oó]gico|compressa|banda|bandagem|abafador|protetor auricular|protetor de ouvido|equipamento de prote[cç][aã]o individual|\bepi\b)\b/i, "saude"],
-  [/\b(maquiagem|batom|r[ií]mel|delineador|esmalte|esfoliante|m[aá]scara de c[ií]lios|skincare|sabonete facial|[aá]cido hialur[oô]nico|vitamina c|serum|[aá]gua micelar|protetor solar|hidratante|condicionador|shampoo|finalizador|progressiva|escova modeladora|\bspa\b|harmoniza[cç][aã]o|depila[cç][aã]o|est[eé]tica|drenagem (linf[aá]tica|corporal|manual)|massagem|massoterapia|endermologia|celulite|gordura (localizada|corp[oó]rea)|modeladora)\b/i, "beleza"],
+  [/\b(maquiagem|batom|r[ií]mel|delineador|esmalte|esfoliante|m[aá]scara de c[ií]lios|skincare|sabonete facial|[aá]cido hialur[oô]nico|vitamina c|serum|[aá]gua micelar|protetor solar|hidratante|condicionador|shampoo|finalizador|progressiva|escova modeladora|\bspa\b|harmoniza[cç][aã]o|depila[cç][aã]o|est[eé]tica|drenagem (linf[aá]tica|corporal|manual)|massagem|massoterapia|endermologia|celulite|gordura (localizada|corp[oó]rea)|estrias?|vergetures?|cicatrizes?|modeladora)\b/i, "beleza"],
 
   // ===== Casa / eletro =====
   [/\b(ar.?condicionado|ar condicionado|split|ventilador|torre de ventila|aquecedor|climatizador|purificador de ar|umidificador|desumidificador|exaustor|circulador de ar|frio port[aá]til)\b/i, "climatizacao"],
