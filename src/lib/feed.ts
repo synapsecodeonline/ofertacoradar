@@ -208,6 +208,9 @@ export interface LomadeeBrand {
   name: string;
   logo?: string;
   site?: string;
+  /** Vertical pré-definida da loja pela Lomadee (ex.: "Calças",
+   *  "Perfumaria", "retail"). Base da classificação de categoria. */
+  segment?: string;
 }
 
 interface LomadeeChannel {
@@ -251,7 +254,7 @@ export async function fetchLomadeeBrandsPage(
   page: number,
 ): Promise<{ items: LomadeeBrand[]; totalPages: number }> {
   const json = await lomadeeGet<{
-    data?: { id: string; name: string; logo?: string; site?: string }[];
+    data?: { id: string; name: string; logo?: string; site?: string; segment?: string }[];
     meta?: { totalPages?: number };
     pagination?: { totalPages?: number };
   }>(apiKey, baseUrl, "/affiliate/brands", { page, limit: 20 });
@@ -261,6 +264,7 @@ export async function fetchLomadeeBrandsPage(
       name: b.name,
       logo: b.logo,
       site: b.site,
+      segment: b.segment,
     })),
     totalPages: json.pagination?.totalPages ?? json.meta?.totalPages ?? page,
   };

@@ -24,9 +24,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function upsertByExternalId(
   p: NormalizedProduct,
   merchantFallback?: string,
+  segment?: string | null,
 ) {
   const merchant = p.merchant ?? merchantFallback ?? null;
-  const category = resolveCategory(p.category, p.title, merchant);
+  const category = resolveCategory(p.category, p.title, merchant, segment);
   const data = {
     title: p.title,
     description: p.description,
@@ -87,8 +88,8 @@ async function runCycle(apiKey: string, baseUrl: string) {
       await prisma.brand
         .upsert({
           where: { id: b.id },
-          create: { id: b.id, name: b.name, logo: b.logo, site: b.site },
-          update: { name: b.name, logo: b.logo, site: b.site },
+          create: { id: b.id, name: b.name, logo: b.logo, site: b.site, segment: b.segment },
+          update: { name: b.name, logo: b.logo, site: b.site, segment: b.segment },
         })
         .catch(() => {});
     }
@@ -112,6 +113,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
         name: b.name,
         logo: b.logo ?? undefined,
         site: b.site ?? undefined,
+        segment: (b as { segment?: string | null }).segment ?? undefined,
       });
     }
   }
@@ -140,6 +142,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
       await upsertByExternalId(
         n.product,
         n.org?.organizationId ? brands.get(n.org.organizationId)?.name : undefined,
+        brand?.segment,
       ).catch(() => {});
       if (n.org) {
         await prisma.affiliatedOrg
@@ -208,6 +211,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
           affiliateUrl: undefined,
         },
         p.organizationId ? orgNames.get(p.organizationId) : undefined,
+        p.organizationId ? brands.get(p.organizationId)?.segment : undefined,
       ).catch(() => {});
     }
     if (items.length < 100) {

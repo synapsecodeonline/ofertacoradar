@@ -869,6 +869,87 @@ export function merchantCategory(merchant?: string | null): string | null {
   return null;
 }
 
+// ===== Segmentos Lomadee (taxonomia pré-definida das brands) =====
+// O endpoint /affiliate/brands retorna `segment` por loja — é a
+// classificação que a própria Lomadee dá à vertical da loja, sem
+// depender do nome. Só mapeamos segmentos ESPECÍFICOS: "retail",
+// "others", "fashion", "technology", "entertainment", "moda geral"
+// etc. são genéricos demais → retornam null e o título decide.
+const SEGMENT_RULES: [RegExp, string][] = [
+  // --- bebê / infantil (antes de moda adulta) ---
+  [/\b(carrinho de bebe|berco|fraldas?|enxoval|bebe comfort|layette)\b/, "bebe"],
+  [/\b(moda infantil|roupas? infantis?|calcados? infantil|moda praia infantil)\b/, "moda-infantil"],
+  // --- moda ---
+  [/\bmoda praia\b/, "moda-praia"],
+  [/\bfitness\b/, "fitness"],
+  [/\b(calcados?|sapatos?|tenis|sandalias?|scarpin|sapatilhas?|coturno|rasteirinha|papete|chinelo|footwear|shoes)\b/, "calcados"],
+  [/^calcas?\b/, "calcas"], // segmento curto tipo "Calças" (Sawary)
+  [/\b(camisas?|ternos?|blazers?|paletos?|moda masculina|roupas masculinas|corta vento)\b/, "moda-masculina"],
+  [/\b(roupas? femininas?)(?!.*masculinas)\b/, "moda-feminina"],
+  [/\b(lingerie|intimo|intimates)\b/, "lingerie"],
+  [/\b(bolsas?|malas e mochilas|mochilas?|luggage|bags)\b/, "bolsas-mochilas"],
+  [/\b(joias?|relogios?|watches|jewelry|aliancas?|piercing)\b/, "joias-relogios"],
+  [/\b(oculos|otica)\b/, "oculos"],
+  // --- beleza / saúde ---
+  [/\b(perfumaria|perfumes?|colonias?|fragrancias?)\b/, "perfumaria"],
+  [/\b(skin ?care|skincare|dermocosmet)\b/, "skincare"],
+  [/\b(cabelo|finalizadores|progressiva)\b/, "cabelo"],
+  [/\b(maquiagem|makeup)\b/, "maquiagem"],
+  [/\b(suplementos?|whey|protein|vitamina|colageno|creatina)\b/, "suplementos"],
+  [/\b(saude|farmacia|remedios|medicamentos|drogaria|health|bem-estar|bem estar|desempenho|perda de peso|curativos|manipulacao|saboaria|pharma)\b/, "saude"],
+  [/\b(cosmeticos|beleza|higiene)\b/, "beleza"],
+  // --- alimentos / mercado ---
+  [/\b(bebidas?|food|alimentos?|vinho|cerveja|bebida alcoolica|utensilios de bar|yakisoba|bowls?|comida|delivery|restaurante|lanches?|porcoes|refeicoes)\b/, "alimentos-bebidas"],
+  [/\b(supermercado|mercearia|hortifruti|atacado)\b/, "supermercado"],
+  [/\b(limpeza|detergente|desinfetante)\b/, "limpeza-higiene"],
+  [/\b(pets?|animais?|petshop|veterin)\b/, "pets"],
+  // --- casa ---
+  [/\b(moveis|movel|sala de jantar|guarda roupas|camas?|sofas?|colchoes?|rack|estante|mesa de jantar|guarda-roupas)\b/, "moveis"],
+  [/\beletrodom/, "eletrodomesticos"],
+  [/\b(fogao|fogueira|cooktop|forno)\b/, "eletro-cocina"],
+  [/\b(panelas?|utensilios|loucas|faqueiros|travessas|assadeiras?|cozinha|tabuas?)\b/, "cozinha"],
+  [/\b(organizacao|organizer|prateleira|nichos?|closet|guarda-roupa|arrumacao|cestos?)\b/, "organizacao"],
+  [/\b(ilumina|luminaria|lustre|lampada|fita de led)\b/, "iluminacao"],
+  [/\b(cama|travesseiro|lencol|lencois|toalha|cobertor|edredom|textil)\b/, "textil-cama"],
+  [/\b(decora\w*|quadros?|vasos?|flores?|cortina|almofada|tapete|utilidades domesticas)\b/, "decoracao"],
+  [/\b(jardim|garden|piscina|grama|plantas?|floricultura)\b/, "jardim"],
+  // --- auto / industrial ---
+  [/\b(bombas?|pressurizadores?|motores?)\b/, "bombas-motores"],
+  [/\b(pneus?|automotiv|veiculos?|autopecas|caminhao)\b/, "pecas-veiculos"],
+  [/\b(construcao|construcao|civil|tinta|pintura|hidraulica|cimento|areia|pedreiro|acabamentos?|revestimento)\b/, "construcao"],
+  [/\bel[eé]trica\b/, "eletrica"],
+  [/\b(quimica|quimicos|industrial)\b/, "quimica-industrial"],
+  [/\b(ferramentas?|tools)\b/, "ferramentas"],
+  [/\b(industry|industria)\b/, "industria"],
+  // --- tecnologia ---
+  [/\b(games?|gaming|videogame|console|playstation|xbox|nintendo)\b/, "games"],
+  [/\b(hardware|notebook|pc gamer|computador|monitores?|informatica|perifericos)\b/, "informatica"],
+  [/\beletronicos?\b/, "eletronicos"],
+  [/\b(celular|smartphone|celulares)\b/, "celulares"],
+  [/\b(tv|televisao|televisores|som|audio|soundbar)\b/, "tv-audio"],
+  [/\b(cameras?|fotografia|drone)\b/, "fotografia"],
+  [/\b(software|aplicativo)\b/, "software"],
+  // --- mercado / papelaria / brinquedos ---
+  [/\b(brinquedos?|toys|hobbies|funko|colecionaveis?)\b/, "brinquedos"],
+  [/\b(livros?|livraria|editora|papelaria|stationery)\b/, "papelaria"],
+  // --- serviços / viagem ---
+  [/\b(turismo|viagem|tourism|deonibus|passagem|hoteis?|pousadas?)\b/, "viagem"],
+  [/\b(ingressos?|eventos?|tickets?)\b/, "eventos"],
+  [/\b(servicos?|services|streaming|cambio|education|educacao|cursos?)\b/, "servicos"],
+];
+
+// Segmento normalizado (minúsculas, sem acento) -> categoria canonica.
+// Retorna null para segmentos genéricos/ausentes.
+export function segmentCategory(segment?: string | null): string | null {
+  if (!segment) return null;
+  const s = MERCHANT_NORM(segment);
+  if (!s) return null;
+  for (const [re, slug] of SEGMENT_RULES) {
+    if (re.test(s)) return slug;
+  }
+  return null;
+}
+
 // Resolve uma categoria de origem para a canonica; se desconhecida,
 // tenta classificar pelo titulo; fallback "outros".
 // Categorias cujo sinal do título é inequívoco (produto concreto: bolsa,
@@ -884,6 +965,18 @@ const TITLE_STRONG: ReadonlySet<string> = new Set([
   "eletro-limpeza", "climatizacao",
   "quimica-industrial", "fixacao-metalica", "eletrica", "medicao-precisao",
   "bombas-motores", "construcao", "tinta-pintura", "ferramentas", "jardim",
+  // Produto concreto de casa/moda: "aparelho de jantar", "sofa",
+  // "vestido", "calça" são inequívocos — vencem até segmentos amplos
+  // da loja ("Casa e Construção", "Eletrodomésticos", "fashion").
+  "pecas-veiculos", "automotivo",
+  "casa-decoracao", "decoracao", "iluminacao", "textil-cama",
+  "organizacao", "moveis", "cozinha",
+  "esporte-lazer", "esporte-infantil", "fitness", "ciclismo", "camping",
+  "moda-feminina", "moda-masculina", "moda-infantil", "moda-praia",
+  "moda-praia-infantil", "calcados", "calcados-infantil",
+  "vestidos", "calcas", "blusas", "lingerie",
+  "beleza", "beleza-infantil", "maquiagem", "cabelo", "skincare",
+  "perfumaria", "eletronicos-infantil",
 ]);
 
 // Loja de vertical única tem prioridade sobre o título; sem ela, a
@@ -892,6 +985,7 @@ export function resolveCategory(
   raw: string | undefined | null,
   title?: string,
   merchant?: string | null,
+  segment?: string | null,
 ): string {
   let titleSlug: string | null = null;
   if (title) {
@@ -902,13 +996,18 @@ export function resolveCategory(
       }
     }
   }
-  const mc = merchantCategory(merchant);
-  if (mc) {
+  // Prioridade da vertical da loja: o mapa manual (merchantCategory) é
+  // validado loja a loja e cobre casos que o segment genérico da Lomadee
+  // não resolve (iRobot → eletro-limpeza, NutriBullet → eletro-cocina);
+  // o `segment` da brand cobre todas as demais lojas com a taxonomia
+  // pré-definida da Lomadee.
+  const storeSlug = merchantCategory(merchant) ?? segmentCategory(segment);
+  if (storeSlug) {
     if (titleSlug === "ofertas") return "ofertas";
-    if (titleSlug && titleSlug !== mc && TITLE_STRONG.has(titleSlug)) {
+    if (titleSlug && titleSlug !== storeSlug && TITLE_STRONG.has(titleSlug)) {
       return titleSlug;
     }
-    return mc;
+    return storeSlug;
   }
   if (titleSlug) return titleSlug;
   if (raw) {

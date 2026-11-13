@@ -40,10 +40,11 @@ model Product {
 }
 
 model Brand {
-  id   String  @id
-  name String
-  logo String?
-  site String?
+  id      String  @id
+  name    String
+  logo    String?
+  site    String?
+  segment String?
 
   @@schema("ofertacoradar")
 }
