@@ -17,6 +17,7 @@ import FeaturedCarousel, {
 } from "@/components/FeaturedCarousel";
 import CountdownTimer from "@/components/CountdownTimer";
 import CategoryNav from "@/components/CategoryNav";
+import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { Suspense } from "react";
@@ -495,20 +496,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       {/* Ofertas relampago: terminam em ate 48h */}
       {flashDeals.length > 0 && (
-        <section id="relampago" className="mb-6 -mx-4 scroll-mt-20 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50 px-4 py-4 dark:border-amber-900/40 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-amber-950/30">
-          <div className="mx-auto flex max-w-6xl flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-                <IconZap className="h-4 w-4" />
-                Ofertas relâmpago
-                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-amber-700 dark:text-amber-300">
-                  terminam em breve
-                </span>
-              </h2>
-              <span className="text-xs font-medium text-amber-600/80 dark:text-amber-500/80">
-                {flashDeals.length} ofertas
+        <CollapsibleSection
+          id="relampago"
+          className="border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50 dark:border-amber-900/40 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-amber-950/30"
+          title={
+            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+              <IconZap className="h-4 w-4" />
+              Ofertas relâmpago
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-amber-700 dark:text-amber-300">
+                terminam em breve
               </span>
-            </div>
+            </h2>
+          }
+          meta={
+            <span className="text-xs font-medium text-amber-600/80 dark:text-amber-500/80">
+              {flashDeals.length} ofertas
+            </span>
+          }
+        >
             <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory [scrollbar-width:thin]">
               {flashDeals.map((p) => {
                 const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
@@ -566,22 +571,25 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 );
               })}
             </div>
-          </div>
-        </section>
+        </CollapsibleSection>
       )}
 
       {/* Aproveitadas agora: prova social real (cliques 48h) */}
       {aproveitadas.length > 0 && (
-        <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
+        <CollapsibleSection
+          className="border-orange-200/70 bg-gradient-to-r from-orange-50 via-rose-50/60 to-orange-50 dark:border-orange-900/40 dark:from-orange-950/30 dark:via-rose-950/20 dark:to-orange-950/30"
+          title={
             <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
               <IconFlame className="h-4 w-4" />
               Aproveitadas agora
             </h2>
-            <span className="text-xs font-medium text-zinc-400">
+          }
+          meta={
+            <span className="text-xs font-medium text-orange-600/80 dark:text-orange-500/80">
               mais clicadas nas últimas 48h
             </span>
-          </div>
+          }
+        >
           <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
             {aproveitadas.map((p) => {
               const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
@@ -627,7 +635,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               );
             })}
           </div>
-        </section>
+        </CollapsibleSection>
       )}
 
       {items.length === 0 ? (
