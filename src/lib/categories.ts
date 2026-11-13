@@ -469,9 +469,9 @@ const SUBTYPES: Record<string, SubtypeDef[]> = {
   moveis: [
     { slug: "sofa-poltrona", label: "Sofá e Poltrona", re: /sof[aá]|poltrona|puff|reclin[aá]vel|retr[aá]til/i },
     { slug: "quarto-bebe", label: "Quarto de Bebê", re: /ber[cç]o|berco|mois[eé]s|cercadinho|carrinho de beb[eê]|bebe comfort|balan[cç]o|playground|redinha/i },
+    { slug: "armario-estante", label: "Armários e Estantes", re: /arm[aá]rio|armario|guarda-roupa|closet|estante|aparador|buf[eê]|criado|c[oô]moda|comoda|rack/i },
     { slug: "cama-colchao", label: "Cama e Colchão", re: /cama|colch[aã]o|colchao|box|beliche|solteiro|casal/i },
     { slug: "mesa-cadeira", label: "Mesas e Cadeiras", re: /mesa|cadeira|escrivaninha|banco|banqueta|balc[aã]o|balcao|rack|home office/i },
-    { slug: "armario-estante", label: "Armários e Estantes", re: /arm[aá]rio|armario|guarda-roupa|closet|estante|aparador|buf[eê]|criado|c[oô]moda|comoda|rack/i },
   ],
   cozinha: [
     { slug: "panelas-assadeiras", label: "Panelas e Assadeiras", re: /panela|frigideira|assadeira|forma de bolo|leiteira|wok|grill|ca[cç]arola|panela de press[aã]o/i },
