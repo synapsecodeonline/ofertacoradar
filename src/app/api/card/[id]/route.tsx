@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/db";
+import { createClient } from "@/lib/supabase/server";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { siteUrl, SITE_NAME } from "@/lib/site";
 
@@ -28,6 +29,17 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Cards para redes sociais: apenas usuários autenticados
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      return new Response("Login necessário", { status: 401 });
+    }
+  } catch {
+    return new Response("Login necessário", { status: 401 });
+  }
+
   const { id } = await params;
   const size = new URL(req.url).searchParams.get("size") === "story"
     ? "story"
