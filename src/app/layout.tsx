@@ -85,7 +85,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Ofertaço <span className="text-emerald-600">Radar</span>
             </Link>
             <div className="flex items-center gap-2">
-              <nav className="flex items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70">
+              <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <Link
                 href="/?aba=produtos"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"

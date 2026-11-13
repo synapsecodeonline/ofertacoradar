@@ -33,10 +33,10 @@ export default function CollapsibleSection({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="group flex w-full cursor-pointer items-center justify-between gap-3 text-left"
+          className="group flex w-full cursor-pointer flex-wrap items-center justify-between gap-x-3 gap-y-2 text-left"
         >
-          <span className="flex items-center gap-2">{title}</span>
-          <span className="flex shrink-0 items-center gap-2">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">{title}</span>
+          <span className="flex flex-wrap items-center justify-end gap-2">
             {meta}
             <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300/80 bg-white/80 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-zinc-500 shadow-sm transition-all duration-200 group-hover:-translate-y-px group-hover:border-zinc-400 group-hover:text-zinc-800 group-hover:shadow dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-400 dark:group-hover:border-zinc-500 dark:group-hover:text-zinc-200">
               {open ? "Recolher" : "Expandir"}
