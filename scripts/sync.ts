@@ -22,11 +22,17 @@ async function main() {
   const importProducts = process.env.LOMADEE_PRODUCTS === "1";
   let products;
   let orgs: { organizationId: string; name?: string }[] = [];
+  let brandSegments = new Map<string, string | undefined>();
 
   if (apiKey) {
     // Campanhas (ofertas/cupons) trazem links lmdee.link ja rastreados = comissao
     console.log("Buscando campanhas/ofertas na Lomadee...");
     const brands = await fetchLomadeeBrands(apiKey, baseUrl);
+    // segment Lomadee por organizationId — sinal de vertical da loja
+    // usado na classificação (brand.id == organizationId do produto)
+    brandSegments = new Map(
+      [...brands.values()].map((b) => [b.id, b.segment]),
+    );
     const campaigns = await fetchLomadeeCampaigns(apiKey, baseUrl, brands);
     products = campaigns.items;
     orgs = campaigns.orgs;
@@ -84,7 +90,12 @@ async function main() {
   const upsertOne = async (p: (typeof products)[number]) => {
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
-    const category = resolveCategory(p.category, p.title, merchant);
+    const category = resolveCategory(
+      p.category,
+      p.title,
+      merchant,
+      p.organizationId ? brandSegments.get(p.organizationId) : undefined,
+    );
     const data = {
       title: p.title,
       description: p.description,
