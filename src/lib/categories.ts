@@ -15,6 +15,8 @@ export const CATEGORY_LABEL: Record<string, string> = {
   lingerie: "Lingerie e Pijamas",
   "moda-masculina": "Moda Masculina",
   "moda-infantil": "Moda Infantil",
+  "calcados-infantil": "Calçados Infantil",
+  "moda-praia-infantil": "Moda Praia Infantil",
   bebe: "Bebê e Fraldas",
   calcados: "Calçados",
   "bolsas-mochilas": "Bolsas e Mochilas",
@@ -23,6 +25,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   "joias-relogios": "Joias e Relógios",
   // --- Beleza e saude ---
   beleza: "Beleza",
+  "beleza-infantil": "Beleza Infantil",
   maquiagem: "Maquiagem",
   cabelo: "Cabelo e Finalizadores",
   skincare: "Skincare",
@@ -43,6 +46,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   "eletro-limpeza": "Eletro de Limpeza",
   // --- Tecnologia ---
   eletronicos: "Eletrônicos",
+  "eletronicos-infantil": "Eletrônicos Infantil",
   "tv-audio": "TVs e Áudio",
   fotografia: "Fotografia e Câmeras",
   informatica: "Informática",
@@ -51,6 +55,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   software: "Software",
   // --- Esportes ---
   "esporte-lazer": "Esportes e Lazer",
+  "esporte-infantil": "Esporte Infantil",
   fitness: "Fitness e Academia",
   ciclismo: "Ciclismo",
   camping: "Camping e Trilhas",
@@ -185,10 +190,30 @@ const ALIAS: Record<string, string> = Object.fromEntries(
   Object.entries(ALIAS_RAW).map(([k, v]) => [norm(k), v]),
 );
 
+// Marcadores de público infantil (pt-BR) — usados pelas regras kidRe
+const KID =
+  "infantil|infantis|kids?|meninos?|meninas?|criancinhas?|criancas?|crian[cç]as?|juvenil|juvenis|adolescentes?|toddler|teens?|beb[eê]s?|baby";
+
+// Casa quando o título tem marcador infantil E termo de produto
+// (em qualquer ordem, até 60 chars de distância).
+const kidRe = (prod: string) =>
+  new RegExp(
+    `\\b(?:${KID})\\b[\\s\\S]{0,60}\\b(?:${prod})\\b|\\b(?:${prod})\\b[\\s\\S]{0,60}\\b(?:${KID})\\b`,
+    "i",
+  );
+
 // Classificador por palavras-chave do titulo (pt-BR).
 // ORDEM IMPORTA: primeiro match vence — categorias filhas especificas
 // vem antes dos pais genericos.
 const KEYWORDS: [RegExp, string][] = [
+  // ===== Infantil (prioridade máxima: separa do adulto) =====
+  [kidRe("esporte|esportes|futebol|v[oô]lei|v[oô]leis|basquete|handebol|bola|bolas|bicicleta|bicicletas|bike|bikes|patins|patinete|patinetes|hoverboard|monociclo|raquete|raquetes|capacete|capacetes|trenzinho|trenzinhos|t[eê]nis de mesa|ping.?pong|longboard|penny|casco|cascos"), "esporte-infantil"],
+  [kidRe("calcado|calcados|sand[aá]lia|sand[aá]lias|t[eê]nis|sapato|sapatos|bota|botas|chinelo|chinelos|papete|papetes|sapatilha|sapatilhas|rasteirinha|rasteirinhas|sapatenis|sapat[eê]nis|tamanco|tamancos|galocha|galochas|scarpin|scarpins|salto|saltos|mocassim|mocassins|loafer|loafers|sneaker|sneakers|slipper|slippers|coturno|coturnos"), "calcados-infantil"],
+  [kidRe("biqu[ií]ni|biqu[ií]nis|sunga|sungas|cavada|cavadas|mai[oô]|sa[ií]da de praia|canga|cangas|moda praia|praia|pool|piscina|biquini|biquinis"), "moda-praia-infantil"],
+  [kidRe("shampoo|xampu|condicionador|sabonete|sabonetes|creme|cremes|hidratante|hidratantes|protetor solar|repelente|repelentes|pomada|pomadas|len[cç]o umedecido|lencos umedecidos|higiene|higi[eê]nico|higienico|higi[eê]nicos|higienicos|wipes|perfume|perfumes|colonia|colonias|desodorante|desodorantes|protetor labial|protetor facial|higiene bucal|escova de dente|fio dental"), "beleza-infantil"],
+  [kidRe("celular|celulares|smartphone|smartphones|tablet|tablets|smartwatch|smartwatches|fone|headset|console|consoles|videogame|video game|videogames|camera|cameras|drone|drones|eletronico|eletrônico|eletronicos|eletrônicos|notebook|notebooks|computador|computadores|tv|televisao|televisão|televisores|radio|rádio|radios|rádios|caixa de som|microfone|microfones|carregador|carregadores|cabo|cabos|fone bluetooth|smart tv|soundbar|home theater|projetor|projetores"), "eletronicos-infantil"],
+  [kidRe("vestido|vestidos|cal[cç]a|cal[cç]as|saia|saias|blusa|blusas|camisa|camisas|camiseta|camisetas|regata|regatas|moletom|moletoms|hoodie|hoodies|conjunto|conjuntos|pijama|pijamas|macac[aã]o|macac[aã]ões|jardineira|jardineiras|shorts|bermuda|bermudas|body|bodies|tricot|tricots|cardigan|cardigans|jaqueta|jaquetas|casaco|casacos|colete|coletes|tunica|túnica|t[uú]nicas|blusao|blusão|blusões|sutia|sutiã|sutiãs|calcinha|calcinhas|cueca|cuecas|look|looks|outfit|outfits|moda|fashion|estampad|listrad|roupa|roupas|vestuario|vestuário|confec|camisola|camisolas|negligee|macacaozinho|cropped|sueter|suéter|blus[aã]o"), "moda-infantil"],
+
   // ===== Auto / peças de veículos =====
   [/\b(bagageiro|ba[uú]\s*(lateral|traseiro|givi|shad|monolock|top.?case|motocicleta)|ba[uú]leto|bauleto|alforje|top.?case|mala para moto|quebra vento|protetor de (motor|tanque|carenagem|quadro)|capa de moto|hitch|engate|reboque|macaco|tri[aâ]ngulo|estepe|calota|aba (de )?tanque|protetor de tanque)\b/i, "pecas-veiculos"],
   [/\b(pneu|rodado|amortecedor|pastilha de freio|disco de freio|pin[aâ]o|coroa|catraca|kit transmiss[aã]o|embreagem|embreagem kit|kitembreagem|c[aâ]mbio|cambio|bomba de combust[ií]vel|bomba combust[ií]vel|bomba [aá]gua|vela de igni[cç][aã]o|bico injetor|correia dentada|correia|tensionador|sonda lambda|sensor de oxig[eê]nio|coxim|suporte de motor|ponta de eixo|cardan|semieixo|semi.?eixo|homocin[eé]tica|piv[oô]|coletor|escapamento|silenciador|reservat[oó]rio|reservatorio|bobina de igni[cç][aã]o|bobina igni[cç][aã]o|carretel|estator|[ií]m[aã]s?|aro (de )?roda|aro roda|roda (de|para) (carro|moto|caminh[aã]o|onibus)|bomba de (pneu|ar de pneu|bicicleta))\b/i, "pecas-veiculos"],
