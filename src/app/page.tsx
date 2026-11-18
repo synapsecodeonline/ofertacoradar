@@ -22,6 +22,7 @@ import CategoryNav from "@/components/CategoryNav";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
+import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
@@ -136,6 +137,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     featured,
     flashDeals,
     topClicks,
+    brandRows,
   ] = await Promise.all([
       tab === "ofertas"
         ? prisma.product.findMany({
@@ -220,7 +222,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         orderBy: { _count: { productId: "desc" } },
         take: 40,
       }),
+      // Logos das lojas em destaque (Brand.name -> logo Lomadee)
+      prisma.brand.findMany({ select: { name: true, logo: true } }),
     ]);
+
+  // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
+  const brandLogoByName = new Map(
+    brandRows.map((b) => [b.name ?? "", b.logo] as const),
+  );
 
   // Lojas afiliadas reais (com logo quando disponivel) para o hero
   const orgs = await prisma.affiliatedOrg.findMany({
@@ -679,6 +688,55 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             })}
           </div>
         </CollapsibleSection>
+      )}
+
+      {/* Lojas em destaque: marcas com ofertas ativas no site */}
+      {FEATURED_STORES.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+                Lojas parceiras
+              </p>
+              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                Lojas em destaque
+              </h2>
+            </div>
+            <span className="text-sm font-medium text-zinc-400">
+              {FEATURED_STORES.length} lojas
+            </span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+            {FEATURED_STORES.map((s) => {
+              const logo = storeLogo(s, brandLogoByName);
+              return (
+                <Link
+                  key={s.merchant}
+                  href={`/?aba=produtos&loja=${encodeURIComponent(s.merchant)}`}
+                  className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
+                    {logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={logo}
+                        alt={s.merchant}
+                        className="h-full w-full object-contain p-1.5"
+                      />
+                    ) : (
+                      <span className="text-lg font-extrabold text-zinc-300 dark:text-zinc-600">
+                        {s.merchant.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                  <span className="line-clamp-2 text-center text-xs font-bold leading-tight text-zinc-700 transition-colors group-hover:text-emerald-700 dark:text-zinc-300 dark:group-hover:text-emerald-400">
+                    {s.merchant}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {categoryList.length > 0 && (
