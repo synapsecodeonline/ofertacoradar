@@ -224,7 +224,7 @@ export default async function OfertasDoDiaPage({
 
       {/* Home completa: hero, abas por fonte, lojas em destaque e catalogo.
           embedded oculta as secoes de trilho (a pagina ja tem equivalentes). */}
-      <HomeExperience searchParams={searchParams} embedded dayOnly={!catalogMode} />
+      <HomeExperience searchParams={searchParams} dayOnly={!catalogMode} />
 
       <p className="flex items-center gap-2 pb-8 text-center text-xs text-zinc-400">
         <IconTag className="h-3.5 w-3.5" />

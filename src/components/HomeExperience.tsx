@@ -8,25 +8,15 @@ import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypes
 import {
   IconCheck,
   IconClock,
-  IconFlame,
   IconInstagram,
   IconRefresh,
   IconShield,
-  IconTrophy,
-  IconZap,
 } from "@/components/Icons";
-import FeaturedCarousel, {
-  type FeaturedItem,
-} from "@/components/FeaturedCarousel";
-import CountdownTimer from "@/components/CountdownTimer";
 import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
-import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
-import { urgencyLabel } from "@/lib/urgency";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
-import { merchantLogo } from "@/lib/store-logo";
 import { Suspense, type ReactNode } from "react";
 import type { Product } from "@prisma/client";
 
@@ -166,11 +156,9 @@ type SearchParams = Promise<{
 
 export async function HomeExperience({
   searchParams,
-  embedded = false,
   dayOnly = false,
 }: {
   searchParams: SearchParams;
-  embedded?: boolean;
   // dayOnly: renderiza so Instagram + transparencia (tela "Ofertas do dia")
   dayOnly?: boolean;
 }) {
@@ -233,20 +221,14 @@ export async function HomeExperience({
 
   const FLASH_WINDOW_MS = 48 * 3_600_000;
   const now = new Date();
-  const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
 
   const [
     pageItems,
     total,
     categories,
     merchants,
-    featured,
     flashDeals,
-    rankPool,
-    rankClicks,
-    aproveitadasTop,
     brandRows,
-    orgs,
     subtypeFacets,
     srcRows,
   ] = await Promise.all([
@@ -285,12 +267,6 @@ export async function HomeExperience({
       select: { merchant: true },
       distinct: ["merchant"],
     }),
-    // Ofertas em destaque: maiores descontos da fonte ativa
-    prisma.product.findMany({
-      where: listWhere,
-      orderBy: { discountPct: { sort: "desc", nulls: "last" } },
-      take: 5,
-    }),
     // Relampago: terminam nas proximas 48h, mais urgentes primeiro.
     // Escopo da fonte ativa; respeita busca/categoria/loja.
     prisma.product.findMany({
@@ -316,59 +292,9 @@ export async function HomeExperience({
       orderBy: { endsAt: "asc" },
       take: 12,
     }),
-    // Ranking do dia — pool de candidatos: ofertas ordena por urgencia
-    // (endsAt), fontes de produto por maior desconto
-    prisma.product.findMany({
-      where: listWhere,
-      orderBy:
-        tab === "ofertas"
-          ? [{ endsAt: { sort: "asc", nulls: "last" } }]
-          : [{ discountPct: { sort: "desc", nulls: "last" } }],
-      take: 25,
-    }),
-    // Itens mais clicados nas ultimas 24h (boost no ranking)
-    prisma.product.findMany({
-      where: {
-        ...listWhere,
-        clicks: { some: { createdAt: { gte: dayAgo } } },
-      },
-      orderBy: { clicks: { _count: "desc" } },
-      take: 12,
-    }),
-    // "Aproveitadas agora": itens da fonte ativa com cliques recentes,
-    // ordenados por total de cliques. Se vier vazio, cai no fallback abaixo.
-    prisma.product.findMany({
-      where: {
-        active: true,
-        imageUrl: { not: null },
-        AND: [
-          sourceCond,
-          notZeroPrice,
-          notExpired,
-          category ? { category: { in: rawSlugsFor(category) } } : {},
-          merchant
-            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
-            : {},
-          searchFilter,
-          {
-            clicks: {
-              some: {
-                createdAt: { gte: new Date(now.getTime() - 48 * 3_600_000) },
-              },
-            },
-          },
-        ],
-      },
-      orderBy: { clicks: { _count: "desc" } },
-      include: { _count: { select: { clicks: true } } },
-      take: 12,
-    }),
+
     // Logos das lojas em destaque (Brand.name -> logo Lomadee)
     prisma.brand.findMany({ select: { id: true, name: true, logo: true } }),
-    // Lojas afiliadas reais (com logo quando disponivel) para o hero
-    prisma.affiliatedOrg.findMany({
-      select: { organizationId: true, name: true },
-    }),
     // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
     subDefs.length
       ? prisma.product.groupBy({
@@ -449,14 +375,10 @@ export async function HomeExperience({
     }
   }
   // Awin so aparece como aba quando houver itens
-  const visibleTabs = TAB_ORDER.filter(
-    (t) => t !== "awin" || (tabCounts.get(t) ?? 0) > 0,
-  );
   const catalogTotal =
     (tabCounts.get("lojas") ?? 0) +
     (tabCounts.get("ml") ?? 0) +
     (tabCounts.get("awin") ?? 0);
-  const offersTotal = tabCounts.get("ofertas") ?? 0;
 
   // "Lojas em destaque" por aba: cada fonte mostra so as suas lojas.
   // Ofertas = todas as fontes; Lojas Lomadee = prod:; ML = ml:; Awin = aw:.
@@ -492,19 +414,6 @@ export async function HomeExperience({
     }).filter((s) => s.visible);
   const featuredStores = featuredForTab(tab);
 
-  // heroStores: brands cujo id bate com as orgs afiliadas (sem query extra)
-  const orgIds = new Set(orgs.map((o) => o.organizationId));
-  const storeNameByOrg = new Map(orgs.map((o) => [o.organizationId, o.name]));
-  const heroStores = brandRows
-    .filter((b) => orgIds.has(b.id))
-    .map((b) => ({
-      key: b.id,
-      name: b.name ?? storeNameByOrg.get(b.id) ?? "Loja",
-      logo: b.logo,
-    }))
-    .filter((s) => s.name)
-    .slice(0, 12);
-  const storeCount = orgs.length;
 
   const categoryList = [
     ...new Set(
@@ -570,301 +479,36 @@ export async function HomeExperience({
     : [];
   const clickMap = new Map(clickGroups.map((g) => [g.productId, g._count._all]));
 
-  // "Aproveitadas agora": veio no batch (cliques recentes, fonte da aba).
-  // Fallback: sem cliques recentes, mostra os maiores descontos da fonte.
-  let aproveitadas: (Product & { _count?: { clicks: number } })[] =
-    aproveitadasTop.filter((p) => !flashIds.has(p.id));
-  const aproveitadasIsFallback = aproveitadas.length === 0;
-  if (!aproveitadas.length) {
-    aproveitadas = await prisma.product.findMany({
-      where: {
-        active: true,
-        imageUrl: { not: null },
-        discountPct: { gt: 0 },
-        AND: [
-          notZeroPrice,
-          notExpired,
-          sourceCond,
-          merchant
-            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
-            : {},
-        ],
-      },
-      orderBy: { discountPct: "desc" },
-      take: 12,
-    });
-  }
-  // Ranking do dia: score = desconto + urgencia (72h) + cliques 24h.
-  // Funciona para todas as fontes (camp: nao tem discountPct/price).
-  const aproveitadasIds = new Set(aproveitadas.map((p) => p.id));
-  const clickedTodayIds = new Set(rankClicks.map((p) => p.id));
-  const URGENT_MS = 72 * 3_600_000;
-  const rankScore = (p: (typeof rankPool)[number]) =>
-    (p.discountPct ?? 0) +
-    (p.endsAt && p.endsAt.getTime() - now.getTime() < URGENT_MS ? 25 : 0) +
-    (clickedTodayIds.has(p.id) ? 100 : 0);
-  const topDiscounts = [
-    ...rankPool,
-    ...rankClicks.filter((p) => !rankPool.some((r) => r.id === p.id)),
-  ]
-    .filter((p) => !flashIds.has(p.id) && !aproveitadasIds.has(p.id))
-    .sort((a, b) => rankScore(b) - rankScore(a))
-    .slice(0, 10);
-
-  const featuredItems: FeaturedItem[] = await Promise.all(
-    featured.map(async (p) => ({
-      id: p.id,
-      title: p.title,
-      merchant: p.merchant,
-      logoUrl: await merchantLogo(p.merchant),
-      imageUrl: p.imageUrl,
-      priceLabel: formatPrice(p.price, p.currency),
-      oldPriceLabel:
-        p.oldPrice != null && p.price != null && p.oldPrice > p.price
-          ? formatPrice(p.oldPrice, p.currency)
-          : null,
-      discount: p.discountPct ?? discountPercent(p.price, p.oldPrice),
-      urgent: urgencyLabel(p.endsAt),
-    })),
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">
-      {/* Hero */}
+      {/* Cabecalho da visao de catalogo: titulo da fonte + busca */}
       {!dayOnly && (
-      <section className={`relative -mx-4 ${embedded ? "mb-6" : "mb-8"} overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 ${embedded ? "pb-8 pt-6" : "pb-10 pt-10 sm:pt-12"} text-white`}>
-        {/* brilhos de fundo */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 left-1/2 h-96 w-[52rem] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-40 right-[-10%] h-80 w-80 rounded-full bg-teal-500/10 blur-3xl"
-        />
-
-        {!embedded && (
-        <div className="relative mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* Coluna esquerda */}
-          <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-300 backdrop-blur">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
-              {catalogTotal + offersTotal} ofertas ativas agora
-            </span>
-            <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              Os melhores descontos,
-              <span className="block bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                selecionados pra você
-              </span>
-            </h1>
-            <p className="max-w-md text-sm leading-relaxed text-zinc-400 sm:text-base">
-              Cupons, ofertas e produtos das melhores lojas — verificados,
-              com links diretos e sem custo extra.
-            </p>
-
-            {/* Stats */}
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex flex-col items-center lg:items-start">
-                <span className="text-xl font-extrabold text-white">{catalogTotal.toLocaleString("pt-BR")}</span>
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">produtos</span>
-              </div>
-              <div className="h-8 w-px bg-white/10" />
-              <div className="flex flex-col items-center lg:items-start">
-                <span className="text-xl font-extrabold text-white">{offersTotal.toLocaleString("pt-BR")}</span>
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">ofertas</span>
-              </div>
-              <div className="h-8 w-px bg-white/10" />
-              <div className="flex flex-col items-center lg:items-start">
-                <span className="text-xl font-extrabold text-white">{storeCount}</span>
-                <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">lojas</span>
-              </div>
-            </div>
-
-            {/* Lojas parceiras */}
-            {heroStores.length > 0 && (
-              <div className="flex max-w-lg flex-wrap items-center justify-center gap-1.5 lg:justify-start">
-                {heroStores.map((s) => (
-                  <span
-                    key={s.key}
-                    title={s.name}
-                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 text-[11px] font-semibold text-zinc-400 backdrop-blur transition-colors hover:border-emerald-400/40 hover:text-emerald-300"
-                  >
-                    {s.logo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.logo} alt="" className="h-4 w-4 rounded-full object-contain" />
-                    ) : (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500/20 text-[9px] font-bold text-emerald-300">
-                        {s.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="max-w-24 truncate">{s.name}</span>
-                  </span>
-                ))}
-                {storeCount > heroStores.length && (
-                  <span className="text-[11px] font-semibold text-zinc-500">
-                    +{storeCount - heroStores.length}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Coluna direita: carrossel de ofertas em destaque */}
-          {featuredItems.length > 0 && (
-            <FeaturedCarousel items={featuredItems} />
-          )}
-        </div>
-        )}
-
-        {/* Controles */}
-        <div className="relative mx-auto mt-10 flex w-full max-w-6xl flex-col items-center gap-4">
-          {/* Abas por fonte de afiliado — catalogo nunca mistura fontes */}
-          <nav className="flex max-w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
-            {visibleTabs.map((t) => (
-              <HashLink
-                key={t}
-                href={qs({ aba: t })}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                  tab === t
-                    ? "bg-white text-zinc-950 shadow"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {TABS[t].label}
-              </HashLink>
-            ))}
-          </nav>
-
-          <Suspense>
-            <CatalogScrollOnNav />
-            <SearchBar merchants={merchantList} currentMerchant={merchant} />
-          </Suspense>
-
-        </div>
-      </section>
-      )}
-
-      {/* Destaques do momento: relampago + mais aproveitadas */}
-      {!embedded && (flashDeals.length > 0 || aproveitadas.length > 0) && (
-        <CollapsibleSection
-          className="border-zinc-200/80 bg-gradient-to-r from-zinc-50 via-emerald-50/50 to-zinc-50 dark:border-zinc-800 dark:from-zinc-900/60 dark:via-emerald-950/20 dark:to-zinc-900/60"
-          title={
-            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-zinc-700 dark:text-zinc-200">
-              <IconFlame className="h-4 w-4 text-orange-500" />
-              Destaques do momento
-            </h2>
-          }
-          meta={
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              {[
-                flashDeals.length > 0
-                  ? `${flashDeals.length} terminando em breve`
-                  : "",
-                aproveitadas.length > 0
-                  ? `${aproveitadas.length} mais clicadas`
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          }
-        >
-          {flashDeals.length > 0 && (
+        <section className="-mx-4 mb-8 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white px-5 py-8 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/10 dark:to-zinc-900">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 text-center">
             <div>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                <IconZap className="h-3.5 w-3.5" />
-                Terminando em breve
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
+                {cfg.eyebrow}
               </p>
-              <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory [scrollbar-width:thin]">
-                {flashDeals.map((p) => (
-                  <RailCard
-                    key={p.id}
-                    p={p}
-                    className="w-52"
-                    corner={
-                      p.couponCode ? (
-                        <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded bg-zinc-900/85 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300">
-                          {p.couponCode}
-                        </span>
-                      ) : null
-                    }
-                    footer={
-                      p.endsAt ? (
-                        <CountdownTimer endsAt={p.endsAt.toISOString()} />
-                      ) : null
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          {aproveitadas.length > 0 && (
-            <div className={flashDeals.length > 0 ? "mt-5" : ""}>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
-                <IconFlame className="h-3.5 w-3.5" />
-                {aproveitadasIsFallback
-                  ? "Mais aproveitadas"
-                  : "Mais clicadas nas últimas 48h"}
+              <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-4xl">
+                {cfg.title}
+              </h1>
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                {catalogTotal.toLocaleString("pt-BR")} {cfg.noun} verificadas ·
+                preços e ofertas atualizados diariamente
               </p>
-              <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-                {aproveitadas.map((p) => {
-                  const n = p._count?.clicks ?? 0;
-                  return (
-                    <RailCard
-                      key={p.id}
-                      p={p}
-                      className="w-44"
-                      corner={
-                        n > 0 ? (
-                          <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-orange-500/95 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow">
-                            <IconFlame className="h-2.5 w-2.5" />
-                            {n}
-                          </span>
-                        ) : null
-                      }
-                    />
-                  );
-                })}
-              </div>
             </div>
-          )}
-        </CollapsibleSection>
-      )}
-
-      {/* Ofertas do dia: ranking dos maiores descontos da fonte ativa */}
-      {!embedded && topDiscounts.length > 0 && (
-        <CollapsibleSection
-          className="border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-emerald-50 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-emerald-950/30"
-          title={
-            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-              <IconTrophy className="h-4 w-4" />
-              Ofertas do dia
-            </h2>
-          }
-          meta={
-            <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-500/80">
-              Ranking do dia · {topDiscounts.length} ofertas
-            </span>
-          }
-        >
-          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-            {topDiscounts.map((p, i) => (
-              <RailCard
-                key={p.id}
-                p={p}
-                className="w-44"
-                corner={
-                  <span className="absolute left-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-extrabold text-white shadow">
-                    {i + 1}
-                  </span>
-                }
-              />
-            ))}
+            <div className="w-full max-w-2xl">
+              <Suspense>
+                <CatalogScrollOnNav />
+                <SearchBar
+                  merchants={merchantList}
+                  currentMerchant={merchant}
+                />
+              </Suspense>
+            </div>
           </div>
-        </CollapsibleSection>
+        </section>
       )}
 
       {!dayOnly && (<>
