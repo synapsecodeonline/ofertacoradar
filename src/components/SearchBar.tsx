@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconSearch } from "@/components/Icons";
+import { scrollToCatalogWithRetries } from "@/components/HashLink";
 
 export default function SearchBar({
   merchants,
@@ -20,15 +21,7 @@ export default function SearchBar({
     scrollToCatalog();
   };
 
-  const scrollToCatalog = () => {
-    const scroll = () =>
-      document.getElementById("catalogo")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    requestAnimationFrame(scroll);
-    setTimeout(scroll, 400);
-  };
+  const scrollToCatalog = scrollToCatalogWithRetries;
 
   return (
     <form
