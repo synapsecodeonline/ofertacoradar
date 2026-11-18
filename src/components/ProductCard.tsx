@@ -3,15 +3,17 @@ import Image from "next/image";
 import type { Product } from "@prisma/client";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
+import { merchantLogo } from "@/lib/store-logo";
 import { IconArrowRight, IconFlame, IconTag } from "@/components/Icons";
 
-export default function ProductCard({
+export default async function ProductCard({
   product,
   clicks,
 }: {
   product: Product;
   clicks?: number;
 }) {
+  const logo = await merchantLogo(product.merchant);
   const discount = product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const urgent = urgencyLabel(product.endsAt);
   const hasPrice = product.price != null;
@@ -70,8 +72,20 @@ export default function ProductCard({
           {product.title}
         </h3>
         {product.merchant && (
-          <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-            {product.merchant}
+          <span className="flex items-center gap-1.5 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo}
+                alt=""
+                className="h-4 w-4 shrink-0 rounded-sm bg-white object-contain p-px ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700"
+              />
+            ) : (
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-zinc-100 text-[9px] font-extrabold text-zinc-400 dark:bg-zinc-800">
+                {product.merchant.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="truncate">{product.merchant}</span>
           </span>
         )}
         {clicks != null && clicks >= 3 && (

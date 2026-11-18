@@ -23,6 +23,7 @@ import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
+import { merchantLogo } from "@/lib/store-logo";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
@@ -377,19 +378,22 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     (a, b) => (aproveitadasCount.get(b.id) ?? 0) - (aproveitadasCount.get(a.id) ?? 0),
   );
 
-  const featuredItems: FeaturedItem[] = featured.map((p) => ({
-    id: p.id,
-    title: p.title,
-    merchant: p.merchant,
-    imageUrl: p.imageUrl,
-    priceLabel: formatPrice(p.price, p.currency),
-    oldPriceLabel:
-      p.oldPrice != null && p.price != null && p.oldPrice > p.price
-        ? formatPrice(p.oldPrice, p.currency)
-        : null,
-    discount: p.discountPct ?? discountPercent(p.price, p.oldPrice),
-    urgent: urgencyLabel(p.endsAt),
-  }));
+  const featuredItems: FeaturedItem[] = await Promise.all(
+    featured.map(async (p) => ({
+      id: p.id,
+      title: p.title,
+      merchant: p.merchant,
+      logoUrl: await merchantLogo(p.merchant),
+      imageUrl: p.imageUrl,
+      priceLabel: formatPrice(p.price, p.currency),
+      oldPriceLabel:
+        p.oldPrice != null && p.price != null && p.oldPrice > p.price
+          ? formatPrice(p.oldPrice, p.currency)
+          : null,
+      discount: p.discountPct ?? discountPercent(p.price, p.oldPrice),
+      urgent: urgencyLabel(p.endsAt),
+    })),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">

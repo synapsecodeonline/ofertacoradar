@@ -9,6 +9,7 @@ export interface FeaturedItem {
   id: number;
   title: string;
   merchant: string | null;
+  logoUrl?: string | null;
   imageUrl: string | null;
   priceLabel: string | null;
   oldPriceLabel: string | null;
@@ -79,8 +80,20 @@ export default function FeaturedCarousel({ items }: { items: FeaturedItem[] }) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {item.merchant && (
-            <span className="truncate text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-              {item.merchant}
+            <span className="flex items-center gap-1.5 truncate text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+              {item.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.logoUrl}
+                  alt=""
+                  className="h-4 w-4 shrink-0 rounded-sm bg-white object-contain p-px"
+                />
+              ) : (
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-white/10 text-[9px] font-extrabold text-zinc-400">
+                  {item.merchant.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="truncate">{item.merchant}</span>
             </span>
           )}
           <h2 className="line-clamp-2 text-base font-bold leading-snug text-white transition-colors group-hover/carousel:text-emerald-300 sm:text-lg">

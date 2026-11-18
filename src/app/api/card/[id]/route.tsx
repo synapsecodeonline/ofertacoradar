@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { siteUrl, SITE_NAME } from "@/lib/site";
+import { featuredStoreFor } from "@/lib/store-logo";
+import { storeLogo } from "@/lib/featured-stores";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,17 @@ export async function GET(
     product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const domain = new URL(siteUrl()).host;
 
+  // Logo da loja (Brand.logo ou favicon do dominio)
+  const brandRows = await prisma.brand.findMany({
+    select: { name: true, logo: true },
+  });
+  const storeLogoUrl = product.merchant
+    ? storeLogo(
+        featuredStoreFor(product.merchant),
+        new Map(brandRows.map((b) => [b.name ?? "", b.logo])),
+      )
+    : null;
+
   const fonts = await getFont().catch(() => []);
 
   const image = new ImageResponse(
@@ -101,14 +114,57 @@ export async function GET(
           {product.merchant && (
             <div
               style={{
-                fontSize: 34,
-                fontWeight: 800,
-                color: "#99f6e4",
-                letterSpacing: 1,
-                textTransform: "uppercase",
+                display: "flex",
+                alignItems: "center",
+                gap: 18,
+                background: "rgba(255,255,255,0.08)",
+                borderRadius: 18,
+                padding: "12px 24px",
               }}
             >
-              {product.merchant}
+              {storeLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={storeLogoUrl}
+                  alt=""
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 12,
+                    objectFit: "contain",
+                    background: "white",
+                    padding: 6,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 12,
+                    background: "#134e4a",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 30,
+                    fontWeight: 900,
+                    color: "#5eead4",
+                  }}
+                >
+                  {product.merchant.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: 34,
+                  fontWeight: 800,
+                  color: "#99f6e4",
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                {product.merchant}
+              </div>
             </div>
           )}
         </div>
