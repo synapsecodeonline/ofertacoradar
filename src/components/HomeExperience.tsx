@@ -42,7 +42,7 @@ type SortKey = keyof typeof SORTS;
 // Cada aba e uma fonte de afiliado: o catalogo nunca mistura fontes.
 // prefix = externalId prefix; noun = rotulo de contagem; sort default.
 const TABS = {
-  lojas: {
+  lomadee: {
     label: "Lojas Lomadee",
     eyebrow: "Lomadee",
     title: "Produtos Lomadee",
@@ -165,12 +165,12 @@ export async function HomeExperience({
   const rawTab = typeof aba === "string" ? aba : "";
   const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
   // Legado: aba=produtos (catalogo unificado) e ?fonte= migram p/ a aba da fonte
-  // "ofertas" foi absorvida pela aba Lojas Lomadee (secao de ofertas camp:)
-  let tab: Tab = "lojas";
+  // "lojas"/"produtos"/"ofertas" sao legados -> aba canonica e lomadee
+  let tab: Tab = "lomadee";
   if (TAB_ORDER.includes(rawTab as Tab)) tab = rawTab as Tab;
-  else if (rawTab === "produtos" || rawTab === "ofertas")
-    tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lojas";
-  else if (fonteParam === "ml" || fonteParam === "awin") tab = fonteParam;
+  else if (rawTab === "produtos" || rawTab === "ofertas" || rawTab === "lojas")
+    tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lomadee";
+  else if (fonteParam === "ml" || fonteParam === "awin" || fonteParam === "lomadee") tab = fonteParam === "lomadee" ? "lomadee" : fonteParam;
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
   const cfg = TABS[tab];
@@ -209,17 +209,17 @@ export async function HomeExperience({
   // Secao "Ofertas {Fonte}": Lomadee usa camp: (ofertas/cupons);
   // ML/Awin usam os itens com desconto da propria fonte.
   const OFFERS_PREFIX: Record<Tab, string> = {
-    lojas: "camp-lomadee:",
+    lomadee: "camp-lomadee:",
     ml: "ml:",
     awin: "aw:",
   };
   const OFFERS_TITLE: Record<Tab, string> = {
-    lojas: "Ofertas Lomadee",
+    lomadee: "Ofertas Lomadee",
     ml: "Ofertas Mercado Livre",
     awin: "Ofertas Awin",
   };
   const STORE_EYEBROW: Record<Tab, string> = {
-    lojas: "Lojas Lomadee",
+    lomadee: "Lojas Lomadee",
     ml: "Lojas Mercado Livre",
     awin: "Lojas Awin",
   };
@@ -228,7 +228,7 @@ export async function HomeExperience({
     AND: [
       { externalId: { startsWith: OFFERS_PREFIX[tab] } },
       ...listWhere.AND.filter((c) => c !== sourceCond),
-      ...(tab === "lojas" ? [] : [{ discountPct: { gt: 0 } }]),
+      ...(tab === "lomadee" ? [] : [{ discountPct: { gt: 0 } }]),
     ],
   };
 
@@ -341,7 +341,7 @@ export async function HomeExperience({
     prisma.product.findMany({
       where: offersWhere,
       orderBy:
-        tab === "lojas"
+        tab === "lomadee"
           ? { endsAt: { sort: "asc", nulls: "last" } }
           : { discountPct: { sort: "desc", nulls: "last" } },
       take: 12,
@@ -375,7 +375,7 @@ export async function HomeExperience({
   // Contagem de itens visiveis por fonte (abas) e por loja.
   // srcRows: uma linha por merchant com contagem por prefixo de fonte.
   const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
-    lojas: "prod",
+    lomadee: "prod",
     ml: "ml",
     awin: "aw",
   };
@@ -401,14 +401,14 @@ export async function HomeExperience({
   }
   // Awin so aparece como aba quando houver itens
   const catalogTotal =
-    (tabCounts.get("lojas") ?? 0) +
+    (tabCounts.get("lomadee") ?? 0) +
     (tabCounts.get("ml") ?? 0) +
     (tabCounts.get("awin") ?? 0);
 
   // "Lojas em destaque" por aba. Lomadee = rede inteira (camp+prod),
   // ML = ml:, Awin = aw: — cada tela so mostra lojas da sua fonte.
   const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
-    lojas: "prod",
+    lomadee: "prod",
     ml: "ml",
     awin: "aw",
   };
@@ -418,7 +418,7 @@ export async function HomeExperience({
       const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0 };
       // Lojas Lomadee inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
       const visible =
-        t === "lojas"
+        t === "lomadee"
           ? counts.camp + counts.prod > 0
           : (src ? src[SRC_COUNT[t]] : 0) > 0;
       return {

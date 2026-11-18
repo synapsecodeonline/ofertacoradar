@@ -88,7 +88,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <HashLink
-                href="/ofertas-do-dia?aba=lojas#catalogo"
+                href="/ofertas-do-dia?aba=lomadee#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas Lomadee
@@ -113,7 +113,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* Menu mobile: fileira de pills com scroll horizontal */}
           <nav className="flex items-center gap-1 overflow-x-auto border-t border-zinc-200/60 px-4 py-2 [scrollbar-width:none] dark:border-zinc-800/60 sm:hidden [&::-webkit-scrollbar]:hidden">
               <HashLink
-                href="/ofertas-do-dia?aba=lojas#catalogo"
+                href="/ofertas-do-dia?aba=lomadee#catalogo"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
                 Lojas Lomadee
@@ -154,10 +154,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Navegação
               </p>
-              <Link href="/ofertas-do-dia?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/ofertas-do-dia?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas e cupons Lomadee
               </Link>
-              <Link href="/ofertas-do-dia?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/ofertas-do-dia?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Lomadee
               </Link>
               <Link href="/ofertas-do-dia?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
