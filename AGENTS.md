@@ -21,7 +21,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Notas
 
 - Next.js 16 com `cacheComponents` desligado (renderização dinâmica simples).
-- Fontes de produtos: `LOMADEE_API_KEY` (API affiliate) ou `FEED_URL` (XML/JSON genérico → `fetchFeed`). API tem precedência.
+- Fontes de afiliado (prefixo em `Product.externalId`): `camp:` = oferta/cupom **Lomadee**, `prod:` = produto **Lomadee**, `ml:` = produto **Mercado Livre**, `aw:` = produto **Awin**. `LOMADEE_API_KEY` (API Lomadee) ou `FEED_URL` (XML/JSON genérico → `fetchFeed`, também Lomadee). API tem precedência.
 - Com `LOMADEE_API_KEY`, o sync importa **campanhas** (`/affiliate/campaigns`, status `onTime`) — são ofertas/cupons com `lmdee.link` já rastreado por canal = comissão. Catalogo de produtos (`/affiliate/products`) só entra com `LOMADEE_PRODUCTS=1` e usa link direto da loja (SEM comissão).
 - API Lomadee: limite de 20 itens/página em brands/campaigns, rate limit 60 req/min, 500 intermitente em algumas páginas (sync pula e segue). Paginação: campaigns/orders usam `meta`, brands usa `pagination`, products usa `count`.
 - Feed XML: campos mapeados de forma tolerante (title/name, price/preco, link/url, image/imagem etc.).

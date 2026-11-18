@@ -17,8 +17,11 @@ import {
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
-// Ciclo: brands -> campaigns (ofertas) -> products -> espera TTL -> recomeca.
+// Ciclo Lomadee: brands -> campaigns (ofertas camp:) -> products (prod:) -> espera TTL -> recomeca.
 
+// Fontes de afiliado (ver externalId em Product):
+//   camp: = oferta/cupom Lomadee | prod: = produto Lomadee
+//   ml:   = produto Mercado Livre | aw:  = produto Awin
 const STATE_KEY = "main";
 const BUDGET_MS = 45_000; // tempo maximo de trabalho por invocacao
 const CYCLE_TTL_MS = 30 * 60_000; // intervalo entre ciclos completos
@@ -174,7 +177,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
   }
   if (phase === "campaigns") return;
 
-  // Fase 3: catalogo -> so produtos de orgs afiliadas e preco > 0
+  // Fase 3: catalogo Lomadee -> so produtos prod: de orgs afiliadas e preco > 0
   const orgIds = new Set(
     (await prisma.affiliatedOrg.findMany({ select: { organizationId: true } }))
       .map((o) => o.organizationId),
@@ -315,7 +318,7 @@ async function runMLCycle() {
   }
 }
 
-// Chamado via after() junto do maybeSync: nunca bloqueia a resposta
+// Chamado via after() junto do maybeSyncLomadee: nunca bloqueia a resposta
 export async function maybeSyncML() {
   if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) return;
 
@@ -362,7 +365,7 @@ export async function maybeSyncML() {
 }
 
 // Chamado via after() nas paginas: nunca bloqueia a resposta
-export async function maybeSync() {
+export async function maybeSyncLomadee() {
   const apiKey = process.env.LOMADEE_API_KEY;
   if (!apiKey) return;
   const baseUrl = process.env.LOMADEE_API_URL ?? "https://api.lomadee.com.br";

@@ -146,7 +146,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 {SITE_NAME} é um site de ofertas com links de parceiro
                 (afiliado). Podemos receber comissão pelas compras realizadas
                 através dos nossos links, sem custo extra para você. Os preços e
-                cupons são exibidos conforme as informações das lojas parceiras
+                cupons são exibidos conforme as informações das lojas parceiras (Lomadee, Mercado Livre, Awin)
                 e podem sofrer alterações.
               </p>
             </div>

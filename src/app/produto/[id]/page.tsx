@@ -4,7 +4,7 @@ import { after } from "next/server";
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { maybeSync, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { categoryLabel, canonicalCategory } from "@/lib/categories";
@@ -69,7 +69,7 @@ export default async function ProductPage({
   }
 
   after(() => {
-    maybeSync().catch(() => {});
+    maybeSyncLomadee().catch(() => {});
     maybeSyncML().catch(() => {});
   });
 
@@ -112,7 +112,9 @@ export default async function ProductPage({
       ? "prod:"
       : product.externalId?.startsWith("ml:")
         ? "ml:"
-        : null;
+        : product.externalId?.startsWith("aw:")
+          ? "aw:"
+          : null;
   const baseWhere: Prisma.ProductWhereInput = {
     active: true,
     ...(prefix ? { externalId: { startsWith: prefix } } : {}),

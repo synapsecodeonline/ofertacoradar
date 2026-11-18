@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
-import { maybeSync, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
 import ProductCard from "@/components/ProductCard";
 import SearchBar from "@/components/SearchBar";
 import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypesFor } from "@/lib/categories";
@@ -44,8 +44,8 @@ type SortKey = keyof typeof SORTS;
 const TABS = {
   lojas: {
     label: "Lojas Lomadee",
-    eyebrow: "Catálogo",
-    title: "Catálogo de Produtos",
+    eyebrow: "Lomadee",
+    title: "Produtos Lomadee",
     noun: "produtos",
     prefix: "prod:",
     defaultSort: "recentes",
@@ -53,7 +53,7 @@ const TABS = {
   ml: {
     label: "Lojas Mercado Livre",
     eyebrow: "Mercado Livre",
-    title: "Catálogo Mercado Livre",
+    title: "Produtos Mercado Livre",
     noun: "produtos",
     prefix: "ml:",
     defaultSort: "recentes",
@@ -61,7 +61,7 @@ const TABS = {
   awin: {
     label: "Awin",
     eyebrow: "Awin",
-    title: "Catálogo Awin",
+    title: "Produtos Awin",
     noun: "produtos",
     prefix: "aw:",
     defaultSort: "recentes",
@@ -218,6 +218,11 @@ export async function HomeExperience({
     ml: "Ofertas Mercado Livre",
     awin: "Ofertas Awin",
   };
+  const STORE_EYEBROW: Record<Tab, string> = {
+    lojas: "Lojas Lomadee",
+    ml: "Lojas Mercado Livre",
+    awin: "Lojas Awin",
+  };
   const offersWhere = {
     ...listWhere,
     AND: [
@@ -229,7 +234,7 @@ export async function HomeExperience({
 
   // Sync incremental em background: nao bloqueia a resposta
   after(() => {
-    maybeSync().catch(() => {});
+    maybeSyncLomadee().catch(() => {});
     maybeSyncML().catch(() => {});
   });
 
@@ -554,7 +559,7 @@ export async function HomeExperience({
           <div className="mb-4 flex items-end justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                Lojas parceiras
+                {STORE_EYEBROW[tab]}
               </p>
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                 Lojas em destaque
