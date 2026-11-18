@@ -563,7 +563,7 @@ export async function HomeExperience({
       {featuredStores.length > 0 && (
         <CollapsibleSection
           defaultOpen={false}
-          className="mb-8 border-transparent"
+          className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
           title={
             <span className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
