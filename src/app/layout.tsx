@@ -104,6 +104,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 ⚡ Relâmpago
               </Link>
+              <Link
+                href="/ofertas-do-dia"
+                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Ofertas do dia
+              </Link>
               </nav>
               <AuthButton />
               <ThemeToggle />
@@ -137,6 +143,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </Link>
               <Link href="/?aba=ofertas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas e cupons
+              </Link>
+              <Link href="/ofertas-do-dia" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Ofertas do dia
               </Link>
               <a
                 href={

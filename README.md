@@ -43,6 +43,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 |---|---|---|
 | `/` | página | Home dinâmica (`force-dynamic`): abas, busca, filtros, ordenação, paginação e seções de destaque. |
 | `/produto/[id]` | página | Detalhe do item: preço, cupom, countdown, prova social, relacionados, share e JSON-LD. |
+| `/ofertas-do-dia` | página | Curadoria diária: terminando em breve, mais aproveitadas (24h) e maiores descontos. Indexável, no sitemap. |
+| `/api/instagram/kit` | route handler | Kit de conteúdo p/ Instagram (login obrigatório): top produtos ranqueados por cliques 24h + desconto, com `cardUrl` (`/api/card`), `pageUrl` e `caption` prontos. `?count=` (máx 20) e `?size=feed|story`. |
 | `/ir/[id]` | route handler | Redirect 302 para a loja/oferta, registrando `Click`. Suporta `?src=` → `utm_source` no destino final. |
 | `/api/card/[id]` | route handler | PNG de divulgação via `next/og`: `?size=feed` (1080×1080, default) ou `?size=story` (1080×1920). |
 | `/sitemap.xml` | metadata route | Home + até 5.000 produtos ativos. |

@@ -764,6 +764,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                 {tab === "ofertas" ? "Ofertas e cupons de hoje" : "Produtos em oferta"}
               </h2>
+              <Link
+                href="/ofertas-do-dia"
+                className="mt-0.5 text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+              >
+                Ver ofertas do dia →
+              </Link>
             </div>
             <span className="text-sm font-medium text-zinc-400">
               {items.length}

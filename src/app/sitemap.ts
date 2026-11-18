@@ -8,6 +8,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "hourly", priority: 1 },
+    {
+      url: `${base}/ofertas-do-dia`,
+      changeFrequency: "hourly",
+      priority: 0.9,
+    },
   ];
 
   const products = await prisma.product.findMany({
