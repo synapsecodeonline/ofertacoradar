@@ -41,7 +41,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 | Rota | Tipo | Descrição |
 |---|---|---|
-| `/` | página | Home dinâmica (`force-dynamic`): abas, busca, filtros, ordenação, paginação e seções de destaque. |
+| `/` | página | Home dinâmica (`force-dynamic`): hero com stats/lojas parceiras/carrossel, abas, busca, ordenação, filtro por fonte (`?fonte=lomadee|ml|awin`), seção "Destaques do momento" (relâmpago + mais clicadas), lojas em destaque com contagem de itens, categorias, grid, paginação, banner Instagram e seção de transparência. |
 | `/produto/[id]` | página | Detalhe do item: preço, cupom, countdown, prova social, relacionados, share e JSON-LD. |
 | `/ofertas-do-dia` | página | Curadoria diária: terminando em breve, mais aproveitadas (24h) e maiores descontos. Indexável, no sitemap. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo p/ Instagram (login obrigatório): top produtos ranqueados por cliques 24h + desconto, com `cardUrl` (`/api/card`), `pageUrl` e `caption` prontos. `?count=` (máx 20) e `?size=feed|story`. |
@@ -74,11 +74,13 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - **Hero** com estatísticas reais (produtos, ofertas e lojas), chips de lojas parceiras com logo/nome e carrossel de **ofertas em destaque** (top 5 por desconto da aba/filtros atuais, troca a cada 6s, pausa no hover, setas e dots).
 - Abas **Produtos** (default) e **Ofertas e Cupons** (`?aba=produtos|ofertas`).
 - **Busca** (`?q=`) em título, descrição e merchant; **filtro de loja** (`?loja=`, merchant case-insensitive); **categoria** (`?categoria=` canônica, casando slugs legados no banco).
+- **Filtro por fonte de afiliado** (`?fonte=`, só na aba Produtos): `lomadee` (`prod:*`), `ml` (`ml:*`) ou `awin` (`aw:*`); sem valor = todas. Chips "Todas / Lojas parceiras / Mercado Livre / Awin" — o chip Awin só renderiza quando existem itens `aw:*` ativos. O filtro combina com busca, loja, categoria, subtipo e ordenação, e se aplica também às facetas (categorias, lojas, subtipos).
 - **Ordenações** (`?ordem=`): `desconto` (default em Ofertas), `recentes` (default em Produtos), `terminando` e `populares` (por total de cliques). Filtros, busca, loja e ordenação viram query params; mudanças resetam `pagina`.
 - **Paginação** apenas na aba Produtos: 48 itens/página (`pagina`). A aba Ofertas mostra até 120 itens sem paginação.
 - Itens exibidos exigem `active`, `imageUrl`, preço diferente de 0 quando informado e `endsAt` nulo ou futuro.
-- **Faixa "Ofertas Relâmpago"**: `endsAt` entre agora e +48h, até 12 itens ordenados pelo fim mais próximo, countdown ao vivo por segundo e scroll horizontal. Independe da aba e respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar.
-- **"Aproveitadas agora"**: seção global com os produtos mais clicados nas últimas 48h (até 12), com badge de cliques. Cards da listagem mostram prova social de cliques dos últimos 30 dias quando ≥ 3.
+- **"Destaques do momento"**: seção retrátil única que reúne dois trilhos — **"Terminando em breve"** (`endsAt` entre agora e +48h, até 12, countdown ao vivo, cupom quando houver) e **"Mais clicadas nas últimas 48h"** (até 12, badge de cliques; fallback para maiores descontos quando não há cliques). Independe da aba e respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar. Ambos usam o componente `RailCard` compartilhado.
+- **Cards de produto** exibem logo da loja (resolvido por `merchantLogo`: lista de destaque → `Brand.name` → favicon do domínio), selo de origem `ML`/`AW` para fontes não-Lomadee, badge de desconto, cupom, urgência e prova social de cliques dos últimos 30 dias quando ≥ 3.
+- **"Lojas em destaque"**: carrossel horizontal com as lojas de `FEATURED_STORES` que têm itens visíveis; o card mostra o total de ofertas do merchant (produtos + campanhas) e linka para a aba correta (`produtos` ou `ofertas`).
 - **Banner Instagram**: CTA "Ofertas do dia em vídeo" com link para `NEXT_PUBLIC_INSTAGRAM_URL` (default `instagram.com/ofertacoradar`).
 - **Seção "Por que confiar no Ofertaço Radar"**: 4 cards de transparência (preços atualizados, compra na loja oficial, só ofertas reais, aviso de afiliado).
 - Página de produto: breadcrumb, imagem, badges `-%`, cupom copiável, **"Economize R$ X"**, countdown real (<7 dias), lista **"Por que aproveitar agora"** (desconto, economia, cupom, urgência, loja e cliques), selos de confiança, **"como usar o cupom"**, relacionados (mesma loja primeiro, depois mesma categoria), botões **WhatsApp / Copiar link**, botões **"Imagem p/ feed" / "Imagem p/ story"** (`/api/card`) e **CTA fixo no mobile**.
@@ -178,8 +180,10 @@ npx vercel --prod --yes   # publica em ofertacoradar.vercel.app
 ```
 src/
   app/
-    page.tsx                    # home: hero/stats/lojas, carrossel, relâmpago,
-                                # aproveitadas, categorias, grid, filtros, paginação
+    page.tsx                    # home: hero/stats/lojas, carrossel, abas, busca,
+                                # ordenação, filtro por fonte, "Destaques do momento"
+                                # (RailCard compartilhado), lojas em destaque,
+                                # categorias, grid, paginação, Instagram, transparência
     produto/[id]/page.tsx       # detalhe: preço, cupom, countdown, prova social,
                                 # share, imagens p/ feed/story, relacionados, JSON-LD
     ir/[id]/route.ts            # redirect de afiliado + registro de clique

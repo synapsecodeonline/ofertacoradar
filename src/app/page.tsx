@@ -24,7 +24,8 @@ import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
 import { merchantLogo } from "@/lib/store-logo";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
+import type { Product } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,65 @@ function orderByFor(sort: SortKey) {
     default:
       return { updatedAt: "desc" as const };
   }
+}
+
+function RailCard({
+  p,
+  className = "w-48",
+  corner,
+  footer,
+}: {
+  p: Product;
+  className?: string;
+  corner?: ReactNode;
+  footer?: ReactNode;
+}) {
+  const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
+  const saving =
+    p.price != null && p.oldPrice != null && p.oldPrice > p.price
+      ? p.oldPrice - p.price
+      : null;
+  return (
+    <Link
+      href={`/produto/${p.id}`}
+      className={`group flex ${className} shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900`}
+    >
+      <div className="relative aspect-[4/3] bg-zinc-50 dark:bg-zinc-950">
+        {p.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={p.imageUrl}
+            alt={p.title}
+            className="h-full w-full object-contain p-2"
+          />
+        )}
+        {d !== null && (
+          <span className="absolute left-1.5 top-1.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+            -{d}%
+          </span>
+        )}
+        {corner}
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-2.5">
+        <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
+          {p.title}
+        </h3>
+        <div className="mt-auto flex items-baseline gap-1.5">
+          {p.price != null && (
+            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+              {formatPrice(p.price, p.currency)}
+            </span>
+          )}
+          {saving !== null && saving >= 10 && (
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              -{formatPrice(saving, p.currency)}
+            </span>
+          )}
+        </div>
+        {footer}
+      </div>
+    </Link>
+  );
 }
 
 export async function generateMetadata() {
@@ -258,25 +318,25 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         },
       }),
       // Merchants visiveis por tipo -> define a aba do link das "Lojas em destaque"
-      prisma.product.findMany({
+      prisma.product.groupBy({
+        by: ["merchant"],
         where: {
           active: true,
           merchant: { not: null },
           imageUrl: { not: null },
           AND: [isCatalogProduct, notZeroPrice, notExpired],
         },
-        select: { merchant: true },
-        distinct: ["merchant"],
+        _count: { _all: true },
       }),
-      prisma.product.findMany({
+      prisma.product.groupBy({
+        by: ["merchant"],
         where: {
           active: true,
           merchant: { not: null },
           imageUrl: { not: null },
           AND: [isOffer, notZeroPrice, notExpired],
         },
-        select: { merchant: true },
-        distinct: ["merchant"],
+        _count: { _all: true },
       }),
     ]);
 
@@ -286,16 +346,27 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   );
 
   // So exibe lojas com itens visiveis; link aponta para a aba correta
-  const toSet = (rows: { merchant: string | null }[]) =>
-    new Set(rows.map((m) => m.merchant).filter((m): m is string => !!m));
-  const prodSet = toSet(prodMerchants);
-  const campSet = toSet(campMerchants);
+  // e o card mostra quantos itens a loja tem (produtos + ofertas)
+  const countByMerchant = new Map<string, number>();
+  for (const rows of [prodMerchants, campMerchants]) {
+    for (const r of rows) {
+      if (r.merchant) {
+        countByMerchant.set(
+          r.merchant,
+          (countByMerchant.get(r.merchant) ?? 0) + r._count._all,
+        );
+      }
+    }
+  }
+  const hasItems = (m: string) => (countByMerchant.get(m) ?? 0) > 0;
   const featuredStores = FEATURED_STORES.map((s) => ({
     ...s,
-    tab: (prodSet.has(s.merchant) ? "produtos" : campSet.has(s.merchant) ? "ofertas" : null) as
-      | "produtos"
-      | "ofertas"
-      | null,
+    count: countByMerchant.get(s.merchant) ?? 0,
+    tab: (hasItems(s.merchant)
+      ? prodMerchants.some((r) => r.merchant === s.merchant)
+        ? "produtos"
+        : "ofertas"
+      : null) as "produtos" | "ofertas" | null,
   })).filter((s): s is typeof s & { tab: "produtos" | "ofertas" } => s.tab !== null);
 
   // Lojas afiliadas reais (com logo quando disponivel) para o hero
@@ -466,7 +537,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">
       {/* Hero */}
-      <section className="relative -mx-4 mb-8 overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 pb-12 pt-12 text-white sm:pt-16">
+      <section className="relative -mx-4 mb-8 overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 pb-10 pt-10 text-white sm:pt-12">
         {/* brilhos de fundo */}
         <div
           aria-hidden
@@ -629,165 +700,93 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </div>
             </div>
           )}
-
-          {/* Faixa de confianca */}
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-medium text-zinc-500">
-            <span className="inline-flex items-center gap-1.5">
-              <IconCheck className="h-3.5 w-3.5 text-emerald-400" /> Ofertas verificadas
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <IconRefresh className="h-3.5 w-3.5 text-emerald-400" /> Atualizado diariamente
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <IconShield className="h-3.5 w-3.5 text-emerald-400" /> Compra 100% na loja parceira
-            </span>
-          </div>
         </div>
       </section>
 
-      {/* Ofertas relampago: terminam em ate 48h */}
-      {flashDeals.length > 0 && (
+      {/* Destaques do momento: relampago + mais aproveitadas */}
+      {(flashDeals.length > 0 || aproveitadas.length > 0) && (
         <CollapsibleSection
-          id="relampago"
-          className="border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50 dark:border-amber-900/40 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-amber-950/30"
+          className="border-zinc-200/80 bg-gradient-to-r from-zinc-50 via-emerald-50/50 to-zinc-50 dark:border-zinc-800 dark:from-zinc-900/60 dark:via-emerald-950/20 dark:to-zinc-900/60"
           title={
-            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-              <IconZap className="h-4 w-4" />
-              Ofertas relâmpago
-              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-amber-700 dark:text-amber-300">
-                terminam em breve
-              </span>
+            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-zinc-700 dark:text-zinc-200">
+              <IconFlame className="h-4 w-4 text-orange-500" />
+              Destaques do momento
             </h2>
           }
           meta={
-            <span className="text-xs font-medium text-amber-600/80 dark:text-amber-500/80">
-              {flashDeals.length} ofertas
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              {[
+                flashDeals.length > 0
+                  ? `${flashDeals.length} terminando em breve`
+                  : "",
+                aproveitadas.length > 0
+                  ? `${aproveitadas.length} mais clicadas`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           }
         >
-            <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory [scrollbar-width:thin]">
-              {flashDeals.map((p) => {
-                const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
-                const saving =
-                  p.price != null && p.oldPrice != null && p.oldPrice > p.price
-                    ? p.oldPrice - p.price
-                    : null;
-                return (
-                  <Link
+          {flashDeals.length > 0 && (
+            <div>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                <IconZap className="h-3.5 w-3.5" />
+                Terminando em breve
+              </p>
+              <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory [scrollbar-width:thin]">
+                {flashDeals.map((p) => (
+                  <RailCard
                     key={p.id}
-                    href={`/produto/${p.id}`}
-                    className="group flex w-52 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-amber-200/60 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/40 dark:bg-zinc-900"
-                  >
-                    <div className="relative aspect-[4/3] bg-zinc-50 dark:bg-zinc-950">
-                      {p.imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.imageUrl}
-                          alt={p.title}
-                          className="h-full w-full object-contain p-2"
-                        />
-                      )}
-                      {d !== null && (
-                        <span className="absolute left-1.5 top-1.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                          -{d}%
-                        </span>
-                      )}
-                      {p.couponCode && (
-                        <span className="absolute bottom-1.5 left-1.5 rounded bg-zinc-900/85 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300">
+                    p={p}
+                    className="w-52"
+                    corner={
+                      p.couponCode ? (
+                        <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded bg-zinc-900/85 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-300">
                           {p.couponCode}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex flex-1 flex-col gap-1 p-2.5">
-                      <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
-                        {p.title}
-                      </h3>
-                      <div className="mt-auto flex items-baseline gap-1.5">
-                        {p.price != null && (
-                          <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                            {formatPrice(p.price, p.currency)}
-                          </span>
-                        )}
-                        {saving !== null && saving >= 10 && (
-                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                            -{formatPrice(saving, p.currency)}
-                          </span>
-                        )}
-                      </div>
-                      {p.endsAt && (
+                      ) : null
+                    }
+                    footer={
+                      p.endsAt ? (
                         <CountdownTimer endsAt={p.endsAt.toISOString()} />
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
+                      ) : null
+                    }
+                  />
+                ))}
+              </div>
             </div>
-        </CollapsibleSection>
-      )}
-
-      {/* Aproveitadas agora: prova social real (cliques 48h) */}
-      {aproveitadas.length > 0 && (
-        <CollapsibleSection
-          className="border-orange-200/70 bg-gradient-to-r from-orange-50 via-rose-50/60 to-orange-50 dark:border-orange-900/40 dark:from-orange-950/30 dark:via-rose-950/20 dark:to-orange-950/30"
-          title={
-            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
-              <IconFlame className="h-4 w-4" />
-              Aproveitadas agora
-            </h2>
-          }
-          meta={
-            <span className="text-xs font-medium text-orange-600/80 dark:text-orange-500/80">
-              {aproveitadasIsFallback
-                ? "maiores descontos ativos"
-                : "mais clicadas nas últimas 48h"}
-            </span>
-          }
-        >
-          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-            {aproveitadas.map((p) => {
-              const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
-              const n = aproveitadasCount.get(p.id) ?? 0;
-              return (
-                <Link
-                  key={p.id}
-                  href={`/produto/${p.id}`}
-                  className="group flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <div className="relative aspect-[4/3] bg-zinc-50 dark:bg-zinc-950">
-                    {p.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.imageUrl}
-                        alt={p.title}
-                        className="h-full w-full object-contain p-2"
-                      />
-                    )}
-                    {d !== null && (
-                      <span className="absolute left-1.5 top-1.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                        -{d}%
-                      </span>
-                    )}
-                    {n > 0 && (
-                      <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-orange-500/95 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow">
-                        <IconFlame className="h-2.5 w-2.5" />
-                        {n}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col gap-1 p-2.5">
-                    <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
-                      {p.title}
-                    </h3>
-                    {p.price != null && (
-                      <span className="mt-auto text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {formatPrice(p.price, p.currency)}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          )}
+          {aproveitadas.length > 0 && (
+            <div className={flashDeals.length > 0 ? "mt-5" : ""}>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                <IconFlame className="h-3.5 w-3.5" />
+                {aproveitadasIsFallback
+                  ? "Mais aproveitadas"
+                  : "Mais clicadas nas últimas 48h"}
+              </p>
+              <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+                {aproveitadas.map((p) => {
+                  const n = aproveitadasCount.get(p.id) ?? 0;
+                  return (
+                    <RailCard
+                      key={p.id}
+                      p={p}
+                      className="w-44"
+                      corner={
+                        n > 0 ? (
+                          <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-orange-500/95 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow">
+                            <IconFlame className="h-2.5 w-2.5" />
+                            {n}
+                          </span>
+                        ) : null
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </CollapsibleSection>
       )}
 
@@ -832,6 +831,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   </span>
                   <span className="line-clamp-2 text-center text-xs font-bold leading-tight text-zinc-700 transition-colors group-hover:text-emerald-700 dark:text-zinc-300 dark:group-hover:text-emerald-400">
                     {s.merchant}
+                  </span>
+                  <span className="text-[10px] font-semibold text-zinc-400">
+                    {s.count} {s.count === 1 ? "oferta" : "ofertas"}
                   </span>
                 </Link>
               );
@@ -911,7 +913,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       {items.length === 0 ? (
         <p className="py-16 text-center text-zinc-500">
-          Nenhuma oferta encontrada. Rode <code>npm run sync</code>.
+          Nenhuma oferta encontrada com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.
         </p>
       ) : (
         <>
