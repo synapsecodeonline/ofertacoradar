@@ -628,7 +628,7 @@ export async function HomeExperience({
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">
       {/* Hero */}
-      <section className="relative -mx-4 mb-8 overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 pb-10 pt-10 text-white sm:pt-12">
+      <section className={`relative -mx-4 ${embedded ? "mb-6" : "mb-8"} overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 ${embedded ? "pb-8 pt-6" : "pb-10 pt-10 sm:pt-12"} text-white`}>
         {/* brilhos de fundo */}
         <div
           aria-hidden
@@ -639,6 +639,7 @@ export async function HomeExperience({
           className="pointer-events-none absolute -bottom-40 right-[-10%] h-80 w-80 rounded-full bg-teal-500/10 blur-3xl"
         />
 
+        {!embedded && (
         <div className="relative mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
           {/* Coluna esquerda */}
           <div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
@@ -712,6 +713,7 @@ export async function HomeExperience({
             <FeaturedCarousel items={featuredItems} />
           )}
         </div>
+        )}
 
         {/* Controles */}
         <div className="relative mx-auto mt-10 flex w-full max-w-6xl flex-col items-center gap-4">
