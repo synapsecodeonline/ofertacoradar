@@ -4,16 +4,20 @@ import type { Product } from "@prisma/client";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { merchantLogo } from "@/lib/store-logo";
+import { sourceBadgeOf } from "@/lib/sources";
 import { IconArrowRight, IconFlame, IconTag } from "@/components/Icons";
 
 export default async function ProductCard({
   product,
   clicks,
+  showSource = false,
 }: {
   product: Product;
   clicks?: number;
+  showSource?: boolean;
 }) {
   const logo = await merchantLogo(product.merchant);
+  const source = showSource ? sourceBadgeOf(product.externalId) : null;
   const discount = product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const urgent = urgencyLabel(product.endsAt);
   const hasPrice = product.price != null;
@@ -71,6 +75,13 @@ export default async function ProductCard({
         <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-snug text-zinc-900 transition-colors group-hover:text-emerald-700 dark:text-zinc-100 dark:group-hover:text-emerald-400">
           {product.title}
         </h3>
+        {source && (
+          <span
+            className={`w-fit rounded-md px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${source.className}`}
+          >
+            {source.label}
+          </span>
+        )}
         {product.merchant && (
           <span className="flex items-center gap-1.5 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             {logo ? (

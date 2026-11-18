@@ -8,6 +8,7 @@ import CountdownTimer from "@/components/CountdownTimer";
 import { IconFlame, IconTag, IconZap } from "@/components/Icons";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { HomeExperience } from "@/components/HomeExperience";
+import { ALL_SOURCES, SOURCE_PREFIX, sourceBadgeOf } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
@@ -54,11 +55,26 @@ export default async function OfertasDoDiaPage({
   });
   const now = new Date();
   const [topDiscounts, endingSoon] = await Promise.all([
-    prisma.product.findMany({
-      where: { ...VALID, discountPct: { gt: 0 } },
-      orderBy: { discountPct: "desc" },
-      take: 24,
-    }),
+    // Top descontos de cada fonte (ate 8 por fonte) -> merge ordenado.
+    // Garante que Mercado Livre/Awin aparecam mesmo com poucos descontos.
+    Promise.all(
+      ALL_SOURCES.map((src) =>
+        prisma.product.findMany({
+          where: {
+            ...VALID,
+            discountPct: { gt: 0 },
+            externalId: { startsWith: SOURCE_PREFIX[src] },
+          },
+          orderBy: { discountPct: "desc" },
+          take: 8,
+        }),
+      ),
+    ).then((groups) =>
+      groups
+        .flat()
+        .sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0))
+        .slice(0, 24),
+    ),
     prisma.product.findMany({
       where: {
         ...VALID,
@@ -112,7 +128,9 @@ export default async function OfertasDoDiaPage({
               }
             >
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-                {endingSoon.map((p) => (
+                {endingSoon.map((p) => {
+                  const badge = sourceBadgeOf(p.externalId);
+                  return (
                   <Link
                     key={p.id}
                     href={`/produto/${p.id}`}
@@ -139,6 +157,11 @@ export default async function OfertasDoDiaPage({
                       })()}
                     </div>
                     <div className="flex flex-1 flex-col gap-1 p-2.5">
+                      {badge && (
+                        <span className={`w-fit rounded px-1 py-px text-[9px] font-extrabold uppercase tracking-wider ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      )}
                       <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
                         {p.title}
                       </h3>
@@ -150,7 +173,8 @@ export default async function OfertasDoDiaPage({
                       {p.endsAt && <CountdownTimer endsAt={p.endsAt.toISOString()} />}
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             </CollapsibleSection>
           )}
@@ -169,7 +193,7 @@ export default async function OfertasDoDiaPage({
           >
             <div className="grid grid-cols-2 gap-4 pb-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {topDiscounts.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} showSource />
               ))}
             </div>
           </CollapsibleSection>

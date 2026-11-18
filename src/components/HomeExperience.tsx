@@ -580,16 +580,16 @@ export async function HomeExperience({
             </span>
           }
         >
-          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {featuredStores.map((s) => {
               const logo = storeLogo(s, brandLogoByName);
               return (
                 <HashLink
                   key={s.merchant}
                   href={`/ofertas-do-dia?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
-                  className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
+                  className="group flex aspect-square flex-col items-center justify-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
-                  <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
+                  <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
                     {logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
