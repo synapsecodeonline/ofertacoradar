@@ -15,6 +15,7 @@ import {
 import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
+import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
 import { Suspense, type ReactNode } from "react";
@@ -531,44 +532,54 @@ export async function HomeExperience({
       {!dayOnly && (<>
       {/* Ofertas da fonte: camp-lomadee: na Lomadee; desconto em ML/Awin */}
       {offersItems.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+        <CollapsibleSection
+          defaultOpen={false}
+          className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+          title={
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
                 Ofertas verificadas
-              </p>
-              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+              </span>
+              <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
                 {OFFERS_TITLE[tab]}
-              </h2>
-            </div>
-            <span className="text-sm font-medium text-zinc-400">
+              </span>
+            </span>
+          }
+          meta={
+            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               {offersItems.length} ofertas
             </span>
-          </div>
+          }
+        >
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {offersItems.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
       )}
 
       {/* Lojas em destaque: apenas lojas com produtos ativos */}
       {featuredStores.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+        <CollapsibleSection
+          defaultOpen={false}
+          className="mb-8"
+          title={
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
                 {STORE_EYEBROW[tab]}
-              </p>
-              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+              </span>
+              <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
                 Lojas em destaque
-              </h2>
-            </div>
-            <span className="text-sm font-medium text-zinc-400">
+              </span>
+            </span>
+          }
+          meta={
+            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               {featuredStores.length} lojas
             </span>
-          </div>
+          }
+        >
           <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
             {featuredStores.map((s) => {
               const logo = storeLogo(s, brandLogoByName);
@@ -611,7 +622,7 @@ export async function HomeExperience({
               );
             })}
           </div>
-        </section>
+        </CollapsibleSection>
       )}
 
       {categoryList.length > 0 && (
