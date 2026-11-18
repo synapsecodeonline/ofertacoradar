@@ -56,7 +56,7 @@ const TABS = {
   ofertas: {
     label: "Ofertas & Cupons",
     eyebrow: "Cupons & ofertas",
-    title: "Ofertas e cupons de hoje",
+    title: "Catálogo de Ofertas",
     noun: "ofertas",
     prefix: "camp:",
     defaultSort: "desconto",
@@ -64,7 +64,7 @@ const TABS = {
   lojas: {
     label: "Lojas Lomadee",
     eyebrow: "Catálogo",
-    title: "Produtos das lojas parceiras",
+    title: "Catálogo de Produtos",
     noun: "produtos",
     prefix: "prod:",
     defaultSort: "recentes",
@@ -72,7 +72,7 @@ const TABS = {
   ml: {
     label: "Lojas Mercado Livre",
     eyebrow: "Mercado Livre",
-    title: "Produtos do Mercado Livre",
+    title: "Catálogo Mercado Livre",
     noun: "produtos",
     prefix: "ml:",
     defaultSort: "recentes",
@@ -80,7 +80,7 @@ const TABS = {
   awin: {
     label: "Awin",
     eyebrow: "Awin",
-    title: "Ofertas Awin",
+    title: "Catálogo Awin",
     noun: "produtos",
     prefix: "aw:",
     defaultSort: "recentes",
@@ -194,20 +194,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ? ordem
       : cfg.defaultSort;
 
-  // Visao de loja (Lomadee): catalogo = prod:, ofertas = camp:,
-  // rail de cliques = uniao. ML/Awin tem prefixo unico em tudo.
-  const lomadeeStoreView = !!merchant && (tab === "ofertas" || tab === "lojas");
-  const catalogCond = lomadeeStoreView
-    ? { externalId: { startsWith: "prod:" } }
-    : { externalId: { startsWith: cfg.prefix } };
-  const unionCond = lomadeeStoreView
-    ? {
-        OR: [
-          { externalId: { startsWith: "camp:" } },
-          { externalId: { startsWith: "prod:" } },
-        ],
-      }
-    : catalogCond;
+  // Cada aba filtra um unico prefixo de fonte — nada de misturar.
+  const sourceCond = { externalId: { startsWith: cfg.prefix } };
   const searchFilter = query
     ? {
         OR: [
@@ -220,7 +208,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const listWhere = {
     active: true,
     AND: [
-      catalogCond,
+      sourceCond,
       notZeroPrice,
       notExpired,
       { imageUrl: { not: null } },
@@ -252,8 +240,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     aproveitadasTop,
     brandRows,
     orgs,
-    storeOffers,
-    storeOffersTotal,
     subtypeFacets,
     srcRows,
   ] = await Promise.all([
@@ -269,7 +255,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         category: { not: null },
         AND: [
-          catalogCond,
+          sourceCond,
           notZeroPrice,
           notExpired,
           { imageUrl: { not: null } },
@@ -283,7 +269,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         merchant: { not: null },
         AND: [
-          catalogCond,
+          sourceCond,
           notZeroPrice,
           notExpired,
           { imageUrl: { not: null } },
@@ -304,7 +290,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       where: {
         active: true,
         AND: [
-          unionCond,
+          sourceCond,
           notZeroPrice,
           { imageUrl: { not: null } },
           category ? { category: { in: rawSlugsFor(category) } } : {},
@@ -330,7 +316,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         imageUrl: { not: null },
         AND: [
-          unionCond,
+          sourceCond,
           notZeroPrice,
           notExpired,
           category ? { category: { in: rawSlugsFor(category) } } : {},
@@ -357,39 +343,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     prisma.affiliatedOrg.findMany({
       select: { organizationId: true, name: true },
     }),
-    // Ofertas (camp:) da loja — secao propria na visao de loja
-    lomadeeStoreView
-      ? prisma.product.findMany({
-          where: {
-            active: true,
-            AND: [
-              { externalId: { startsWith: "camp:" } },
-              notZeroPrice,
-              notExpired,
-              { imageUrl: { not: null } },
-              { merchant: { equals: merchant, mode: "insensitive" as const } },
-              category ? { category: { in: rawSlugsFor(category) } } : {},
-              searchFilter,
-            ],
-          },
-          orderBy: { discountPct: { sort: "desc", nulls: "last" } },
-          take: 12,
-        })
-      : Promise.resolve([]),
-    lomadeeStoreView
-      ? prisma.product.count({
-          where: {
-            active: true,
-            AND: [
-              { externalId: { startsWith: "camp:" } },
-              notZeroPrice,
-              notExpired,
-              { imageUrl: { not: null } },
-              { merchant: { equals: merchant, mode: "insensitive" as const } },
-            ],
-          },
-        })
-      : Promise.resolve(0),
     // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
     subDefs.length
       ? prisma.product.groupBy({
@@ -398,7 +351,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             active: true,
             subtype: { not: null },
             AND: [
-              catalogCond,
+              sourceCond,
               notZeroPrice,
               notExpired,
               { imageUrl: { not: null } },
@@ -451,7 +404,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const merchantTab = new Map<string, Tab>();
   const merchantSrc = new Map<
     string,
-    { offers: number; products: number }
+    { camp: number; prod: number; ml: number; aw: number }
   >();
   for (const r of srcRows) {
     const camp = Number(r.camp);
@@ -460,10 +413,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     const aw = Number(r.aw);
     const total = camp + prod + ml + aw;
     countByMerchant.set(r.merchant, total);
-    merchantSrc.set(r.merchant, {
-      offers: camp,
-      products: prod + ml + aw,
-    });
+    merchantSrc.set(r.merchant, { camp, prod, ml, aw });
     for (const t of TAB_ORDER) {
       const n = { camp, prod, ml, aw }[SRC_KEY[t]];
       if (n <= 0) continue;
@@ -482,19 +432,39 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     (tabCounts.get("awin") ?? 0);
   const offersTotal = tabCounts.get("ofertas") ?? 0;
 
-  // So exibe lojas com itens visiveis; link aponta para a aba da fonte
-  const featuredStores = FEATURED_STORES.map((s) => {
-    const src = merchantSrc.get(s.merchant) ?? { offers: 0, products: 0 };
-    return {
-      ...s,
-      offers: src.offers,
-      products: src.products,
-      tab: (merchantTab.get(s.merchant) ?? null) as Tab | null,
-    };
-  }).filter(
-    (s): s is typeof s & { tab: Tab } =>
-      s.tab !== null && s.offers + s.products > 0,
-  );
+  // "Lojas em destaque" por aba: cada fonte mostra so as suas lojas.
+  // Ofertas = todas as fontes; Lojas Lomadee = prod:; ML = ml:; Awin = aw:.
+  const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
+    ofertas: "camp",
+    lojas: "prod",
+    ml: "ml",
+    awin: "aw",
+  };
+  const featuredForTab = (t: Tab) =>
+    FEATURED_STORES.map((s) => {
+      const src = merchantSrc.get(s.merchant);
+      const inSource = src ? src[SRC_COUNT[t]] : 0;
+      // aba Ofertas mostra lojas de TODAS as fontes (ofertas+produtos);
+      // as demais abas exigem a loja ter itens na fonte da aba
+      const visible =
+        t === "ofertas"
+          ? (countByMerchant.get(s.merchant) ?? 0) > 0
+          : inSource > 0;
+      const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0 };
+      // Na aba Ofertas, loja sem camp: linka para a aba onde ela tem itens
+      const linkTab =
+        t === "ofertas" && counts.camp === 0
+          ? (merchantTab.get(s.merchant) ?? t)
+          : t;
+      return {
+        ...s,
+        offers: counts.camp,
+        products: counts.prod + counts.ml + counts.aw,
+        linkTab,
+        visible,
+      };
+    }).filter((s) => s.visible);
+  const featuredStores = featuredForTab(tab);
 
   // heroStores: brands cujo id bate com as orgs afiliadas (sem query extra)
   const orgIds = new Set(orgs.map((o) => o.organizationId));
@@ -588,7 +558,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         AND: [
           notZeroPrice,
           notExpired,
-          catalogCond,
+          sourceCond,
           merchant
             ? { merchant: { equals: merchant, mode: "insensitive" as const } }
             : {},
@@ -727,58 +697,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <SearchBar merchants={merchantList} currentMerchant={merchant} />
           </Suspense>
 
-          {/* Ordenacao */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
-            <span className="mr-1 font-semibold text-zinc-500">Ordenar por</span>
-            <div className="flex flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-              {(Object.keys(SORTS) as SortKey[]).map((s) => (
-                <HashLink
-                  key={s}
-                  href={qs({ ordem: s })}
-                  className={`rounded-full px-3 py-1 font-medium transition-all ${
-                    sort === s
-                      ? "bg-white text-zinc-950 shadow-sm"
-                      : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {SORTS[s].label}
-                </HashLink>
-              ))}
-            </div>
-          </div>
-
         </div>
       </section>
 
-      {/* Visao de loja: ofertas (camp:) da loja em bloco recolhivel */}
-      {lomadeeStoreView && storeOffers.length > 0 && (
-        <CollapsibleSection
-          id="catalogo"
-          defaultOpen={false}
-          className="border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-          title={
-            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
-              <IconZap className="h-4 w-4" />
-              Ofertas da loja
-            </h2>
-          }
-          meta={
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              {storeOffersTotal.toLocaleString("pt-BR")}{" "}
-              {storeOffersTotal === 1 ? "oferta" : "ofertas"}
-            </span>
-          }
-        >
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {storeOffers.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
-
       {/* Destaques do momento: relampago + mais aproveitadas */}
-      {!lomadeeStoreView && (flashDeals.length > 0 || aproveitadas.length > 0) && (
+      {(flashDeals.length > 0 || aproveitadas.length > 0) && (
         <CollapsibleSection
           className="border-zinc-200/80 bg-gradient-to-r from-zinc-50 via-emerald-50/50 to-zinc-50 dark:border-zinc-800 dark:from-zinc-900/60 dark:via-emerald-950/20 dark:to-zinc-900/60"
           title={
@@ -865,7 +788,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
 
       {/* Lojas em destaque: apenas lojas com produtos ativos */}
-      {!lomadeeStoreView && featuredStores.length > 0 && (
+      {featuredStores.length > 0 && (
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -886,7 +809,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               return (
                 <HashLink
                   key={s.merchant}
-                  href={`/?aba=${s.tab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
+                  href={`/?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
                   className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -946,48 +869,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
 
-      <div
-        id={lomadeeStoreView && storeOffers.length > 0 ? undefined : "catalogo"}
-        className="scroll-mt-20"
-      >
-      {lomadeeStoreView && aproveitadas.length > 0 && (
-        <CollapsibleSection
-          defaultOpen={false}
-          className="mb-5 border-orange-200/60 bg-orange-50/40 dark:border-orange-900/40 dark:bg-orange-950/20"
-          title={
-            <h3 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
-              <IconFlame className="h-4 w-4" />
-              Mais clicadas nas últimas 48h
-            </h3>
-          }
-          meta={
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              {aproveitadas.length} itens
-            </span>
-          }
-        >
-          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-            {aproveitadas.map((p) => {
-              const n = p._count?.clicks ?? 0;
-              return (
-                <RailCard
-                  key={p.id}
-                  p={p}
-                  className="w-44"
-                  corner={
-                    n > 0 ? (
-                      <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-orange-500/95 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow">
-                        <IconFlame className="h-2.5 w-2.5" />
-                        {n}
-                      </span>
-                    ) : null
-                  }
-                />
-              );
-            })}
-          </div>
-        </CollapsibleSection>
-      )}
+      <div id="catalogo" className="scroll-mt-20">
       {category && visibleSubs.length > 0 && (
         <nav
           aria-label="Tipos de produto"
@@ -1035,6 +917,28 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </nav>
       )}
 
+      {/* Ordenacao: entre categorias e catalogo */}
+      <div className="mb-5 flex flex-wrap items-center justify-center gap-1.5 text-xs">
+        <span className="mr-1 font-semibold text-zinc-500 dark:text-zinc-400">
+          Ordenar por
+        </span>
+        <div className="flex flex-wrap justify-center gap-1 rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+          {(Object.keys(SORTS) as SortKey[]).map((s) => (
+            <HashLink
+              key={s}
+              href={qs({ ordem: s })}
+              className={`rounded-full px-3 py-1 font-medium transition-all ${
+                sort === s
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {SORTS[s].label}
+            </HashLink>
+          ))}
+        </div>
+      </div>
+
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
           <p className="text-lg font-bold text-zinc-700 dark:text-zinc-200">
@@ -1043,9 +947,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
             {tab === "awin"
               ? "Awin ainda não tem ofertas ativas. Assim que uma loja parceira for aprovada, os produtos aparecem aqui automaticamente."
-              : lomadeeStoreView
-                ? `Nenhum produto encontrado na loja ${merchant} com esses filtros. Tente outra busca ou volte mais tarde.`
-                : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
+              : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
           </p>
         </div>
       ) : (
@@ -1053,10 +955,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <div className="mb-4 flex items-end justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                {lomadeeStoreView ? "Loja" : cfg.eyebrow}
+                {cfg.eyebrow}
               </p>
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                {lomadeeStoreView ? merchant : cfg.title}
+                {cfg.title}
               </h2>
               <Link
                 href="/ofertas-do-dia"
@@ -1068,7 +970,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <span className="text-sm font-medium text-zinc-400">
               {items.length}
               {total > items.length ? ` de ${total.toLocaleString("pt-BR")}` : ""}{" "}
-              {lomadeeStoreView ? "itens" : cfg.noun}
+              {cfg.noun}
             </span>
           </div>
           <main className="grid grid-cols-2 gap-4 pb-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
