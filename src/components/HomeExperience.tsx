@@ -167,9 +167,12 @@ type SearchParams = Promise<{
 export async function HomeExperience({
   searchParams,
   embedded = false,
+  dayOnly = false,
 }: {
   searchParams: SearchParams;
   embedded?: boolean;
+  // dayOnly: renderiza so Instagram + transparencia (tela "Ofertas do dia")
+  dayOnly?: boolean;
 }) {
   const { q, categoria, aba, pagina, ordem, loja, tipo, fonte: fonteRaw } =
     await searchParams;
@@ -628,6 +631,7 @@ export async function HomeExperience({
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">
       {/* Hero */}
+      {!dayOnly && (
       <section className={`relative -mx-4 ${embedded ? "mb-6" : "mb-8"} overflow-hidden rounded-b-[2rem] bg-zinc-950 px-4 ${embedded ? "pb-8 pt-6" : "pb-10 pt-10 sm:pt-12"} text-white`}>
         {/* brilhos de fundo */}
         <div
@@ -741,6 +745,7 @@ export async function HomeExperience({
 
         </div>
       </section>
+      )}
 
       {/* Destaques do momento: relampago + mais aproveitadas */}
       {!embedded && (flashDeals.length > 0 || aproveitadas.length > 0) && (
@@ -862,6 +867,7 @@ export async function HomeExperience({
         </CollapsibleSection>
       )}
 
+      {!dayOnly && (<>
       {/* Lojas em destaque: apenas lojas com produtos ativos */}
       {featuredStores.length > 0 && (
         <section className="mb-8">
@@ -884,7 +890,7 @@ export async function HomeExperience({
               return (
                 <HashLink
                   key={s.merchant}
-                  href={`/?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
+                  href={`/ofertas-do-dia?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
                   className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -1080,6 +1086,8 @@ export async function HomeExperience({
           )}
         </nav>
       )}
+
+      </>)}
 
       {/* Instagram: ofertas do dia em video */}
       <section className="relative mb-10 -mx-4 overflow-hidden rounded-3xl bg-gradient-to-br from-fuchsia-600 via-rose-500 to-orange-400 px-6 py-10 text-white shadow-lg">

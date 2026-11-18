@@ -29,11 +29,29 @@ const VALID = {
   ],
 };
 
+const CATALOG_PARAMS = [
+  "aba",
+  "q",
+  "categoria",
+  "loja",
+  "ordem",
+  "tipo",
+  "pagina",
+  "fonte",
+] as const;
+
 export default async function OfertasDoDiaPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const sp = await searchParams;
+  // Sem params de catalogo = tela "Ofertas do dia" (so o dia).
+  // Com ?aba=/?loja=/filtros = visao completa de catalogo.
+  const catalogMode = CATALOG_PARAMS.some((k) => {
+    const v = sp[k];
+    return typeof v === "string" ? v !== "" : Array.isArray(v) && v.length > 0;
+  });
   const now = new Date();
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
   const [topDiscounts, endingSoon, clicked] = await Promise.all([
@@ -74,6 +92,7 @@ export default async function OfertasDoDiaPage({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
+      {!catalogMode && (
       <header className="flex flex-col gap-2">
         <nav className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
           <Link href="/ofertas-do-dia" className="transition-colors hover:text-emerald-600">
@@ -90,8 +109,9 @@ export default async function OfertasDoDiaPage({
           todo mundo está aproveitando. Preços verificados nas lojas parceiras.
         </p>
       </header>
+      )}
 
-      {total === 0 ? (
+      {catalogMode ? null : total === 0 ? (
         <p className="py-16 text-center text-zinc-500">
           Nenhuma oferta ativa no momento. Volte em breve!
         </p>
@@ -204,7 +224,7 @@ export default async function OfertasDoDiaPage({
 
       {/* Home completa: hero, abas por fonte, lojas em destaque e catalogo.
           embedded oculta as secoes de trilho (a pagina ja tem equivalentes). */}
-      <HomeExperience searchParams={searchParams} embedded />
+      <HomeExperience searchParams={searchParams} embedded dayOnly={!catalogMode} />
 
       <p className="flex items-center gap-2 pb-8 text-center text-xs text-zinc-400">
         <IconTag className="h-3.5 w-3.5" />
