@@ -139,7 +139,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     flashDeals,
     topClicks,
     brandRows,
-    activeMerchants,
+    prodMerchants,
+    campMerchants,
   ] = await Promise.all([
       tab === "ofertas"
         ? prisma.product.findMany({
@@ -226,9 +227,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       }),
       // Logos das lojas em destaque (Brand.name -> logo Lomadee)
       prisma.brand.findMany({ select: { name: true, logo: true } }),
-      // Merchants com produtos ativos -> filtra "Lojas em destaque"
+      // Merchants visiveis por tipo -> define a aba do link das "Lojas em destaque"
       prisma.product.findMany({
-        where: { active: true },
+        where: {
+          active: true,
+          merchant: { not: null },
+          imageUrl: { not: null },
+          AND: [isCatalogProduct, notZeroPrice, notExpired],
+        },
+        select: { merchant: true },
+        distinct: ["merchant"],
+      }),
+      prisma.product.findMany({
+        where: {
+          active: true,
+          merchant: { not: null },
+          imageUrl: { not: null },
+          AND: [isOffer, notZeroPrice, notExpired],
+        },
         select: { merchant: true },
         distinct: ["merchant"],
       }),
@@ -239,13 +255,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     brandRows.map((b) => [b.name ?? "", b.logo] as const),
   );
 
-  // So exibe lojas que tem produtos ativos no catalogo
-  const activeMerchantSet = new Set(
-    activeMerchants.map((m) => m.merchant).filter((m): m is string => !!m),
-  );
-  const featuredStores = FEATURED_STORES.filter((s) =>
-    activeMerchantSet.has(s.merchant),
-  );
+  // So exibe lojas com itens visiveis; link aponta para a aba correta
+  const toSet = (rows: { merchant: string | null }[]) =>
+    new Set(rows.map((m) => m.merchant).filter((m): m is string => !!m));
+  const prodSet = toSet(prodMerchants);
+  const campSet = toSet(campMerchants);
+  const featuredStores = FEATURED_STORES.map((s) => ({
+    ...s,
+    tab: (prodSet.has(s.merchant) ? "produtos" : campSet.has(s.merchant) ? "ofertas" : null) as
+      | "produtos"
+      | "ofertas"
+      | null,
+  })).filter((s): s is typeof s & { tab: "produtos" | "ofertas" } => s.tab !== null);
 
   // Lojas afiliadas reais (com logo quando disponivel) para o hero
   const orgs = await prisma.affiliatedOrg.findMany({
@@ -731,7 +752,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               return (
                 <Link
                   key={s.merchant}
-                  href={`/?aba=produtos&loja=${encodeURIComponent(s.merchant)}`}
+                  href={s.tab === "ofertas" ? `/?aba=ofertas&loja=${encodeURIComponent(s.merchant)}` : `/?aba=produtos&loja=${encodeURIComponent(s.merchant)}`}
                   className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
