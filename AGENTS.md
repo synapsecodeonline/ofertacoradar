@@ -27,4 +27,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Atenção: API de produtos retorna URL direta da loja; link comissionado pode exigir feed XML lomadeezado ou shortener (`POST /affiliate/shortener/url`).
 - Redirect de afiliado: `/ir/[id]` registra clique e redireciona para `affiliateUrl` (ou `url`; produtos `prod:` sem affiliateUrl geram `lmdee.link` via shortener, cacheado em `TrackedLink`).
 - `Product.discountPct` — % de desconto calculado no sync (alimenta ordenação "Maior desconto" e relacionadas). Manter atualizado em `scripts/sync.ts` e `src/lib/syncer.ts`.
-- Home tem abas/ordenação/filtros via query params: `aba`, `q`, `categoria`, `loja`, `ordem` (desconto|recentes|terminando|populares), `pagina`. URLs `/ir/` ficam fora do sitemap e são `Disallow` no robots.
+- Home tem abas/ordenação/filtros via query params: `aba`, `q`, `categoria`, `loja`, `fonte` (lomadee|ml|awin, so na aba produtos), `ordem` (desconto|recentes|terminando|populares), `pagina`. URLs `/ir/` ficam fora do sitemap e são `Disallow` no robots.

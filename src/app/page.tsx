@@ -70,7 +70,8 @@ export async function generateMetadata() {
 }
 
 export default async function Home({ searchParams }: PageProps<"/">) {
-  const { q, categoria, aba, pagina, ordem, loja, tipo } = await searchParams;
+  const { q, categoria, aba, pagina, ordem, loja, tipo, fonte: fonteRaw } =
+    await searchParams;
   const query = typeof q === "string" ? q : "";
   const rawCat = typeof categoria === "string" ? categoria : "";
   const category = rawCat ? canonicalCategory(rawCat) : "";
@@ -80,6 +81,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const tab = aba === "ofertas" ? "ofertas" : "produtos";
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
+  const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
+  const fonte: "lomadee" | "ml" | "awin" | "" =
+    fonteParam === "lomadee" || fonteParam === "ml" || fonteParam === "awin"
+      ? fonteParam
+      : "";
   const sort: SortKey =
     ordem === "recentes" || ordem === "terminando" || ordem === "populares"
       ? ordem
@@ -92,6 +98,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     OR: [
       { externalId: { startsWith: "prod:" } },
       { externalId: { startsWith: "ml:" } },
+      { externalId: { startsWith: "aw:" } },
     ],
   };
   const searchFilter = query
@@ -103,10 +110,21 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         ],
       }
     : {};
+  // Filtro por fonte de afiliado (so na aba Produtos; Ofertas e tudo Lomadee)
+  const sourceCond =
+    tab === "produtos" && fonte
+      ? {
+          externalId: {
+            startsWith:
+              fonte === "ml" ? "ml:" : fonte === "awin" ? "aw:" : "prod:",
+          },
+        }
+      : {};
   const listWhere = (kind: "ofertas" | "produtos") => ({
     active: true,
     AND: [
       kind === "ofertas" ? isOffer : isCatalogProduct,
+      sourceCond,
       notZeroPrice,
       notExpired,
       { imageUrl: { not: null } },
@@ -139,6 +157,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     flashDeals,
     topClicks,
     brandRows,
+    awinTotal,
     prodMerchants,
     campMerchants,
   ] = await Promise.all([
@@ -165,6 +184,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           category: { not: null },
           AND: [
             tab === "ofertas" ? isOffer : isCatalogProduct,
+            sourceCond,
             notZeroPrice,
             notExpired,
             { imageUrl: { not: null } },
@@ -179,6 +199,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           merchant: { not: null },
           AND: [
             tab === "ofertas" ? isOffer : isCatalogProduct,
+            sourceCond,
             notZeroPrice,
             notExpired,
             { imageUrl: { not: null } },
@@ -227,6 +248,15 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       }),
       // Logos das lojas em destaque (Brand.name -> logo Lomadee)
       prisma.brand.findMany({ select: { name: true, logo: true } }),
+      // Tem itens Awin? (chip so aparece quando houver)
+      prisma.product.count({
+        where: {
+          active: true,
+          externalId: { startsWith: "aw:" },
+          imageUrl: { not: null },
+          AND: [notZeroPrice, notExpired],
+        },
+      }),
       // Merchants visiveis por tipo -> define a aba do link das "Lojas em destaque"
       prisma.product.findMany({
         where: {
@@ -311,6 +341,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         subtype: { not: null },
         AND: [
           tab === "ofertas" ? isOffer : isCatalogProduct,
+          sourceCond,
           notZeroPrice,
           notExpired,
           { imageUrl: { not: null } },
@@ -343,6 +374,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     if (category) p.set("categoria", category);
     if (category && subtype) p.set("tipo", subtype);
     if (merchant) p.set("loja", merchant);
+    if (fonte) p.set("fonte", fonte);
     p.set("aba", tab);
     const defaultSort = tab === "ofertas" ? "desconto" : "recentes";
     if (sort !== defaultSort) p.set("ordem", sort);
@@ -568,6 +600,35 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               ))}
             </div>
           </div>
+
+          {/* Filtro por fonte de afiliado (so na aba Produtos) */}
+          {tab === "produtos" && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+              <span className="mr-1 font-semibold text-zinc-500">Fonte</span>
+              <div className="flex flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+                {(
+                  [
+                    { key: "", label: "Todas" },
+                    { key: "lomadee", label: "Lojas parceiras" },
+                    { key: "ml", label: "Mercado Livre" },
+                    ...(awinTotal > 0 ? [{ key: "awin", label: "Awin" }] : []),
+                  ] as { key: string; label: string }[]
+                ).map((f) => (
+                  <Link
+                    key={f.key}
+                    href={qs({ fonte: f.key })}
+                    className={`rounded-full px-3 py-1 font-medium transition-all ${
+                      fonte === f.key
+                        ? "bg-white text-zinc-950 shadow-sm"
+                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {f.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Faixa de confianca */}
           <div className="mt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-medium text-zinc-500">
