@@ -87,22 +87,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <Link
-                href="/?aba=produtos"
-                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Produtos
-              </Link>
-              <Link
                 href="/?aba=ofertas"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Ofertas e Cupons
+                Ofertas
               </Link>
               <Link
-                href="/#relampago"
-                className="hidden rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-amber-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800 sm:inline-block"
+                href="/?aba=lojas"
+                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                ⚡ Relâmpago
+                Lojas
+              </Link>
+              <Link
+                href="/?aba=ml"
+                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Mercado Livre
               </Link>
               <Link
                 href="/ofertas-do-dia"
@@ -138,11 +138,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Navegação
               </p>
-              <Link href="/?aba=produtos" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Produtos em oferta
-              </Link>
               <Link href="/?aba=ofertas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas e cupons
+              </Link>
+              <Link href="/?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Lojas parceiras
+              </Link>
+              <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Mercado Livre
               </Link>
               <Link href="/ofertas-do-dia" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas do dia

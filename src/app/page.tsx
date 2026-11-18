@@ -30,7 +30,6 @@ import type { Product } from "@prisma/client";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 48;
-const OFFERS_LIMIT = 120;
 
 // Esconde itens com preco zerado (R$0,00) e ofertas expiradas
 const notZeroPrice = {
@@ -48,6 +47,45 @@ const SORTS = {
 } as const;
 
 type SortKey = keyof typeof SORTS;
+
+// Cada aba e uma fonte de afiliado: o catalogo nunca mistura fontes.
+// prefix = externalId prefix; noun = rotulo de contagem; sort default.
+const TABS = {
+  ofertas: {
+    label: "Ofertas & Cupons",
+    eyebrow: "Cupons & ofertas",
+    title: "Ofertas e cupons de hoje",
+    noun: "ofertas",
+    prefix: "camp:",
+    defaultSort: "desconto",
+  },
+  lojas: {
+    label: "Lojas parceiras",
+    eyebrow: "Catálogo",
+    title: "Produtos das lojas parceiras",
+    noun: "produtos",
+    prefix: "prod:",
+    defaultSort: "recentes",
+  },
+  ml: {
+    label: "Mercado Livre",
+    eyebrow: "Mercado Livre",
+    title: "Produtos do Mercado Livre",
+    noun: "produtos",
+    prefix: "ml:",
+    defaultSort: "recentes",
+  },
+  awin: {
+    label: "Awin",
+    eyebrow: "Awin",
+    title: "Ofertas Awin",
+    noun: "produtos",
+    prefix: "aw:",
+    defaultSort: "recentes",
+  },
+} as const;
+type Tab = keyof typeof TABS;
+const TAB_ORDER = Object.keys(TABS) as Tab[];
 
 function orderByFor(sort: SortKey) {
   switch (sort) {
@@ -138,29 +176,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const rawSub = typeof tipo === "string" ? tipo : "";
   const subDefs = subtypesFor(category);
   const subtype = subDefs.some((d) => d.slug === rawSub) ? rawSub : "";
-  const tab = aba === "ofertas" ? "ofertas" : "produtos";
+  const rawTab = typeof aba === "string" ? aba : "";
+  const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
+  // Legado: aba=produtos (catalogo unificado) e ?fonte= migram p/ a aba da fonte
+  let tab: Tab = "ofertas";
+  if (TAB_ORDER.includes(rawTab as Tab)) tab = rawTab as Tab;
+  else if (rawTab === "produtos")
+    tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lojas";
+  else if (fonteParam === "ml" || fonteParam === "awin") tab = fonteParam;
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
-  const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
-  const fonte: "lomadee" | "ml" | "awin" | "" =
-    fonteParam === "lomadee" || fonteParam === "ml" || fonteParam === "awin"
-      ? fonteParam
-      : "";
+  const cfg = TABS[tab];
   const sort: SortKey =
     ordem === "recentes" || ordem === "terminando" || ordem === "populares"
       ? ordem
-      : tab === "ofertas"
-        ? "desconto"
-        : "recentes";
+      : cfg.defaultSort;
 
-  const isOffer = { externalId: { startsWith: "camp:" } };
-  const isCatalogProduct = {
-    OR: [
-      { externalId: { startsWith: "prod:" } },
-      { externalId: { startsWith: "ml:" } },
-      { externalId: { startsWith: "aw:" } },
-    ],
-  };
+  // Esta aba ja define a fonte: todo filtro carrega o prefixo do externalId
+  const sourceCond = { externalId: { startsWith: cfg.prefix } };
   const searchFilter = query
     ? {
         OR: [
@@ -170,20 +203,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         ],
       }
     : {};
-  // Filtro por fonte de afiliado (so na aba Produtos; Ofertas e tudo Lomadee)
-  const sourceCond =
-    tab === "produtos" && fonte
-      ? {
-          externalId: {
-            startsWith:
-              fonte === "ml" ? "ml:" : fonte === "awin" ? "aw:" : "prod:",
-          },
-        }
-      : {};
-  const listWhere = (kind: "ofertas" | "produtos") => ({
+  const listWhere = {
     active: true,
     AND: [
-      kind === "ofertas" ? isOffer : isCatalogProduct,
       sourceCond,
       notZeroPrice,
       notExpired,
@@ -195,7 +217,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         : {},
       searchFilter,
     ],
-  });
+  };
 
   // Sync incremental em background: nao bloqueia a resposta
   after(() => {
@@ -207,167 +229,148 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const now = new Date();
 
   const [
-    offers,
-    products,
-    totalOffers,
-    totalProducts,
+    pageItems,
+    total,
     categories,
     merchants,
     featured,
     flashDeals,
     topClicks,
     brandRows,
-    awinTotal,
-    prodMerchants,
-    campMerchants,
+    srcMerchants,
   ] = await Promise.all([
-      tab === "ofertas"
-        ? prisma.product.findMany({
-            where: listWhere("ofertas"),
-            orderBy: orderByFor(sort),
-            take: OFFERS_LIMIT,
-          })
-        : Promise.resolve([]),
-      tab === "produtos"
-        ? prisma.product.findMany({
-            where: listWhere("produtos"),
-            orderBy: orderByFor(sort),
-            skip: (page - 1) * PAGE_SIZE,
-            take: PAGE_SIZE,
-          })
-        : Promise.resolve([]),
-      prisma.product.count({ where: listWhere("ofertas") }),
-      prisma.product.count({ where: listWhere("produtos") }),
-      prisma.product.findMany({
-        where: {
-          active: true,
-          category: { not: null },
-          AND: [
-            tab === "ofertas" ? isOffer : isCatalogProduct,
-            sourceCond,
-            notZeroPrice,
-            notExpired,
-            { imageUrl: { not: null } },
-          ],
-        },
-        select: { category: true },
-        distinct: ["category"],
-      }),
-      prisma.product.findMany({
-        where: {
-          active: true,
-          merchant: { not: null },
-          AND: [
-            tab === "ofertas" ? isOffer : isCatalogProduct,
-            sourceCond,
-            notZeroPrice,
-            notExpired,
-            { imageUrl: { not: null } },
-          ],
-        },
-        select: { merchant: true },
-        distinct: ["merchant"],
-      }),
-      // Ofertas em destaque: maiores descontos do tipo ativo na aba
-      prisma.product.findMany({
-        where: listWhere(tab),
-        orderBy: { discountPct: { sort: "desc", nulls: "last" } },
-        take: 5,
-      }),
-      // Relampago: terminam nas proximas 48h, mais urgentes primeiro.
-      // Independe da aba: oferta que expira e oferta em qualquer aba.
-      prisma.product.findMany({
-        where: {
-          active: true,
-          AND: [
-            notZeroPrice,
-            { imageUrl: { not: null } },
-            category ? { category: { in: rawSlugsFor(category) } } : {},
-            merchant
-              ? { merchant: { equals: merchant, mode: "insensitive" as const } }
-              : {},
-            searchFilter,
-            {
-              endsAt: {
-                gte: now,
-                lte: new Date(now.getTime() + FLASH_WINDOW_MS),
-              },
+    prisma.product.findMany({
+      where: listWhere,
+      orderBy: orderByFor(sort),
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.product.count({ where: listWhere }),
+    prisma.product.findMany({
+      where: {
+        active: true,
+        category: { not: null },
+        AND: [
+          sourceCond,
+          notZeroPrice,
+          notExpired,
+          { imageUrl: { not: null } },
+        ],
+      },
+      select: { category: true },
+      distinct: ["category"],
+    }),
+    prisma.product.findMany({
+      where: {
+        active: true,
+        merchant: { not: null },
+        AND: [
+          sourceCond,
+          notZeroPrice,
+          notExpired,
+          { imageUrl: { not: null } },
+        ],
+      },
+      select: { merchant: true },
+      distinct: ["merchant"],
+    }),
+    // Ofertas em destaque: maiores descontos da fonte ativa
+    prisma.product.findMany({
+      where: listWhere,
+      orderBy: { discountPct: { sort: "desc", nulls: "last" } },
+      take: 5,
+    }),
+    // Relampago: terminam nas proximas 48h, mais urgentes primeiro.
+    // Escopo da fonte ativa; respeita busca/categoria/loja.
+    prisma.product.findMany({
+      where: {
+        active: true,
+        AND: [
+          sourceCond,
+          notZeroPrice,
+          { imageUrl: { not: null } },
+          category ? { category: { in: rawSlugsFor(category) } } : {},
+          merchant
+            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
+            : {},
+          searchFilter,
+          {
+            endsAt: {
+              gte: now,
+              lte: new Date(now.getTime() + FLASH_WINDOW_MS),
             },
-          ],
-        },
-        orderBy: { endsAt: "asc" },
-        take: 12,
-      }),
-      // Cliques nas ultimas 48h -> prova social real ("aproveitadas agora")
-      prisma.click.groupBy({
-        by: ["productId"],
-        where: { createdAt: { gte: new Date(now.getTime() - 48 * 3_600_000) } },
-        _count: { _all: true },
-        orderBy: { _count: { productId: "desc" } },
-        take: 40,
-      }),
-      // Logos das lojas em destaque (Brand.name -> logo Lomadee)
-      prisma.brand.findMany({ select: { name: true, logo: true } }),
-      // Tem itens Awin? (chip so aparece quando houver)
-      prisma.product.count({
-        where: {
-          active: true,
-          externalId: { startsWith: "aw:" },
-          imageUrl: { not: null },
-          AND: [notZeroPrice, notExpired],
-        },
-      }),
-      // Merchants visiveis por tipo -> define a aba do link das "Lojas em destaque"
-      prisma.product.groupBy({
-        by: ["merchant"],
-        where: {
-          active: true,
-          merchant: { not: null },
-          imageUrl: { not: null },
-          AND: [isCatalogProduct, notZeroPrice, notExpired],
-        },
-        _count: { _all: true },
-      }),
-      prisma.product.groupBy({
-        by: ["merchant"],
-        where: {
-          active: true,
-          merchant: { not: null },
-          imageUrl: { not: null },
-          AND: [isOffer, notZeroPrice, notExpired],
-        },
-        _count: { _all: true },
-      }),
-    ]);
+          },
+        ],
+      },
+      orderBy: { endsAt: "asc" },
+      take: 12,
+    }),
+    // Cliques nas ultimas 48h -> prova social real ("aproveitadas agora")
+    prisma.click.groupBy({
+      by: ["productId"],
+      where: { createdAt: { gte: new Date(now.getTime() - 48 * 3_600_000) } },
+      _count: { _all: true },
+      orderBy: { _count: { productId: "desc" } },
+      take: 100,
+    }),
+    // Logos das lojas em destaque (Brand.name -> logo Lomadee)
+    prisma.brand.findMany({ select: { name: true, logo: true } }),
+    // Merchants visiveis por fonte -> aba das "Lojas em destaque" + contagem das abas
+    Promise.all(
+      TAB_ORDER.map((t) =>
+        prisma.product.groupBy({
+          by: ["merchant"],
+          where: {
+            active: true,
+            merchant: { not: null },
+            imageUrl: { not: null },
+            AND: [notZeroPrice, notExpired, { externalId: { startsWith: TABS[t].prefix } }],
+          },
+          _count: { _all: true },
+        }),
+      ),
+    ),
+  ]);
 
   // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
   const brandLogoByName = new Map(
     brandRows.map((b) => [b.name ?? "", b.logo] as const),
   );
 
-  // So exibe lojas com itens visiveis; link aponta para a aba correta
-  // e o card mostra quantos itens a loja tem (produtos + ofertas)
+  // Contagem de itens visiveis por fonte (abas) e por loja
+  const tabCounts = new Map<Tab, number>();
   const countByMerchant = new Map<string, number>();
-  for (const rows of [prodMerchants, campMerchants]) {
-    for (const r of rows) {
-      if (r.merchant) {
-        countByMerchant.set(
-          r.merchant,
-          (countByMerchant.get(r.merchant) ?? 0) + r._count._all,
-        );
-      }
+  const merchantTab = new Map<string, Tab>();
+  TAB_ORDER.forEach((t, i) => {
+    let sum = 0;
+    for (const r of srcMerchants[i]) {
+      if (!r.merchant) continue;
+      sum += r._count._all;
+      countByMerchant.set(
+        r.merchant,
+        (countByMerchant.get(r.merchant) ?? 0) + r._count._all,
+      );
+      // primeira fonte que tem a loja define a aba do card (ofertas > lojas > ml > awin)
+      if (!merchantTab.has(r.merchant)) merchantTab.set(r.merchant, t);
     }
-  }
-  const hasItems = (m: string) => (countByMerchant.get(m) ?? 0) > 0;
+    tabCounts.set(t, sum);
+  });
+  // Awin so aparece como aba quando houver itens
+  const visibleTabs = TAB_ORDER.filter(
+    (t) => t !== "awin" || (tabCounts.get(t) ?? 0) > 0,
+  );
+  const catalogTotal =
+    (tabCounts.get("lojas") ?? 0) +
+    (tabCounts.get("ml") ?? 0) +
+    (tabCounts.get("awin") ?? 0);
+  const offersTotal = tabCounts.get("ofertas") ?? 0;
+
+  // So exibe lojas com itens visiveis; link aponta para a aba da fonte
   const featuredStores = FEATURED_STORES.map((s) => ({
     ...s,
     count: countByMerchant.get(s.merchant) ?? 0,
-    tab: (hasItems(s.merchant)
-      ? prodMerchants.some((r) => r.merchant === s.merchant)
-        ? "produtos"
-        : "ofertas"
-      : null) as "produtos" | "ofertas" | null,
-  })).filter((s): s is typeof s & { tab: "produtos" | "ofertas" } => s.tab !== null);
+    tab: (merchantTab.get(s.merchant) ?? null) as Tab | null,
+  })).filter((s): s is typeof s & { tab: Tab } => s.tab !== null);
 
   // Lojas afiliadas reais (com logo quando disponivel) para o hero
   const orgs = await prisma.affiliatedOrg.findMany({
@@ -411,7 +414,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         subtype: { not: null },
         AND: [
-          tab === "ofertas" ? isOffer : isCatalogProduct,
           sourceCond,
           notZeroPrice,
           notExpired,
@@ -445,9 +447,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     if (category) p.set("categoria", category);
     if (category && subtype) p.set("tipo", subtype);
     if (merchant) p.set("loja", merchant);
-    if (fonte) p.set("fonte", fonte);
     p.set("aba", tab);
-    const defaultSort = tab === "ofertas" ? "desconto" : "recentes";
+    const defaultSort = cfg.defaultSort;
     if (sort !== defaultSort) p.set("ordem", sort);
     for (const [k, v] of Object.entries(extra)) {
       if (v === "") p.delete(k);
@@ -457,12 +458,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     return s ? `/?${s}` : "/";
   };
 
-  const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasNextPage = page < totalPages;
   const flashIds = new Set(flashDeals.map((p) => p.id));
-  const items = (tab === "ofertas" ? offers : products).filter(
-    (p) => !flashIds.has(p.id),
-  );
+  const items = pageItems.filter((p) => !flashIds.has(p.id));
 
   // Cliques por produto (30d) para prova social nos cards
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
@@ -482,41 +481,42 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // Fallback: sem cliques recentes (ex.: banco recém-populado), mostra
   // os maiores descontos ativos — dado real, e volta a ranquear por
   // cliques assim que houver volume.
+  // Pega candidatos de todas as fontes e filtra pela fonte da aba;
+  // ordena por cliques e corta em 12 depois do filtro.
   const aproveitadasIds = topClicks
     .sort((a, b) => b._count._all - a._count._all)
     .map((g) => g.productId)
-    .filter((id) => !flashIds.has(id))
-    .slice(0, 12);
-  const aproveitadasIsFallback = aproveitadasIds.length === 0;
+    .filter((id) => !flashIds.has(id));
+  const aproveitadasCount = new Map(
+    topClicks.map((g) => [g.productId, g._count._all]),
+  );
   let aproveitadas = aproveitadasIds.length
     ? await prisma.product.findMany({
         where: {
           active: true,
           id: { in: aproveitadasIds },
           imageUrl: { not: null },
-          AND: [notZeroPrice],
+          AND: [sourceCond, notZeroPrice],
         },
       })
     : [];
+  aproveitadas.sort(
+    (a, b) => (aproveitadasCount.get(b.id) ?? 0) - (aproveitadasCount.get(a.id) ?? 0),
+  );
+  aproveitadas = aproveitadas.slice(0, 12);
+  const aproveitadasIsFallback = aproveitadas.length === 0;
   if (!aproveitadas.length) {
     aproveitadas = await prisma.product.findMany({
       where: {
         active: true,
         imageUrl: { not: null },
         discountPct: { gt: 0 },
-        AND: [notZeroPrice, notExpired, isOffer],
+        AND: [notZeroPrice, notExpired, sourceCond],
       },
       orderBy: { discountPct: "desc" },
       take: 12,
     });
   }
-  const aproveitadasCount = new Map(
-    topClicks.map((g) => [g.productId, g._count._all]),
-  );
-  aproveitadas.sort(
-    (a, b) => (aproveitadasCount.get(b.id) ?? 0) - (aproveitadasCount.get(a.id) ?? 0),
-  );
-
   const featuredItems: FeaturedItem[] = await Promise.all(
     featured.map(async (p) => ({
       id: p.id,
@@ -556,7 +556,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
               </span>
-              {totalProducts + totalOffers} ofertas ativas agora
+              {catalogTotal + offersTotal} ofertas ativas agora
             </span>
             <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               Os melhores descontos,
@@ -572,12 +572,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             {/* Stats */}
             <div className="flex items-center gap-6 text-sm">
               <div className="flex flex-col items-center lg:items-start">
-                <span className="text-xl font-extrabold text-white">{totalProducts.toLocaleString("pt-BR")}</span>
+                <span className="text-xl font-extrabold text-white">{catalogTotal.toLocaleString("pt-BR")}</span>
                 <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">produtos</span>
               </div>
               <div className="h-8 w-px bg-white/10" />
               <div className="flex flex-col items-center lg:items-start">
-                <span className="text-xl font-extrabold text-white">{totalOffers.toLocaleString("pt-BR")}</span>
+                <span className="text-xl font-extrabold text-white">{offersTotal.toLocaleString("pt-BR")}</span>
                 <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">ofertas</span>
               </div>
               <div className="h-8 w-px bg-white/10" />
@@ -624,28 +624,33 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
         {/* Controles */}
         <div className="relative mx-auto mt-10 flex w-full max-w-6xl flex-col items-center gap-4">
-          {/* Abas */}
-          <nav className="flex rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
-            <Link
-              href={qs({ aba: "produtos" })}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition-all ${
-                tab === "produtos"
-                  ? "bg-white text-zinc-950 shadow"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Produtos{totalProducts > 0 ? ` (${totalProducts})` : ""}
-            </Link>
-            <Link
-              href={qs({ aba: "ofertas" })}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition-all ${
-                tab === "ofertas"
-                  ? "bg-white text-zinc-950 shadow"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Ofertas e Cupons{totalOffers > 0 ? ` (${totalOffers})` : ""}
-            </Link>
+          {/* Abas por fonte de afiliado — catalogo nunca mistura fontes */}
+          <nav className="flex max-w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
+            {visibleTabs.map((t) => {
+              const count = tabCounts.get(t) ?? 0;
+              return (
+                <Link
+                  key={t}
+                  href={qs({ aba: t })}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                    tab === t
+                      ? "bg-white text-zinc-950 shadow"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {TABS[t].label}
+                  {count > 0 ? (
+                    <span
+                      className={`ml-1.5 text-[11px] font-bold ${
+                        tab === t ? "text-zinc-500" : "text-zinc-500"
+                      }`}
+                    >
+                      {count.toLocaleString("pt-BR")}
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
           </nav>
 
           <Suspense>
@@ -672,34 +677,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </div>
           </div>
 
-          {/* Filtro por fonte de afiliado (so na aba Produtos) */}
-          {tab === "produtos" && (
-            <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
-              <span className="mr-1 font-semibold text-zinc-500">Fonte</span>
-              <div className="flex flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-                {(
-                  [
-                    { key: "", label: "Todas" },
-                    { key: "lomadee", label: "Lojas parceiras" },
-                    { key: "ml", label: "Mercado Livre" },
-                    ...(awinTotal > 0 ? [{ key: "awin", label: "Awin" }] : []),
-                  ] as { key: string; label: string }[]
-                ).map((f) => (
-                  <Link
-                    key={f.key}
-                    href={qs({ fonte: f.key })}
-                    className={`rounded-full px-3 py-1 font-medium transition-all ${
-                      fonte === f.key
-                        ? "bg-white text-zinc-950 shadow-sm"
-                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {f.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
@@ -812,7 +789,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               return (
                 <Link
                   key={s.merchant}
-                  href={s.tab === "ofertas" ? `/?aba=ofertas&loja=${encodeURIComponent(s.merchant)}` : `/?aba=produtos&loja=${encodeURIComponent(s.merchant)}`}
+                  href={`/?aba=${s.tab}&loja=${encodeURIComponent(s.merchant)}`}
                   className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -912,18 +889,25 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
 
       {items.length === 0 ? (
-        <p className="py-16 text-center text-zinc-500">
-          Nenhuma oferta encontrada com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.
-        </p>
+        <div className="flex flex-col items-center gap-2 py-16 text-center">
+          <p className="text-lg font-bold text-zinc-700 dark:text-zinc-200">
+            Nada por aqui ainda
+          </p>
+          <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+            {tab === "awin"
+              ? "Awin ainda não tem ofertas ativas. Assim que uma loja parceira for aprovada, os produtos aparecem aqui automaticamente."
+              : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
+          </p>
+        </div>
       ) : (
         <>
           <div className="mb-4 flex items-end justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                {tab === "ofertas" ? "Cupons & ofertas" : "Catálogo"}
+                {cfg.eyebrow}
               </p>
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                {tab === "ofertas" ? "Ofertas e cupons de hoje" : "Produtos em oferta"}
+                {cfg.title}
               </h2>
               <Link
                 href="/ofertas-do-dia"
@@ -934,10 +918,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </div>
             <span className="text-sm font-medium text-zinc-400">
               {items.length}
-              {tab === "produtos" && totalProducts > items.length
-                ? ` de ${totalProducts}`
-                : ""}{" "}
-              {tab === "ofertas" ? "ofertas" : "produtos"}
+              {total > items.length ? ` de ${total.toLocaleString("pt-BR")}` : ""}{" "}
+              {cfg.noun}
             </span>
           </div>
           <main className="grid grid-cols-2 gap-4 pb-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -949,7 +931,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
       </div>
 
-      {tab === "produtos" && (page > 1 || hasNextPage) && (
+      {(page > 1 || hasNextPage) && (
         <nav className="flex items-center justify-center gap-4 pb-8 text-sm">
           {page > 1 && (
             <Link

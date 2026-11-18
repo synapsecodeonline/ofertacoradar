@@ -25,12 +25,15 @@ export default function SearchBar({
       method="get"
       className="mt-5 flex w-full max-w-2xl flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white p-2 shadow-lg shadow-zinc-900/5 sm:flex-row dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20"
     >
-      <input type="hidden" name="aba" value={params.get("aba") ?? "produtos"} />
+      <input type="hidden" name="aba" value={params.get("aba") ?? "ofertas"} />
       {params.get("categoria") && (
         <input type="hidden" name="categoria" value={params.get("categoria")!} />
       )}
       {params.get("ordem") && (
         <input type="hidden" name="ordem" value={params.get("ordem")!} />
+      )}
+      {params.get("tipo") && (
+        <input type="hidden" name="tipo" value={params.get("tipo")!} />
       )}
       <div className="relative flex-1">
         <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />

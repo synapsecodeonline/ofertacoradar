@@ -64,20 +64,6 @@ export default async function ProductCard({
             {product.couponCode}
           </span>
         )}
-
-        {/* Fonte do produto (ML / Awin) */}
-        {(product.externalId?.startsWith("ml:") || product.externalId?.startsWith("aw:")) && (
-          <span
-            title={
-              product.externalId.startsWith("ml:")
-                ? "Mercado Livre"
-                : "Awin"
-            }
-            className="absolute bottom-2.5 right-2.5 rounded-md bg-zinc-900/85 px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-white backdrop-blur-sm"
-          >
-            {product.externalId.startsWith("ml:") ? "ML" : "AW"}
-          </span>
-        )}
       </div>
 
       {/* Conteúdo */}

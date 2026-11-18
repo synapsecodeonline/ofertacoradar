@@ -41,7 +41,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 | Rota | Tipo | Descrição |
 |---|---|---|
-| `/` | página | Home dinâmica (`force-dynamic`): hero com stats/lojas parceiras/carrossel, abas, busca, ordenação, filtro por fonte (`?fonte=lomadee|ml|awin`), seção "Destaques do momento" (relâmpago + mais clicadas), lojas em destaque com contagem de itens, categorias, grid, paginação, banner Instagram e seção de transparência. |
+| `/` | página | Home dinâmica (`force-dynamic`): hero com stats/lojas parceiras/carrossel, **abas por fonte de afiliado** (`?aba=ofertas|lojas|ml|awin` — o catálogo nunca mistura fontes), busca, ordenação, seção "Destaques do momento" (relâmpago + mais clicadas, escopo da fonte), lojas em destaque com contagem, categorias, grid paginado, banner Instagram e transparência. |
 | `/produto/[id]` | página | Detalhe do item: preço, cupom, countdown, prova social, relacionados, share e JSON-LD. |
 | `/ofertas-do-dia` | página | Curadoria diária: terminando em breve, mais aproveitadas (24h) e maiores descontos. Indexável, no sitemap. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo p/ Instagram (login obrigatório): top produtos ranqueados por cliques 24h + desconto, com `cardUrl` (`/api/card`), `pageUrl` e `caption` prontos. `?count=` (máx 20) e `?size=feed|story`. |
@@ -72,15 +72,15 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 ### UX / Conversão
 
 - **Hero** com estatísticas reais (produtos, ofertas e lojas), chips de lojas parceiras com logo/nome e carrossel de **ofertas em destaque** (top 5 por desconto da aba/filtros atuais, troca a cada 6s, pausa no hover, setas e dots).
-- Abas **Produtos** (default) e **Ofertas e Cupons** (`?aba=produtos|ofertas`).
+- **Abas por fonte de afiliado** (`?aba=`): `ofertas` (default, `camp:*` Lomadee), `lojas` (`prod:*` Lomadee), `ml` (`ml:*` Mercado Livre) e `awin` (`aw:*`, só renderiza quando há itens). O catálogo **nunca mistura fontes** — cada aba tem seu próprio grid, filtros, facetas e destaques. Legado: `aba=produtos` → `lojas` (ou `ml`/`awin` conforme `?fonte=`); `?fonte=` sozinho também resolve a aba.
 - **Busca** (`?q=`) em título, descrição e merchant; **filtro de loja** (`?loja=`, merchant case-insensitive); **categoria** (`?categoria=` canônica, casando slugs legados no banco).
-- **Filtro por fonte de afiliado** (`?fonte=`, só na aba Produtos): `lomadee` (`prod:*`), `ml` (`ml:*`) ou `awin` (`aw:*`); sem valor = todas. Chips "Todas / Lojas parceiras / Mercado Livre / Awin" — o chip Awin só renderiza quando existem itens `aw:*` ativos. O filtro combina com busca, loja, categoria, subtipo e ordenação, e se aplica também às facetas (categorias, lojas, subtipos).
+- A separação por fonte é **estrutural** (abas), não visual — por isso não há badge de origem nos cards.
 - **Ordenações** (`?ordem=`): `desconto` (default em Ofertas), `recentes` (default em Produtos), `terminando` e `populares` (por total de cliques). Filtros, busca, loja e ordenação viram query params; mudanças resetam `pagina`.
-- **Paginação** apenas na aba Produtos: 48 itens/página (`pagina`). A aba Ofertas mostra até 120 itens sem paginação.
+- **Paginação** em todas as abas: 48 itens/página (`pagina`).
 - Itens exibidos exigem `active`, `imageUrl`, preço diferente de 0 quando informado e `endsAt` nulo ou futuro.
-- **"Destaques do momento"**: seção retrátil única que reúne dois trilhos — **"Terminando em breve"** (`endsAt` entre agora e +48h, até 12, countdown ao vivo, cupom quando houver) e **"Mais clicadas nas últimas 48h"** (até 12, badge de cliques; fallback para maiores descontos quando não há cliques). Independe da aba e respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar. Ambos usam o componente `RailCard` compartilhado.
+- **"Destaques do momento"**: seção retrátil única com dois trilhos **escopados na fonte da aba** — **"Terminando em breve"** (`endsAt` entre agora e +48h, até 12, countdown ao vivo, cupom quando houver) e **"Mais clicadas nas últimas 48h"** (até 12 candidatos filtrados pela fonte, badge de cliques; fallback para maiores descontos da fonte quando não há cliques). Respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar. Ambos usam o componente `RailCard` compartilhado.
 - **Cards de produto** exibem logo da loja (resolvido por `merchantLogo`: lista de destaque → `Brand.name` → favicon do domínio), selo de origem `ML`/`AW` para fontes não-Lomadee, badge de desconto, cupom, urgência e prova social de cliques dos últimos 30 dias quando ≥ 3.
-- **"Lojas em destaque"**: carrossel horizontal com as lojas de `FEATURED_STORES` que têm itens visíveis; o card mostra o total de ofertas do merchant (produtos + campanhas) e linka para a aba correta (`produtos` ou `ofertas`).
+- **"Lojas em destaque"**: carrossel horizontal com as lojas de `FEATURED_STORES` que têm itens visíveis; o card mostra o total de itens do merchant (soma de todas as fontes) e linka para a aba da **primeira fonte** que tem a loja (preferência: `ofertas` → `lojas` → `ml` → `awin`).
 - **Banner Instagram**: CTA "Ofertas do dia em vídeo" com link para `NEXT_PUBLIC_INSTAGRAM_URL` (default `instagram.com/ofertacoradar`).
 - **Seção "Por que confiar no Ofertaço Radar"**: 4 cards de transparência (preços atualizados, compra na loja oficial, só ofertas reais, aviso de afiliado).
 - Página de produto: breadcrumb, imagem, badges `-%`, cupom copiável, **"Economize R$ X"**, countdown real (<7 dias), lista **"Por que aproveitar agora"** (desconto, economia, cupom, urgência, loja e cliques), selos de confiança, **"como usar o cupom"**, relacionados (mesma loja primeiro, depois mesma categoria), botões **WhatsApp / Copiar link**, botões **"Imagem p/ feed" / "Imagem p/ story"** (`/api/card`) e **CTA fixo no mobile**.
