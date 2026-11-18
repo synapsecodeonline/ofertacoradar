@@ -20,6 +20,7 @@ import FeaturedCarousel, {
 import CountdownTimer from "@/components/CountdownTimer";
 import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
+import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
@@ -193,8 +194,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ? ordem
       : cfg.defaultSort;
 
-  // Esta aba ja define a fonte: todo filtro carrega o prefixo do externalId
-  const sourceCond = { externalId: { startsWith: cfg.prefix } };
+  // Filtro de loja nas abas Lomadee une camp:+prod: — a loja mostra
+  // ofertas E produtos (mesma rede de afiliado). ML/Awin tem prefixo unico.
+  const lomadeeStoreView = !!merchant && (tab === "ofertas" || tab === "lojas");
+  const sourceCond = lomadeeStoreView
+    ? {
+        OR: [
+          { externalId: { startsWith: "camp:" } },
+          { externalId: { startsWith: "prod:" } },
+        ],
+      }
+    : { externalId: { startsWith: cfg.prefix } };
   const searchFilter = query
     ? {
         OR: [
@@ -628,34 +638,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <div className="relative mx-auto mt-10 flex w-full max-w-6xl flex-col items-center gap-4">
           {/* Abas por fonte de afiliado — catalogo nunca mistura fontes */}
           <nav className="flex max-w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur">
-            {visibleTabs.map((t) => {
-              const count = tabCounts.get(t) ?? 0;
-              return (
-                <HashLink
-                  key={t}
-                  href={qs({ aba: t })}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                    tab === t
-                      ? "bg-white text-zinc-950 shadow"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  {TABS[t].label}
-                  {count > 0 ? (
-                    <span
-                      className={`ml-1.5 text-[11px] font-bold ${
-                        tab === t ? "text-zinc-500" : "text-zinc-500"
-                      }`}
-                    >
-                      {count.toLocaleString("pt-BR")}
-                    </span>
-                  ) : null}
-                </HashLink>
-              );
-            })}
+            {visibleTabs.map((t) => (
+              <HashLink
+                key={t}
+                href={qs({ aba: t })}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                  tab === t
+                    ? "bg-white text-zinc-950 shadow"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {TABS[t].label}
+              </HashLink>
+            ))}
           </nav>
 
           <Suspense>
+            <CatalogScrollOnNav />
             <SearchBar merchants={merchantList} currentMerchant={merchant} />
           </Suspense>
 
@@ -906,10 +905,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <div className="mb-4 flex items-end justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                {cfg.eyebrow}
+                {lomadeeStoreView ? "Loja" : cfg.eyebrow}
               </p>
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                {cfg.title}
+                {lomadeeStoreView ? merchant : cfg.title}
               </h2>
               <Link
                 href="/ofertas-do-dia"
@@ -921,7 +920,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <span className="text-sm font-medium text-zinc-400">
               {items.length}
               {total > items.length ? ` de ${total.toLocaleString("pt-BR")}` : ""}{" "}
-              {cfg.noun}
+              {lomadeeStoreView ? "itens" : cfg.noun}
             </span>
           </div>
           <main className="grid grid-cols-2 gap-4 pb-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

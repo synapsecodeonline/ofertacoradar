@@ -5,6 +5,7 @@ import "./globals.css";
 import { SITE_NAME, SITE_TAGLINE, siteUrl } from "@/lib/site";
 import { IconInstagram, IconTag } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
+import HashLink from "@/components/HashLink";
 import AuthButton from "@/components/AuthButton";
 
 const geistSans = Geist({
@@ -86,24 +87,24 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Link>
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
-              <Link
-                href="/?aba=ofertas"
+              <HashLink
+                href="/?aba=ofertas#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Ofertas
-              </Link>
-              <Link
-                href="/?aba=lojas"
+              </HashLink>
+              <HashLink
+                href="/?aba=lojas#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas
-              </Link>
-              <Link
-                href="/?aba=ml"
+              </HashLink>
+              <HashLink
+                href="/?aba=ml#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Mercado Livre
-              </Link>
+              </HashLink>
               <Link
                 href="/ofertas-do-dia"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
