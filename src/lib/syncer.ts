@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { syncPrisma as prisma } from "./db";
 import { discountPctOf } from "./format";
 import { resolveCategory, resolveSubtype } from "./categories";
 import {

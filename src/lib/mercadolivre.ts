@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { syncPrisma as prisma } from "./db";
 import type { NormalizedProduct } from "./feed";
 
 // ---- Mercado Livre (api.mercadolibre.com) ----

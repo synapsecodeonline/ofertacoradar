@@ -104,6 +104,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - Metadata global com template `%s | Ofertaço Radar`, keywords pt-BR, Open Graph `pt_BR` e Twitter `summary_large_image`.
 - Páginas de produto: canonical próprio, OG/Twitter com imagem do produto e JSON-LD `Product`/`Offer` (preço, moeda, disponibilidade, `validThrough`, seller).
 - Home, páginas de produto, `/api/card` e `sitemap.xml` usam `force-dynamic` (dados sempre frescos).
+- **Performance da home**: todas as queries independentes rodam num único `Promise.all` (~11 paralelas); merchants×fonte vêm de uma `$queryRaw` com `COUNT(*) FILTER` (1 query em vez de 4); `heroStores` é derivado de `brandRows` sem query extra. Cada roundtrip ao pooler custa ~800ms — paralelizar e reduzir queries é o que mantém a home rápida. Sync usa `syncPrisma` (pool separado, ver AGENTS.md).
 - `loading.tsx` (skeleton de cards) e `not-found.tsx` em pt-BR.
 
 ---

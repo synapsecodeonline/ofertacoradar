@@ -236,9 +236,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     merchants,
     featured,
     flashDeals,
-    topClicks,
+    aproveitadasTop,
     brandRows,
-    srcMerchants,
+    orgs,
+    subtypeFacets,
+    srcRows,
   ] = await Promise.all([
     prisma.product.findMany({
       where: listWhere,
@@ -306,31 +308,76 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       orderBy: { endsAt: "asc" },
       take: 12,
     }),
-    // Cliques nas ultimas 48h -> prova social real ("aproveitadas agora")
-    prisma.click.groupBy({
-      by: ["productId"],
-      where: { createdAt: { gte: new Date(now.getTime() - 48 * 3_600_000) } },
-      _count: { _all: true },
-      orderBy: { _count: { productId: "desc" } },
-      take: 100,
+    // "Aproveitadas agora": itens da fonte ativa com cliques recentes,
+    // ordenados por total de cliques. Se vier vazio, cai no fallback abaixo.
+    prisma.product.findMany({
+      where: {
+        active: true,
+        imageUrl: { not: null },
+        AND: [
+          sourceCond,
+          notZeroPrice,
+          notExpired,
+          {
+            clicks: {
+              some: {
+                createdAt: { gte: new Date(now.getTime() - 48 * 3_600_000) },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { clicks: { _count: "desc" } },
+      include: { _count: { select: { clicks: true } } },
+      take: 12,
     }),
     // Logos das lojas em destaque (Brand.name -> logo Lomadee)
-    prisma.brand.findMany({ select: { name: true, logo: true } }),
-    // Merchants visiveis por fonte -> aba das "Lojas em destaque" + contagem das abas
-    Promise.all(
-      TAB_ORDER.map((t) =>
-        prisma.product.groupBy({
-          by: ["merchant"],
+    prisma.brand.findMany({ select: { id: true, name: true, logo: true } }),
+    // Lojas afiliadas reais (com logo quando disponivel) para o hero
+    prisma.affiliatedOrg.findMany({
+      select: { organizationId: true, name: true },
+    }),
+    // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
+    subDefs.length
+      ? prisma.product.groupBy({
+          by: ["subtype"],
           where: {
             active: true,
-            merchant: { not: null },
-            imageUrl: { not: null },
-            AND: [notZeroPrice, notExpired, { externalId: { startsWith: TABS[t].prefix } }],
+            subtype: { not: null },
+            AND: [
+              sourceCond,
+              notZeroPrice,
+              notExpired,
+              { imageUrl: { not: null } },
+              { category: { in: rawSlugsFor(category) } },
+              merchant
+                ? { merchant: { equals: merchant, mode: "insensitive" as const } }
+                : {},
+              searchFilter,
+            ],
           },
           _count: { _all: true },
-        }),
-      ),
-    ),
+        })
+      : Promise.resolve([]),
+    // Merchants visiveis por fonte em UMA query (FILTER por prefixo) ->
+    // aba das "Lojas em destaque" + contagem das abas. Uma query so porque
+    // o pool do banco e pequeno (connection_limit baixo).
+    prisma.$queryRaw<
+      { merchant: string; camp: bigint; prod: bigint; ml: bigint; aw: bigint }[]
+    >`
+      SELECT "merchant",
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'camp:%') AS camp,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'prod:%') AS prod,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'ml:%')   AS ml,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'aw:%')   AS aw
+      FROM "Product"
+      WHERE active
+        AND "merchant" IS NOT NULL
+        AND "imageUrl" IS NOT NULL
+        AND ("price" IS NULL OR "price" <> 0)
+        AND ("endsAt" IS NULL OR "endsAt" >= now())
+      GROUP BY "merchant"
+    `,
   ]);
 
   // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
@@ -338,24 +385,28 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     brandRows.map((b) => [b.name ?? "", b.logo] as const),
   );
 
-  // Contagem de itens visiveis por fonte (abas) e por loja
+  // Contagem de itens visiveis por fonte (abas) e por loja.
+  // srcRows: uma linha por merchant com contagem por prefixo de fonte.
+  const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
+    ofertas: "camp",
+    lojas: "prod",
+    ml: "ml",
+    awin: "aw",
+  };
   const tabCounts = new Map<Tab, number>();
   const countByMerchant = new Map<string, number>();
   const merchantTab = new Map<string, Tab>();
-  TAB_ORDER.forEach((t, i) => {
-    let sum = 0;
-    for (const r of srcMerchants[i]) {
-      if (!r.merchant) continue;
-      sum += r._count._all;
-      countByMerchant.set(
-        r.merchant,
-        (countByMerchant.get(r.merchant) ?? 0) + r._count._all,
-      );
+  for (const r of srcRows) {
+    const total = Number(r.camp) + Number(r.prod) + Number(r.ml) + Number(r.aw);
+    countByMerchant.set(r.merchant, total);
+    for (const t of TAB_ORDER) {
+      const n = Number(r[SRC_KEY[t]]);
+      if (n <= 0) continue;
+      tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
       // primeira fonte que tem a loja define a aba do card (ofertas > lojas > ml > awin)
       if (!merchantTab.has(r.merchant)) merchantTab.set(r.merchant, t);
     }
-    tabCounts.set(t, sum);
-  });
+  }
   // Awin so aparece como aba quando houver itens
   const visibleTabs = TAB_ORDER.filter(
     (t) => t !== "awin" || (tabCounts.get(t) ?? 0) > 0,
@@ -373,18 +424,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     tab: (merchantTab.get(s.merchant) ?? null) as Tab | null,
   })).filter((s): s is typeof s & { tab: Tab } => s.tab !== null);
 
-  // Lojas afiliadas reais (com logo quando disponivel) para o hero
-  const orgs = await prisma.affiliatedOrg.findMany({
-    select: { organizationId: true, name: true },
-  });
-  const storeBrands = orgs.length
-    ? await prisma.brand.findMany({
-        where: { id: { in: orgs.map((o) => o.organizationId) } },
-        select: { id: true, name: true, logo: true },
-      })
-    : [];
+  // heroStores: brands cujo id bate com as orgs afiliadas (sem query extra)
+  const orgIds = new Set(orgs.map((o) => o.organizationId));
   const storeNameByOrg = new Map(orgs.map((o) => [o.organizationId, o.name]));
-  const heroStores = storeBrands
+  const heroStores = brandRows
+    .filter((b) => orgIds.has(b.id))
     .map((b) => ({
       key: b.id,
       name: b.name ?? storeNameByOrg.get(b.id) ?? "Loja",
@@ -406,31 +450,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       (CATEGORY_ORDER.indexOf(b) + 1 || 999),
   );
 
-  // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
+  // Contagem por subtipo dentro da categoria ativa (veio no batch)
   const subtypeCounts = new Map<string, number>();
-  if (subDefs.length) {
-    const facets = await prisma.product.groupBy({
-      by: ["subtype"],
-      where: {
-        active: true,
-        subtype: { not: null },
-        AND: [
-          sourceCond,
-          notZeroPrice,
-          notExpired,
-          { imageUrl: { not: null } },
-          { category: { in: rawSlugsFor(category) } },
-          merchant
-            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
-            : {},
-          searchFilter,
-        ],
-      },
-      _count: { _all: true },
-    });
-    for (const f of facets) {
-      if (f.subtype) subtypeCounts.set(f.subtype, f._count._all);
-    }
+  for (const f of subtypeFacets) {
+    if (f.subtype) subtypeCounts.set(f.subtype, f._count._all);
   }
   // Mostra so subtipos com itens; o subtipo ativo sempre aparece (mesmo zerado)
   const visibleSubs = subDefs.filter(
@@ -478,33 +501,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     : [];
   const clickMap = new Map(clickGroups.map((g) => [g.productId, g._count._all]));
 
-  // "Aproveitadas agora": produtos com mais cliques nas ultimas 48h.
-  // Fallback: sem cliques recentes (ex.: banco recém-populado), mostra
-  // os maiores descontos ativos — dado real, e volta a ranquear por
-  // cliques assim que houver volume.
-  // Pega candidatos de todas as fontes e filtra pela fonte da aba;
-  // ordena por cliques e corta em 12 depois do filtro.
-  const aproveitadasIds = topClicks
-    .sort((a, b) => b._count._all - a._count._all)
-    .map((g) => g.productId)
-    .filter((id) => !flashIds.has(id));
-  const aproveitadasCount = new Map(
-    topClicks.map((g) => [g.productId, g._count._all]),
-  );
-  let aproveitadas = aproveitadasIds.length
-    ? await prisma.product.findMany({
-        where: {
-          active: true,
-          id: { in: aproveitadasIds },
-          imageUrl: { not: null },
-          AND: [sourceCond, notZeroPrice],
-        },
-      })
-    : [];
-  aproveitadas.sort(
-    (a, b) => (aproveitadasCount.get(b.id) ?? 0) - (aproveitadasCount.get(a.id) ?? 0),
-  );
-  aproveitadas = aproveitadas.slice(0, 12);
+  // "Aproveitadas agora": veio no batch (cliques recentes, fonte da aba).
+  // Fallback: sem cliques recentes, mostra os maiores descontos da fonte.
+  let aproveitadas: (Product & { _count?: { clicks: number } })[] =
+    aproveitadasTop.filter((p) => !flashIds.has(p.id));
   const aproveitadasIsFallback = aproveitadas.length === 0;
   if (!aproveitadas.length) {
     aproveitadas = await prisma.product.findMany({
@@ -745,7 +745,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </p>
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
                 {aproveitadas.map((p) => {
-                  const n = aproveitadasCount.get(p.id) ?? 0;
+                  const n = p._count?.clicks ?? 0;
                   return (
                     <RailCard
                       key={p.id}
