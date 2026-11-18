@@ -788,6 +788,30 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
       </div>
 
+      {tab === "produtos" && (page > 1 || hasNextPage) && (
+        <nav className="flex items-center justify-center gap-4 pb-8 text-sm">
+          {page > 1 && (
+            <Link
+              href={qs({ pagina: String(page - 1) })}
+              className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
+            >
+              ← Anterior
+            </Link>
+          )}
+          <span className="text-zinc-500">
+            Página {page} de {totalPages}
+          </span>
+          {hasNextPage && (
+            <Link
+              href={qs({ pagina: String(page + 1) })}
+              className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
+            >
+              Próxima →
+            </Link>
+          )}
+        </nav>
+      )}
+
       {/* Instagram: ofertas do dia em video */}
       <section className="relative mb-10 -mx-4 overflow-hidden rounded-3xl bg-gradient-to-br from-fuchsia-600 via-rose-500 to-orange-400 px-6 py-10 text-white shadow-lg">
         <div
@@ -870,30 +894,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           ))}
         </div>
       </section>
-
-      {tab === "produtos" && (page > 1 || hasNextPage) && (
-        <nav className="flex items-center justify-center gap-4 pb-12 text-sm">
-          {page > 1 && (
-            <Link
-              href={qs({ pagina: String(page - 1) })}
-              className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
-            >
-              ← Anterior
-            </Link>
-          )}
-          <span className="text-zinc-500">
-            Página {page} de {totalPages}
-          </span>
-          {hasNextPage && (
-            <Link
-              href={qs({ pagina: String(page + 1) })}
-              className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
-            >
-              Próxima →
-            </Link>
-          )}
-        </nav>
-      )}
     </div>
   );
 }
