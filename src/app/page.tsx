@@ -139,6 +139,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     flashDeals,
     topClicks,
     brandRows,
+    activeMerchants,
   ] = await Promise.all([
       tab === "ofertas"
         ? prisma.product.findMany({
@@ -225,11 +226,25 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       }),
       // Logos das lojas em destaque (Brand.name -> logo Lomadee)
       prisma.brand.findMany({ select: { name: true, logo: true } }),
+      // Merchants com produtos ativos -> filtra "Lojas em destaque"
+      prisma.product.findMany({
+        where: { active: true },
+        select: { merchant: true },
+        distinct: ["merchant"],
+      }),
     ]);
 
   // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
   const brandLogoByName = new Map(
     brandRows.map((b) => [b.name ?? "", b.logo] as const),
+  );
+
+  // So exibe lojas que tem produtos ativos no catalogo
+  const activeMerchantSet = new Set(
+    activeMerchants.map((m) => m.merchant).filter((m): m is string => !!m),
+  );
+  const featuredStores = FEATURED_STORES.filter((s) =>
+    activeMerchantSet.has(s.merchant),
   );
 
   // Lojas afiliadas reais (com logo quando disponivel) para o hero
@@ -694,8 +709,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </CollapsibleSection>
       )}
 
-      {/* Lojas em destaque: marcas com ofertas ativas no site */}
-      {FEATURED_STORES.length > 0 && (
+      {/* Lojas em destaque: apenas lojas com produtos ativos */}
+      {featuredStores.length > 0 && (
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -707,11 +722,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </h2>
             </div>
             <span className="text-sm font-medium text-zinc-400">
-              {FEATURED_STORES.length} lojas
+              {featuredStores.length} lojas
             </span>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-            {FEATURED_STORES.map((s) => {
+            {featuredStores.map((s) => {
               const logo = storeLogo(s, brandLogoByName);
               return (
                 <Link
