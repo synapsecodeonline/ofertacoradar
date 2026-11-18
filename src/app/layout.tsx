@@ -77,7 +77,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="sticky top-0 z-10 border-b border-zinc-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
             <Link
-              href="/"
+              href="/ofertas-do-dia"
               className="group flex items-center gap-2 text-lg font-extrabold tracking-tight"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm transition-transform group-hover:scale-105">
@@ -88,19 +88,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <HashLink
-                href="/?aba=ofertas#catalogo"
+                href="/ofertas-do-dia?aba=ofertas#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Ofertas
               </HashLink>
               <HashLink
-                href="/?aba=lojas#catalogo"
+                href="/ofertas-do-dia?aba=lojas#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas Lomadee
               </HashLink>
               <HashLink
-                href="/?aba=ml#catalogo"
+                href="/ofertas-do-dia?aba=ml#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas Mercado Livre
@@ -139,13 +139,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Navegação
               </p>
-              <Link href="/?aba=ofertas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/ofertas-do-dia?aba=ofertas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas e cupons
               </Link>
-              <Link href="/?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/ofertas-do-dia?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Lomadee
               </Link>
-              <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/ofertas-do-dia?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Mercado Livre
               </Link>
               <Link href="/ofertas-do-dia" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">

@@ -7,6 +7,7 @@ import ProductCard from "@/components/ProductCard";
 import CountdownTimer from "@/components/CountdownTimer";
 import { IconFlame, IconTag, IconZap } from "@/components/Icons";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import { HomeExperience } from "@/components/HomeExperience";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,11 @@ const VALID = {
   ],
 };
 
-export default async function OfertasDoDiaPage() {
+export default async function OfertasDoDiaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
   const [topDiscounts, endingSoon, clicked] = await Promise.all([
@@ -71,7 +76,7 @@ export default async function OfertasDoDiaPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
       <header className="flex flex-col gap-2">
         <nav className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
-          <Link href="/" className="transition-colors hover:text-emerald-600">
+          <Link href="/ofertas-do-dia" className="transition-colors hover:text-emerald-600">
             Início
           </Link>
           <span>/</span>
@@ -196,6 +201,10 @@ export default async function OfertasDoDiaPage() {
           </CollapsibleSection>
         </>
       )}
+
+      {/* Home completa: hero, abas por fonte, lojas em destaque e catalogo.
+          embedded oculta as secoes de trilho (a pagina ja tem equivalentes). */}
+      <HomeExperience searchParams={searchParams} embedded />
 
       <p className="flex items-center gap-2 pb-8 text-center text-xs text-zinc-400">
         <IconTag className="h-3.5 w-3.5" />
