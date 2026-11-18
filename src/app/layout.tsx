@@ -97,13 +97,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 href="/?aba=lojas#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Lojas
+                Lojas Lomadee
               </HashLink>
               <HashLink
                 href="/?aba=ml#catalogo"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Mercado Livre
+                Lojas Mercado Livre
               </HashLink>
               <Link
                 href="/ofertas-do-dia"
@@ -143,10 +143,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Ofertas e cupons
               </Link>
               <Link href="/?aba=lojas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Lojas parceiras
+                Lojas Lomadee
               </Link>
               <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Mercado Livre
+                Lojas Mercado Livre
               </Link>
               <Link href="/ofertas-do-dia" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas do dia

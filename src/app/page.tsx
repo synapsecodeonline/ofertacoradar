@@ -62,7 +62,7 @@ const TABS = {
     defaultSort: "desconto",
   },
   lojas: {
-    label: "Lojas parceiras",
+    label: "Lojas Lomadee",
     eyebrow: "Catálogo",
     title: "Produtos das lojas parceiras",
     noun: "produtos",
@@ -70,7 +70,7 @@ const TABS = {
     defaultSort: "recentes",
   },
   ml: {
-    label: "Mercado Livre",
+    label: "Lojas Mercado Livre",
     eyebrow: "Mercado Livre",
     title: "Produtos do Mercado Livre",
     noun: "produtos",
@@ -194,17 +194,20 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ? ordem
       : cfg.defaultSort;
 
-  // Filtro de loja nas abas Lomadee une camp:+prod: — a loja mostra
-  // ofertas E produtos (mesma rede de afiliado). ML/Awin tem prefixo unico.
+  // Visao de loja (Lomadee): catalogo = prod:, ofertas = camp:,
+  // rail de cliques = uniao. ML/Awin tem prefixo unico em tudo.
   const lomadeeStoreView = !!merchant && (tab === "ofertas" || tab === "lojas");
-  const sourceCond = lomadeeStoreView
+  const catalogCond = lomadeeStoreView
+    ? { externalId: { startsWith: "prod:" } }
+    : { externalId: { startsWith: cfg.prefix } };
+  const unionCond = lomadeeStoreView
     ? {
         OR: [
           { externalId: { startsWith: "camp:" } },
           { externalId: { startsWith: "prod:" } },
         ],
       }
-    : { externalId: { startsWith: cfg.prefix } };
+    : catalogCond;
   const searchFilter = query
     ? {
         OR: [
@@ -217,7 +220,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const listWhere = {
     active: true,
     AND: [
-      sourceCond,
+      catalogCond,
       notZeroPrice,
       notExpired,
       { imageUrl: { not: null } },
@@ -249,6 +252,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     aproveitadasTop,
     brandRows,
     orgs,
+    storeOffers,
+    storeOffersTotal,
     subtypeFacets,
     srcRows,
   ] = await Promise.all([
@@ -264,7 +269,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         category: { not: null },
         AND: [
-          sourceCond,
+          catalogCond,
           notZeroPrice,
           notExpired,
           { imageUrl: { not: null } },
@@ -278,7 +283,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         merchant: { not: null },
         AND: [
-          sourceCond,
+          catalogCond,
           notZeroPrice,
           notExpired,
           { imageUrl: { not: null } },
@@ -299,7 +304,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       where: {
         active: true,
         AND: [
-          sourceCond,
+          unionCond,
           notZeroPrice,
           { imageUrl: { not: null } },
           category ? { category: { in: rawSlugsFor(category) } } : {},
@@ -325,9 +330,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         imageUrl: { not: null },
         AND: [
-          sourceCond,
+          unionCond,
           notZeroPrice,
           notExpired,
+          category ? { category: { in: rawSlugsFor(category) } } : {},
+          merchant
+            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
+            : {},
+          searchFilter,
           {
             clicks: {
               some: {
@@ -347,6 +357,39 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     prisma.affiliatedOrg.findMany({
       select: { organizationId: true, name: true },
     }),
+    // Ofertas (camp:) da loja — secao propria na visao de loja
+    lomadeeStoreView
+      ? prisma.product.findMany({
+          where: {
+            active: true,
+            AND: [
+              { externalId: { startsWith: "camp:" } },
+              notZeroPrice,
+              notExpired,
+              { imageUrl: { not: null } },
+              { merchant: { equals: merchant, mode: "insensitive" as const } },
+              category ? { category: { in: rawSlugsFor(category) } } : {},
+              searchFilter,
+            ],
+          },
+          orderBy: { discountPct: { sort: "desc", nulls: "last" } },
+          take: 12,
+        })
+      : Promise.resolve([]),
+    lomadeeStoreView
+      ? prisma.product.count({
+          where: {
+            active: true,
+            AND: [
+              { externalId: { startsWith: "camp:" } },
+              notZeroPrice,
+              notExpired,
+              { imageUrl: { not: null } },
+              { merchant: { equals: merchant, mode: "insensitive" as const } },
+            ],
+          },
+        })
+      : Promise.resolve(0),
     // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
     subDefs.length
       ? prisma.product.groupBy({
@@ -355,7 +398,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             active: true,
             subtype: { not: null },
             AND: [
-              sourceCond,
+              catalogCond,
               notZeroPrice,
               notExpired,
               { imageUrl: { not: null } },
@@ -406,11 +449,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const tabCounts = new Map<Tab, number>();
   const countByMerchant = new Map<string, number>();
   const merchantTab = new Map<string, Tab>();
+  const merchantSrc = new Map<
+    string,
+    { offers: number; products: number }
+  >();
   for (const r of srcRows) {
-    const total = Number(r.camp) + Number(r.prod) + Number(r.ml) + Number(r.aw);
+    const camp = Number(r.camp);
+    const prod = Number(r.prod);
+    const ml = Number(r.ml);
+    const aw = Number(r.aw);
+    const total = camp + prod + ml + aw;
     countByMerchant.set(r.merchant, total);
+    merchantSrc.set(r.merchant, {
+      offers: camp,
+      products: prod + ml + aw,
+    });
     for (const t of TAB_ORDER) {
-      const n = Number(r[SRC_KEY[t]]);
+      const n = { camp, prod, ml, aw }[SRC_KEY[t]];
       if (n <= 0) continue;
       tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
       // primeira fonte que tem a loja define a aba do card (ofertas > lojas > ml > awin)
@@ -428,11 +483,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const offersTotal = tabCounts.get("ofertas") ?? 0;
 
   // So exibe lojas com itens visiveis; link aponta para a aba da fonte
-  const featuredStores = FEATURED_STORES.map((s) => ({
-    ...s,
-    count: countByMerchant.get(s.merchant) ?? 0,
-    tab: (merchantTab.get(s.merchant) ?? null) as Tab | null,
-  })).filter((s): s is typeof s & { tab: Tab } => s.tab !== null);
+  const featuredStores = FEATURED_STORES.map((s) => {
+    const src = merchantSrc.get(s.merchant) ?? { offers: 0, products: 0 };
+    return {
+      ...s,
+      offers: src.offers,
+      products: src.products,
+      tab: (merchantTab.get(s.merchant) ?? null) as Tab | null,
+    };
+  }).filter(
+    (s): s is typeof s & { tab: Tab } =>
+      s.tab !== null && s.offers + s.products > 0,
+  );
 
   // heroStores: brands cujo id bate com as orgs afiliadas (sem query extra)
   const orgIds = new Set(orgs.map((o) => o.organizationId));
@@ -523,7 +585,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         active: true,
         imageUrl: { not: null },
         discountPct: { gt: 0 },
-        AND: [notZeroPrice, notExpired, sourceCond],
+        AND: [
+          notZeroPrice,
+          notExpired,
+          catalogCond,
+          merchant
+            ? { merchant: { equals: merchant, mode: "insensitive" as const } }
+            : {},
+        ],
       },
       orderBy: { discountPct: "desc" },
       take: 12,
@@ -681,8 +750,35 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       </section>
 
+      {/* Visao de loja: ofertas (camp:) da loja em bloco recolhivel */}
+      {lomadeeStoreView && storeOffers.length > 0 && (
+        <CollapsibleSection
+          id="catalogo"
+          defaultOpen={false}
+          className="border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+          title={
+            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+              <IconZap className="h-4 w-4" />
+              Ofertas da loja
+            </h2>
+          }
+          meta={
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              {storeOffersTotal.toLocaleString("pt-BR")}{" "}
+              {storeOffersTotal === 1 ? "oferta" : "ofertas"}
+            </span>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {storeOffers.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
       {/* Destaques do momento: relampago + mais aproveitadas */}
-      {(flashDeals.length > 0 || aproveitadas.length > 0) && (
+      {!lomadeeStoreView && (flashDeals.length > 0 || aproveitadas.length > 0) && (
         <CollapsibleSection
           className="border-zinc-200/80 bg-gradient-to-r from-zinc-50 via-emerald-50/50 to-zinc-50 dark:border-zinc-800 dark:from-zinc-900/60 dark:via-emerald-950/20 dark:to-zinc-900/60"
           title={
@@ -769,7 +865,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
 
       {/* Lojas em destaque: apenas lojas com produtos ativos */}
-      {featuredStores.length > 0 && (
+      {!lomadeeStoreView && featuredStores.length > 0 && (
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -810,8 +906,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <span className="line-clamp-2 text-center text-xs font-bold leading-tight text-zinc-700 transition-colors group-hover:text-emerald-700 dark:text-zinc-300 dark:group-hover:text-emerald-400">
                     {s.merchant}
                   </span>
-                  <span className="text-[10px] font-semibold text-zinc-400">
-                    {s.count} {s.count === 1 ? "oferta" : "ofertas"}
+                  <span className="text-center text-[10px] font-semibold leading-tight text-zinc-400">
+                    {[
+                      s.offers > 0
+                        ? `${s.offers} ${s.offers === 1 ? "oferta" : "ofertas"}`
+                        : "",
+                      s.products > 0
+                        ? `${s.products} ${s.products === 1 ? "produto" : "produtos"}`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </HashLink>
               );
@@ -841,7 +946,48 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
 
-      <div id="catalogo" className="scroll-mt-20">
+      <div
+        id={lomadeeStoreView && storeOffers.length > 0 ? undefined : "catalogo"}
+        className="scroll-mt-20"
+      >
+      {lomadeeStoreView && aproveitadas.length > 0 && (
+        <CollapsibleSection
+          defaultOpen={false}
+          className="mb-5 border-orange-200/60 bg-orange-50/40 dark:border-orange-900/40 dark:bg-orange-950/20"
+          title={
+            <h3 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+              <IconFlame className="h-4 w-4" />
+              Mais clicadas nas últimas 48h
+            </h3>
+          }
+          meta={
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              {aproveitadas.length} itens
+            </span>
+          }
+        >
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+            {aproveitadas.map((p) => {
+              const n = p._count?.clicks ?? 0;
+              return (
+                <RailCard
+                  key={p.id}
+                  p={p}
+                  className="w-44"
+                  corner={
+                    n > 0 ? (
+                      <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-orange-500/95 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow">
+                        <IconFlame className="h-2.5 w-2.5" />
+                        {n}
+                      </span>
+                    ) : null
+                  }
+                />
+              );
+            })}
+          </div>
+        </CollapsibleSection>
+      )}
       {category && visibleSubs.length > 0 && (
         <nav
           aria-label="Tipos de produto"
@@ -897,7 +1043,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
             {tab === "awin"
               ? "Awin ainda não tem ofertas ativas. Assim que uma loja parceira for aprovada, os produtos aparecem aqui automaticamente."
-              : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
+              : lomadeeStoreView
+                ? `Nenhum produto encontrado na loja ${merchant} com esses filtros. Tente outra busca ou volte mais tarde.`
+                : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
           </p>
         </div>
       ) : (
