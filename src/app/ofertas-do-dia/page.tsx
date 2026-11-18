@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Ofertas do dia",
     description:
-      "As maiores ofertas do dia: maiores descontos, produtos terminando em breve e os mais aproveitados agora.",
+      "As maiores ofertas do dia: maiores descontos e produtos terminando em breve.",
     alternates: { canonical: `${siteUrl()}/ofertas-do-dia` },
   };
 }
@@ -53,8 +53,7 @@ export default async function OfertasDoDiaPage({
     return typeof v === "string" ? v !== "" : Array.isArray(v) && v.length > 0;
   });
   const now = new Date();
-  const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
-  const [topDiscounts, endingSoon, clicked] = await Promise.all([
+  const [topDiscounts, endingSoon] = await Promise.all([
     prisma.product.findMany({
       where: { ...VALID, discountPct: { gt: 0 } },
       orderBy: { discountPct: "desc" },
@@ -68,27 +67,9 @@ export default async function OfertasDoDiaPage({
       orderBy: { endsAt: "asc" },
       take: 12,
     }),
-    prisma.click.groupBy({
-      by: ["productId"],
-      where: { createdAt: { gte: dayAgo } },
-      _count: { _all: true },
-      orderBy: { _count: { productId: "desc" } },
-      take: 12,
-    }),
   ]);
 
-  const clickedIds = clicked.map((c) => c.productId);
-  const popular = clickedIds.length
-    ? await prisma.product.findMany({
-        where: { ...VALID, id: { in: clickedIds } },
-      })
-    : [];
-  const clickCount = new Map(clicked.map((c) => [c.productId, c._count._all]));
-  popular.sort(
-    (a, b) => (clickCount.get(b.id) ?? 0) - (clickCount.get(a.id) ?? 0),
-  );
-
-  const total = topDiscounts.length + endingSoon.length + popular.length;
+  const total = topDiscounts.length + endingSoon.length;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
@@ -105,8 +86,7 @@ export default async function OfertasDoDiaPage({
           Ofertas do dia
         </h1>
         <p className="max-w-xl text-sm text-zinc-500">
-          Os maiores descontos de hoje, o que está terminando em breve e o que
-          todo mundo está aproveitando. Preços verificados nas lojas parceiras.
+          Os maiores descontos de hoje e o que está terminando em breve. Preços verificados nas lojas parceiras.
         </p>
       </header>
       )}
@@ -170,32 +150,6 @@ export default async function OfertasDoDiaPage({
                       {p.endsAt && <CountdownTimer endsAt={p.endsAt.toISOString()} />}
                     </div>
                   </Link>
-                ))}
-              </div>
-            </CollapsibleSection>
-          )}
-
-          {popular.length > 0 && (
-            <CollapsibleSection
-              className="border-orange-200/70 bg-gradient-to-r from-orange-50 via-rose-50/60 to-orange-50 dark:border-orange-900/40 dark:from-orange-950/30 dark:via-rose-950/20 dark:to-orange-950/30"
-              title={
-                <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-orange-600 dark:text-orange-400">
-                  <IconFlame className="h-4 w-4" /> Mais aproveitadas (24h)
-                </h2>
-              }
-              meta={
-                <span className="text-xs font-medium text-orange-600/80 dark:text-orange-500/80">
-                  por cliques reais
-                </span>
-              }
-            >
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {popular.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    clicks={clickCount.get(p.id)}
-                  />
                 ))}
               </div>
             </CollapsibleSection>

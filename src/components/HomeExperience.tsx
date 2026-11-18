@@ -42,14 +42,6 @@ type SortKey = keyof typeof SORTS;
 // Cada aba e uma fonte de afiliado: o catalogo nunca mistura fontes.
 // prefix = externalId prefix; noun = rotulo de contagem; sort default.
 const TABS = {
-  ofertas: {
-    label: "Ofertas & Cupons",
-    eyebrow: "Cupons & ofertas",
-    title: "Catálogo de Ofertas",
-    noun: "ofertas",
-    prefix: "camp:",
-    defaultSort: "desconto",
-  },
   lojas: {
     label: "Lojas Lomadee",
     eyebrow: "Catálogo",
@@ -173,9 +165,10 @@ export async function HomeExperience({
   const rawTab = typeof aba === "string" ? aba : "";
   const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
   // Legado: aba=produtos (catalogo unificado) e ?fonte= migram p/ a aba da fonte
-  let tab: Tab = "ofertas";
+  // "ofertas" foi absorvida pela aba Lojas Lomadee (secao de ofertas camp:)
+  let tab: Tab = "lojas";
   if (TAB_ORDER.includes(rawTab as Tab)) tab = rawTab as Tab;
-  else if (rawTab === "produtos")
+  else if (rawTab === "produtos" || rawTab === "ofertas")
     tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lojas";
   else if (fonteParam === "ml" || fonteParam === "awin") tab = fonteParam;
   const page = Math.max(1, Number(pagina) || 1);
@@ -213,6 +206,27 @@ export async function HomeExperience({
     ],
   };
 
+  // Secao "Ofertas {Fonte}": Lomadee usa camp: (ofertas/cupons);
+  // ML/Awin usam os itens com desconto da propria fonte.
+  const OFFERS_PREFIX: Record<Tab, string> = {
+    lojas: "camp:",
+    ml: "ml:",
+    awin: "aw:",
+  };
+  const OFFERS_TITLE: Record<Tab, string> = {
+    lojas: "Ofertas Lomadee",
+    ml: "Ofertas Mercado Livre",
+    awin: "Ofertas Awin",
+  };
+  const offersWhere = {
+    ...listWhere,
+    AND: [
+      { externalId: { startsWith: OFFERS_PREFIX[tab] } },
+      ...listWhere.AND.filter((c) => c !== sourceCond),
+      ...(tab === "lojas" ? [] : [{ discountPct: { gt: 0 } }]),
+    ],
+  };
+
   // Sync incremental em background: nao bloqueia a resposta
   after(() => {
     maybeSync().catch(() => {});
@@ -230,6 +244,7 @@ export async function HomeExperience({
     flashDeals,
     brandRows,
     subtypeFacets,
+    offersItems,
     srcRows,
   ] = await Promise.all([
     prisma.product.findMany({
@@ -317,6 +332,15 @@ export async function HomeExperience({
           _count: { _all: true },
         })
       : Promise.resolve([]),
+    // Secao de ofertas da fonte (camp: na Lomadee; desconto em ML/Awin)
+    prisma.product.findMany({
+      where: offersWhere,
+      orderBy:
+        tab === "lojas"
+          ? { endsAt: { sort: "asc", nulls: "last" } }
+          : { discountPct: { sort: "desc", nulls: "last" } },
+      take: 12,
+    }),
     // Merchants visiveis por fonte em UMA query (FILTER por prefixo) ->
     // aba das "Lojas em destaque" + contagem das abas. Uma query so porque
     // o pool do banco e pequeno (connection_limit baixo).
@@ -346,14 +370,12 @@ export async function HomeExperience({
   // Contagem de itens visiveis por fonte (abas) e por loja.
   // srcRows: uma linha por merchant com contagem por prefixo de fonte.
   const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
-    ofertas: "camp",
     lojas: "prod",
     ml: "ml",
     awin: "aw",
   };
   const tabCounts = new Map<Tab, number>();
   const countByMerchant = new Map<string, number>();
-  const merchantTab = new Map<string, Tab>();
   const merchantSrc = new Map<
     string,
     { camp: number; prod: number; ml: number; aw: number }
@@ -370,8 +392,6 @@ export async function HomeExperience({
       const n = { camp, prod, ml, aw }[SRC_KEY[t]];
       if (n <= 0) continue;
       tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
-      // primeira fonte que tem a loja define a aba do card (ofertas > lojas > ml > awin)
-      if (!merchantTab.has(r.merchant)) merchantTab.set(r.merchant, t);
     }
   }
   // Awin so aparece como aba quando houver itens
@@ -380,10 +400,9 @@ export async function HomeExperience({
     (tabCounts.get("ml") ?? 0) +
     (tabCounts.get("awin") ?? 0);
 
-  // "Lojas em destaque" por aba: cada fonte mostra so as suas lojas.
-  // Ofertas = todas as fontes; Lojas Lomadee = prod:; ML = ml:; Awin = aw:.
+  // "Lojas em destaque" por aba. Lomadee = rede inteira (camp+prod),
+  // ML = ml:, Awin = aw: — cada tela so mostra lojas da sua fonte.
   const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
-    ofertas: "camp",
     lojas: "prod",
     ml: "ml",
     awin: "aw",
@@ -391,24 +410,17 @@ export async function HomeExperience({
   const featuredForTab = (t: Tab) =>
     FEATURED_STORES.map((s) => {
       const src = merchantSrc.get(s.merchant);
-      const inSource = src ? src[SRC_COUNT[t]] : 0;
-      // aba Ofertas mostra lojas de TODAS as fontes (ofertas+produtos);
-      // as demais abas exigem a loja ter itens na fonte da aba
-      const visible =
-        t === "ofertas"
-          ? (countByMerchant.get(s.merchant) ?? 0) > 0
-          : inSource > 0;
       const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0 };
-      // Na aba Ofertas, loja sem camp: linka para a aba onde ela tem itens
-      const linkTab =
-        t === "ofertas" && counts.camp === 0
-          ? (merchantTab.get(s.merchant) ?? t)
-          : t;
+      // Lojas Lomadee inclui ofertas camp: + produtos prod: da rede Lomadee
+      const visible =
+        t === "lojas"
+          ? counts.camp + counts.prod > 0
+          : (src ? src[SRC_COUNT[t]] : 0) > 0;
       return {
         ...s,
         offers: counts.camp,
         products: counts.prod + counts.ml + counts.aw,
-        linkTab,
+        linkTab: t,
         visible,
       };
     }).filter((s) => s.visible);
@@ -512,6 +524,30 @@ export async function HomeExperience({
       )}
 
       {!dayOnly && (<>
+      {/* Ofertas da fonte: camp: na Lomadee; desconto em ML/Awin */}
+      {offersItems.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                Ofertas verificadas
+              </p>
+              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                {OFFERS_TITLE[tab]}
+              </h2>
+            </div>
+            <span className="text-sm font-medium text-zinc-400">
+              {offersItems.length} ofertas
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {offersItems.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Lojas em destaque: apenas lojas com produtos ativos */}
       {featuredStores.length > 0 && (
         <section className="mb-8">
