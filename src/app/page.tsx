@@ -479,7 +479,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       else p.set(k, v);
     }
     const s = p.toString();
-    return s ? `/?${s}` : "/";
+    // Toda mudanca de filtro leva a altura do catalogo (HashLink cuida do scroll)
+    return s ? `/?${s}#catalogo` : "/#catalogo";
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -630,7 +631,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             {visibleTabs.map((t) => {
               const count = tabCounts.get(t) ?? 0;
               return (
-                <Link
+                <HashLink
                   key={t}
                   href={qs({ aba: t })}
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
@@ -649,7 +650,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                       {count.toLocaleString("pt-BR")}
                     </span>
                   ) : null}
-                </Link>
+                </HashLink>
               );
             })}
           </nav>
@@ -663,7 +664,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <span className="mr-1 font-semibold text-zinc-500">Ordenar por</span>
             <div className="flex flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
               {(Object.keys(SORTS) as SortKey[]).map((s) => (
-                <Link
+                <HashLink
                   key={s}
                   href={qs({ ordem: s })}
                   className={`rounded-full px-3 py-1 font-medium transition-all ${
@@ -673,7 +674,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   }`}
                 >
                   {SORTS[s].label}
-                </Link>
+                </HashLink>
               ))}
             </div>
           </div>
@@ -788,9 +789,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             {featuredStores.map((s) => {
               const logo = storeLogo(s, brandLogoByName);
               return (
-                <Link
+                <HashLink
                   key={s.merchant}
-                  href={`/?aba=${s.tab}&loja=${encodeURIComponent(s.merchant)}`}
+                  href={`/?aba=${s.tab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
                   className="group flex w-32 shrink-0 snap-start flex-col items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -813,7 +814,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <span className="text-[10px] font-semibold text-zinc-400">
                     {s.count} {s.count === 1 ? "oferta" : "ofertas"}
                   </span>
-                </Link>
+                </HashLink>
               );
             })}
           </div>
@@ -827,13 +828,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               {
                 slug: "",
                 label: "Todas",
-                href: qs({ categoria: "", tipo: "" }) + "#catalogo",
+                href: qs({ categoria: "", tipo: "" }),
                 active: !category,
               },
               ...categoryList.map((cat) => ({
                 slug: cat,
                 label: categoryLabel(cat),
-                href: qs({ categoria: cat, tipo: "" }) + "#catalogo",
+                href: qs({ categoria: cat, tipo: "" }),
                 active: category === cat,
               })),
             ]}
@@ -851,7 +852,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             Tipo:
           </span>
           <HashLink
-            href={qs({ tipo: "" }) + "#catalogo"}
+            href={qs({ tipo: "" })}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               !subtype
                 ? "border-emerald-600 bg-emerald-600 text-white"
@@ -866,7 +867,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             return (
               <HashLink
                 key={d.slug}
-                href={qs({ tipo: d.slug }) + "#catalogo"}
+                href={qs({ tipo: d.slug })}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   active
                     ? "border-emerald-600 bg-emerald-600 text-white"
@@ -936,7 +937,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <nav className="flex items-center justify-center gap-4 pb-8 text-sm">
           {page > 1 && (
             <HashLink
-              href={qs({ pagina: String(page - 1) }) + "#catalogo"}
+              href={qs({ pagina: String(page - 1) })}
               className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
             >
               ← Anterior
@@ -947,7 +948,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           </span>
           {hasNextPage && (
             <HashLink
-              href={qs({ pagina: String(page + 1) }) + "#catalogo"}
+              href={qs({ pagina: String(page + 1) })}
               className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
             >
               Próxima →
