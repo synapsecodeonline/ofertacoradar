@@ -65,8 +65,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 - **Ofertas/cupons** (`externalId` `camp:*`): campanhas Lomadee com link `lmdee.link` já rastreado — comissão por conversão.
 - **Catálogo de produtos** (`prod:*`): produtos de lojas afiliadas; o link comissionado é gerado **no clique** via `POST /affiliate/shortener/url` e cacheado em `TrackedLink`.
-- **Mercado Livre** (`ml:*`): produtos do catálogo ML (API `/products/search` + buy-box winner); link direto para o anúncio vencedor — **sem comissão** por enquanto.
-- `/ir/[id]` é o **único caminho de saída** para lojas e registra `Click` sem bloquear o redirect. Produtos `ml:*` têm `organizationId = null` → redirect direto para o permalink.
+- **Mercado Livre** (`ml:*`): produtos do catálogo ML (API `/products/search` + buy-box winner). Comissão pelo **programa de afiliados próprio do ML** (independente da Lomadee): com `ML_AFFILIATE_TOOL`+`ML_AFFILIATE_WORD` configurados, `/ir/` redireciona para a página de catálogo `/p/MLB{id}` com `matt_tool`/`matt_word` — até 16% conforme categoria, pago via Mercado Pago. Sem as vars, cai no link direto (sem comissão).
+- `/ir/[id]` é o **único caminho de saída** para lojas e registra `Click` sem bloquear o redirect. Produtos `ml:*` têm `organizationId = null` (nunca passam pelo shortener Lomadee); a monetização é exclusiva do programa de afiliados do ML via `matt_tool`/`matt_word`.
 - Disclosure de afiliado no footer, na página do produto, nos CTAs e na seção "Por que confiar" da home.
 
 ### UX / Conversão
@@ -131,6 +131,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 | `ML_CLIENT_ID` | não | Client ID do app Mercado Livre — habilita sync ML |
 | `ML_CLIENT_SECRET` | não | Secret Key do app Mercado Livre |
 | `ML_AUTH_SECRET` | não | protege `/api/ml-auth/start` e valida o `state` do OAuth |
+| `ML_AFFILIATE_TOOL` | não | `matt_tool` do programa Afiliados e Criadores do ML — habilita comissão em `ml:*` |
+| `ML_AFFILIATE_WORD` | não | `matt_word` (etiqueta) do afiliado ML — vai junto do `matt_tool` no redirect |
 | `NEXT_PUBLIC_INSTAGRAM_URL` | não | link do Instagram (default `https://instagram.com/ofertacoradar`) |
 
 \* O sync **incremental** (`src/lib/syncer.ts`) só funciona com `LOMADEE_API_KEY`; `FEED_URL` é usado apenas por `npm run sync`. Atenção: a fase `products` do syncer roda sempre que houver `AffiliatedOrg` — ela **não** consulta `LOMADEE_PRODUCTS`.
@@ -141,6 +143,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - **Busca**: `/sites/{site}/search` foi **descontinuado pelo ML** (403 global). Usamos a API de catálogo: `GET /products/search?site_id=MLB&status=active&q=...` → `GET /products/{id}/items?limit=1` (vencedor da buy box, preço + `original_price`) → URL do anúncio via formato curto `produto.mercadolivre.com.br/MLB-{item_id}`. `/items/{id}` é restrito a itens do próprio usuário (403) — por isso a URL é montada.
 - **Sync independente**: `SyncState` key `ml`, fases `q:{índice da query}` + `page`=offset, mesmas regras do Lomadee (budget 45s, TTL 30min, lock 3min). `ML_QUERIES` cobre ~54 termos; `ML_LIMIT=30` por página, até offset 200 por query.
 - Desativação no sync manual é **por fonte**: `ml:*` só é desativado quando o ML rodou naquela execução, e nunca afeta `camp:`/`prod:`/feed.
+- **Afiliado ML** (programa "Afiliados e Criadores", até 16% por categoria, pagamento via Mercado Pago a partir de R$30): gere um link no portal `mercadolivre.com.br/afiliados/linkbuilder`, copie os valores de `matt_tool` e `matt_word` do link gerado e configure `ML_AFFILIATE_TOOL`/`ML_AFFILIATE_WORD` na Vercel. Todo link de afiliado ML é a URL do produto + esses dois parâmetros.
 
 Na Vercel essas vars estão configuradas no projeto `ofertacoradar` (time `synapse-code1`).
 

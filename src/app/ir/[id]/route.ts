@@ -25,6 +25,25 @@ export async function GET(
     })
     .catch(() => {});
 
+  // Mercado Livre: programa de afiliados proprio (independente da Lomadee).
+  // Com ML_AFFILIATE_TOOL/WORD configurados, manda para a pagina de catalogo
+  // /p/MLB{id} com matt_tool/matt_word — a commissionacao fica no ML.
+  if (product.externalId?.startsWith("ml:")) {
+    const tool = process.env.ML_AFFILIATE_TOOL;
+    const catalogId = product.externalId.slice(3);
+    if (tool && catalogId) {
+      const target = new URL(
+        `https://www.mercadolivre.com.br/p/${catalogId}`,
+      );
+      target.searchParams.set("matt_tool", tool);
+      const word = process.env.ML_AFFILIATE_WORD;
+      if (word) target.searchParams.set("matt_word", word);
+      const source = request.nextUrl.searchParams.get("src");
+      if (source) target.searchParams.set("utm_source", source);
+      return NextResponse.redirect(target, 302);
+    }
+  }
+
   // Produtos do catalogo nao tem link de afiliado pronto:
   // gera um lmdee.link rastreado na hora (cacheado) ou cai na URL direta
   if (!product.affiliateUrl && product.organizationId) {
