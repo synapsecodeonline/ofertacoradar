@@ -116,6 +116,33 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <ThemeToggle />
             </div>
           </div>
+          {/* Menu mobile: fileira de pills com scroll horizontal */}
+          <nav className="flex items-center gap-1 overflow-x-auto border-t border-zinc-200/60 px-4 py-2 [scrollbar-width:none] dark:border-zinc-800/60 sm:hidden [&::-webkit-scrollbar]:hidden">
+              <HashLink
+                href="/ofertas-do-dia?aba=ofertas#catalogo"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
+              >
+                Ofertas
+              </HashLink>
+              <HashLink
+                href="/ofertas-do-dia?aba=lojas#catalogo"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
+              >
+                Lojas Lomadee
+              </HashLink>
+              <HashLink
+                href="/ofertas-do-dia?aba=ml#catalogo"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
+              >
+                Lojas Mercado Livre
+              </HashLink>
+              <Link
+                href="/ofertas-do-dia"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
+              >
+                Ofertas do dia
+              </Link>
+          </nav>
         </header>
         {children}
         <footer className="mt-auto border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
