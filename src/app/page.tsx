@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
-import { maybeSync } from "@/lib/syncer";
+import { maybeSync, maybeSyncML } from "@/lib/syncer";
 import ProductCard from "@/components/ProductCard";
 import SearchBar from "@/components/SearchBar";
 import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypesFor } from "@/lib/categories";
 import {
   IconCheck,
+  IconClock,
   IconFlame,
+  IconInstagram,
   IconRefresh,
   IconShield,
   IconZap,
@@ -84,7 +86,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         : "recentes";
 
   const isOffer = { externalId: { startsWith: "camp:" } };
-  const isCatalogProduct = { externalId: { startsWith: "prod:" } };
+  const isCatalogProduct = {
+    OR: [
+      { externalId: { startsWith: "prod:" } },
+      { externalId: { startsWith: "ml:" } },
+    ],
+  };
   const searchFilter = query
     ? {
         OR: [
@@ -111,7 +118,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   });
 
   // Sync incremental em background: nao bloqueia a resposta
-  after(() => maybeSync().catch(() => {}));
+  after(() => {
+    maybeSync().catch(() => {});
+    maybeSyncML().catch(() => {});
+  });
 
   const FLASH_WINDOW_MS = 48 * 3_600_000;
   const now = new Date();
@@ -771,6 +781,89 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </>
       )}
       </div>
+
+      {/* Instagram: ofertas do dia em video */}
+      <section className="relative mb-10 -mx-4 overflow-hidden rounded-3xl bg-gradient-to-br from-fuchsia-600 via-rose-500 to-orange-400 px-6 py-10 text-white shadow-lg">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"
+        />
+        <div className="relative flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div className="flex flex-col gap-2">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest backdrop-blur">
+              <IconInstagram className="h-3.5 w-3.5" /> Novidades primeiro no Instagram
+            </span>
+            <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              Ofertas do dia em vídeo, antes de todo mundo
+            </h2>
+            <p className="max-w-md text-sm text-white/85">
+              A gente caça os maiores descontos e posta no Instagram em tempo
+              real. Siga para não perder nenhuma.
+            </p>
+          </div>
+          <a
+            href={
+              process.env.NEXT_PUBLIC_INSTAGRAM_URL ??
+              "https://instagram.com/ofertacoradar"
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-white px-6 text-sm font-extrabold text-fuchsia-700 shadow-lg transition-transform hover:scale-[1.03] active:scale-[0.98]"
+          >
+            <IconInstagram className="h-5 w-5" />
+            Seguir no Instagram
+          </a>
+        </div>
+      </section>
+
+      {/* Transparência: por que confiar no Radar */}
+      <section className="mb-10">
+        <div className="mb-4 text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+            Transparência total
+          </p>
+          <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+            Por que confiar no Ofertaço Radar
+          </h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              icon: <IconRefresh className="h-5 w-5 text-emerald-600" />,
+              title: "Preços atualizados",
+              text: "Sincronizamos os preços direto nas lojas parceiras — o valor que você vê é o que está valendo agora.",
+            },
+            {
+              icon: <IconShield className="h-5 w-5 text-emerald-600" />,
+              title: "Compra na loja oficial",
+              text: "Você finaliza a compra no site da própria loja (Mercado Livre, Amazon etc). Nunca pedimos seus dados.",
+            },
+            {
+              icon: <IconCheck className="h-5 w-5 text-emerald-600" />,
+              title: "Só ofertas reais",
+              text: "Filtramos itens sem estoque, preço zerado e promoções encerradas. Se não está no ar, não aparece.",
+            },
+            {
+              icon: <IconClock className="h-5 w-5 text-emerald-600" />,
+              title: "Aviso de afiliado",
+              text: "Nossos links são de parceiro: podemos receber comissão pela compra, sem custo extra para você.",
+            },
+          ].map((c) => (
+            <div
+              key={c.title}
+              className="flex flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                {c.icon}
+              </span>
+              <h3 className="text-sm font-extrabold">{c.title}</h3>
+              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                {c.text}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {tab === "produtos" && (page > 1 || hasNextPage) && (
         <nav className="flex items-center justify-center gap-4 pb-12 text-sm">

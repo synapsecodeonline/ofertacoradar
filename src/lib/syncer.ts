@@ -9,6 +9,11 @@ import {
   type LomadeeBrand,
   type NormalizedProduct,
 } from "./feed";
+import {
+  fetchMercadoLivrePage,
+  ML_LIMIT,
+  ML_QUERIES,
+} from "./mercadolivre";
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
@@ -228,6 +233,131 @@ async function runCycle(apiKey: string, baseUrl: string) {
       where: { key: STATE_KEY },
       data: { phase: "done", page: 1, lastCycleAt: new Date() },
     });
+  }
+}
+
+// ---- Sync Mercado Livre (independente da Lomadee) ----
+// Chave propria no SyncState ("ml"): nao depende de LOMADEE_API_KEY e nao
+// interfere no ciclo Lomadee. Fases: q:{indice da query} com page=offset.
+
+const ML_STATE_KEY = "ml";
+const ML_MAX_OFFSET = 200; // ate 4 paginas de ML_LIMIT por query
+
+async function runMLCycle() {
+  const state = await prisma.syncState.findUnique({
+    where: { key: ML_STATE_KEY },
+  });
+  if (!state) return;
+
+  let qi = 0;
+  let page = 1;
+  if (state.phase.startsWith("q:")) {
+    qi = Number(state.phase.slice(2)) || 0;
+    page = state.page;
+  } else if (state.phase !== "done") {
+    qi = 0;
+    page = 1;
+  }
+
+  const deadline = Date.now() + BUDGET_MS;
+  const save = () =>
+    prisma.syncState.update({
+      where: { key: ML_STATE_KEY },
+      data: { phase: `q:${qi}`, page },
+    });
+
+  let consecutiveFailures = 0;
+  while (qi < ML_QUERIES.length && Date.now() < deadline) {
+    let result: Awaited<ReturnType<typeof fetchMercadoLivrePage>>;
+    try {
+      result = await fetchMercadoLivrePage(ML_QUERIES[qi], (page - 1) * ML_LIMIT);
+    } catch {
+      // pula a query em vez de abortar o ciclo
+      qi++;
+      page = 1;
+      if (++consecutiveFailures > 10) break;
+      await save();
+      await sleep(400);
+      continue;
+    }
+    consecutiveFailures = 0;
+
+    if (!result) {
+      // sem token configurado: encerra o ciclo e tenta de novo no proximo TTL
+      await prisma.syncState.update({
+        where: { key: ML_STATE_KEY },
+        data: { phase: "done", page: 1, lastCycleAt: new Date() },
+      });
+      return;
+    }
+
+    for (const p of result.items) {
+      if (!p.imageUrl) continue;
+      await upsertByExternalId(p, "Mercado Livre").catch(() => {});
+    }
+
+    if ((page - 1) * ML_LIMIT + ML_LIMIT >= ML_MAX_OFFSET ||
+        (page - 1) * ML_LIMIT + ML_LIMIT >= result.total) {
+      qi++;
+      page = 1;
+    } else {
+      page++;
+    }
+    await save();
+    await sleep(400);
+  }
+
+  if (qi >= ML_QUERIES.length) {
+    await prisma.syncState.update({
+      where: { key: ML_STATE_KEY },
+      data: { phase: "done", page: 1, lastCycleAt: new Date() },
+    });
+  }
+}
+
+// Chamado via after() junto do maybeSync: nunca bloqueia a resposta
+export async function maybeSyncML() {
+  if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) return;
+
+  await prisma.syncState.upsert({
+    where: { key: ML_STATE_KEY },
+    create: { key: ML_STATE_KEY, phase: "q:0", page: 1 },
+    update: {},
+  });
+  const state = await prisma.syncState.findUnique({
+    where: { key: ML_STATE_KEY },
+  });
+  if (!state) return;
+
+  const now = Date.now();
+  const lockFresh =
+    state.busyAt && now - state.busyAt.getTime() < LOCK_STALE_MS;
+  const cycleFresh =
+    state.phase === "done" &&
+    state.lastCycleAt &&
+    now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
+  if (lockFresh || cycleFresh) return;
+
+  const locked = await prisma.syncState.updateMany({
+    where: {
+      key: ML_STATE_KEY,
+      OR: [
+        { busyAt: null },
+        { busyAt: { lt: new Date(now - LOCK_STALE_MS) } },
+      ],
+    },
+    data: { busyAt: new Date(now) },
+  });
+  if (locked.count === 0) return;
+
+  try {
+    await runMLCycle();
+  } catch (e) {
+    console.error("[syncer:ml] ciclo falhou:", e);
+  } finally {
+    await prisma.syncState
+      .update({ where: { key: ML_STATE_KEY }, data: { busyAt: null } })
+      .catch(() => {});
   }
 }
 

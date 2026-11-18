@@ -1,8 +1,8 @@
 # Ofertaço 🏷️
 
-Site brasileiro de **cupons, ofertas e produtos com links de afiliado Lomadee**. Vitine de descontos com foco em SEO, conversão e monetização via comissões de afiliado.
+Site brasileiro de **cupons, ofertas e produtos com links de afiliado Lomadee e Mercado Livre**. Vitine de descontos com foco em SEO, conversão e monetização via comissões de afiliado.
 
-**Produção:** https://ofertacoradar.vercel.app
+**Produção:** https://ofertacoradar.vercel.app · **Instagram:** https://instagram.com/ofertacoradar
 
 ---
 
@@ -63,8 +63,9 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 - **Ofertas/cupons** (`externalId` `camp:*`): campanhas Lomadee com link `lmdee.link` já rastreado — comissão por conversão.
 - **Catálogo de produtos** (`prod:*`): produtos de lojas afiliadas; o link comissionado é gerado **no clique** via `POST /affiliate/shortener/url` e cacheado em `TrackedLink`.
-- `/ir/[id]` é o **único caminho de saída** para lojas e registra `Click` sem bloquear o redirect.
-- Disclosure de afiliado no footer, na página do produto e no texto dos CTAs.
+- **Mercado Livre** (`ml:*`): produtos do catálogo ML (API `/products/search` + buy-box winner); link direto para o anúncio vencedor — **sem comissão** por enquanto.
+- `/ir/[id]` é o **único caminho de saída** para lojas e registra `Click` sem bloquear o redirect. Produtos `ml:*` têm `organizationId = null` → redirect direto para o permalink.
+- Disclosure de afiliado no footer, na página do produto, nos CTAs e na seção "Por que confiar" da home.
 
 ### UX / Conversão
 
@@ -76,6 +77,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - Itens exibidos exigem `active`, `imageUrl`, preço diferente de 0 quando informado e `endsAt` nulo ou futuro.
 - **Faixa "Ofertas Relâmpago"**: `endsAt` entre agora e +48h, até 12 itens ordenados pelo fim mais próximo, countdown ao vivo por segundo e scroll horizontal. Independe da aba e respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar.
 - **"Aproveitadas agora"**: seção global com os produtos mais clicados nas últimas 48h (até 12), com badge de cliques. Cards da listagem mostram prova social de cliques dos últimos 30 dias quando ≥ 3.
+- **Banner Instagram**: CTA "Ofertas do dia em vídeo" com link para `NEXT_PUBLIC_INSTAGRAM_URL` (default `instagram.com/ofertacoradar`).
+- **Seção "Por que confiar no Ofertaço Radar"**: 4 cards de transparência (preços atualizados, compra na loja oficial, só ofertas reais, aviso de afiliado).
 - Página de produto: breadcrumb, imagem, badges `-%`, cupom copiável, **"Economize R$ X"**, countdown real (<7 dias), lista **"Por que aproveitar agora"** (desconto, economia, cupom, urgência, loja e cliques), selos de confiança, **"como usar o cupom"**, relacionados (mesma loja primeiro, depois mesma categoria), botões **WhatsApp / Copiar link**, botões **"Imagem p/ feed" / "Imagem p/ story"** (`/api/card`) e **CTA fixo no mobile**.
 - Botão **Voltar** (`router.back()` com fallback) na página de produto.
 - Tema claro/escuro manual (`ThemeToggle`, `localStorage["theme"]`); script inline aplica o tema salvo antes do paint e usa `prefers-color-scheme` quando não há preferência salva.
@@ -107,7 +110,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - **TrackedLink** — cache `sourceUrl → shortUrl` do shortener (`organizationId`, `createdAt`).
 - **AffiliatedOrg** — organizações afiliadas vistas nas campanhas (`organizationId`, `name`); base para filtrar o catálogo e fallback de merchant.
 - **Brand** — marcas Lomadee (`id` = organizationId, `name`, `logo`, `site`).
-- **SyncState** — estado do sync incremental: `key`, `phase`, `page`, `lastCycleAt`, `busyAt`, `orgsCleared`.
+- **SyncState** — estado do sync incremental: `key`, `phase`, `page`, `lastCycleAt`, `busyAt`, `orgsCleared`. Chaves: `main` (Lomadee), `ml` (Mercado Livre) e `ml-token` (`phase` = JSON com access/refresh tokens OAuth).
 
 ---
 
@@ -123,10 +126,21 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 | `NEXT_PUBLIC_SITE_URL` | recomendado | URL canônica (default `http://localhost:3000`) — afeta sitemap/canonical/OG |
 | `VERCEL_URL` | automático | fallback de `siteUrl()` quando `NEXT_PUBLIC_SITE_URL` não existe |
 | `AFFILIATE_URL_OVERRIDE` | não | sobrescreve `affiliateUrl` no sync manual (testes) |
+| `ML_CLIENT_ID` | não | Client ID do app Mercado Livre — habilita sync ML |
+| `ML_CLIENT_SECRET` | não | Secret Key do app Mercado Livre |
+| `ML_AUTH_SECRET` | não | protege `/api/ml-auth/start` e valida o `state` do OAuth |
+| `NEXT_PUBLIC_INSTAGRAM_URL` | não | link do Instagram (default `https://instagram.com/ofertacoradar`) |
 
 \* O sync **incremental** (`src/lib/syncer.ts`) só funciona com `LOMADEE_API_KEY`; `FEED_URL` é usado apenas por `npm run sync`. Atenção: a fase `products` do syncer roda sempre que houver `AffiliatedOrg` — ela **não** consulta `LOMADEE_PRODUCTS`.
 
-Na Vercel essas vars estão configuradas no projeto `ofertacoradar` (time `tisomars-projects`).
+### Mercado Livre (`src/lib/mercadolivre.ts`)
+
+- **Auth OAuth2 + PKCE**: bootstrap web via `GET /api/ml-auth/start?key=$ML_AUTH_SECRET` → autorização no ML → `GET /api/ml-auth/callback` troca o `code` (com `code_verifier`) e grava tokens no `SyncState` key `ml-token` (`phase` = JSON). Access token ~6h, refresh token ~6 meses — o syncer renova sozinho.
+- **Busca**: `/sites/{site}/search` foi **descontinuado pelo ML** (403 global). Usamos a API de catálogo: `GET /products/search?site_id=MLB&status=active&q=...` → `GET /products/{id}/items?limit=1` (vencedor da buy box, preço + `original_price`) → URL do anúncio via formato curto `produto.mercadolivre.com.br/MLB-{item_id}`. `/items/{id}` é restrito a itens do próprio usuário (403) — por isso a URL é montada.
+- **Sync independente**: `SyncState` key `ml`, fases `q:{índice da query}` + `page`=offset, mesmas regras do Lomadee (budget 45s, TTL 30min, lock 3min). `ML_QUERIES` cobre ~54 termos; `ML_LIMIT=30` por página, até offset 200 por query.
+- Desativação no sync manual é **por fonte**: `ml:*` só é desativado quando o ML rodou naquela execução, e nunca afeta `camp:`/`prod:`/feed.
+
+Na Vercel essas vars estão configuradas no projeto `ofertacoradar` (time `synapse-code1`).
 
 ---
 
@@ -165,6 +179,7 @@ src/
                                 # share, imagens p/ feed/story, relacionados, JSON-LD
     ir/[id]/route.ts            # redirect de afiliado + registro de clique
     api/card/[id]/route.tsx     # PNG social (feed/story) via next/og
+    api/ml-auth/start|callback  # OAuth do Mercado Livre (uso único/manual)
     sitemap.ts / robots.ts / layout.tsx / loading.tsx / not-found.tsx
     globals.css / favicon.ico
   components/                   # ProductCard, FeaturedCarousel, CountdownTimer,
@@ -173,7 +188,8 @@ src/
   lib/
     db.ts                       # Prisma client (singleton p/ dev)
     feed.ts                     # fetch/normalização Lomadee API + feed XML/JSON
-    syncer.ts                   # sync incremental via tráfego
+    mercadolivre.ts             # OAuth ML + busca catálogo + normalização ml:*
+    syncer.ts                   # sync incremental via tráfego (main + ml)
     categories.ts               # categorias canônicas + classificador
     format.ts / urgency.ts / site.ts / shortener.ts
 scripts/
@@ -189,8 +205,9 @@ prisma/schema.prisma
 ### Incremental (`src/lib/syncer.ts`)
 
 - Disparado por `after()` na home e na página de produto — roda em background **depois** da resposta, sem atrasar o usuário.
-- Só funciona com `LOMADEE_API_KEY` (ignora `FEED_URL`).
-- Fases: `brands → campaigns → products`.
+- Duas fontes independentes: `maybeSync()` (Lomadee, exige `LOMADEE_API_KEY`) e `maybeSyncML()` (Mercado Livre, exige `ML_CLIENT_ID`+`ML_CLIENT_SECRET`).
+- Lomadee — fases: `brands → campaigns → products`.
+- Mercado Livre — fases: `q:{query}` com `page`=offset sobre `ML_QUERIES`; cada página busca catálogo + vencedor de buy box (~10-19s/página).
 - **Budget** de 45s por invocação; ciclo completo a cada **30min** (`lastCycleAt`); lock anti-corrida com `busyAt` (expira em 3min se o worker morrer).
 - `brands`: upserta `Brand` página a página e, ao terminar, limpa `AffiliatedOrg` para reconstruir no ciclo.
 - `campaigns`: upserta ofertas `camp:*` com imagem (`status=onTime`, `channels[].shortUrls[0]` → `affiliateUrl`) e popula `AffiliatedOrg`; páginas com falha são puladas (até 30 falhas consecutivas encerram a fase).
@@ -201,9 +218,10 @@ prisma/schema.prisma
 
 - Requer `DATABASE_URL` + `LOMADEE_API_KEY` **ou** `FEED_URL`.
 - Com API key: importa **campanhas** sempre; importa catálogo `/affiliate/products` somente se `LOMADEE_PRODUCTS=1` (limitado a orgs afiliadas e `price !== 0`).
+- Com `ML_CLIENT_ID`+`ML_CLIENT_SECRET`: adiciona produtos do catálogo ML (`ml:*`, até 4 páginas por query de `ML_QUERIES`).
 - Com `FEED_URL`: parse tolerante de XML/JSON genérico (title/name, price/preco, link/url, image/imagem etc.).
 - Upsert por `externalId` (ou `url` quando não há id), em paralelo (concorrência 5).
-- Ao final, **desativa** produtos ausentes da fonte (feed/API = fonte da verdade).
+- Ao final, **desativa** produtos ausentes da fonte — por prefixo: Lomadee/feed só desativa itens não-`ml:`, ML só desativa `ml:*` ausentes (e somente se o ML rodou na execução).
 - `AFFILIATE_URL_OVERRIDE` sobrescreve `affiliateUrl` de todos os itens nesse modo.
 
 ### Prioridade de fontes

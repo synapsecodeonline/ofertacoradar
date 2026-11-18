@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import { SITE_NAME, SITE_TAGLINE, siteUrl } from "@/lib/site";
-import { IconTag } from "@/components/Icons";
+import { IconInstagram, IconTag } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
 import AuthButton from "@/components/AuthButton";
 
@@ -138,6 +138,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/?aba=ofertas" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Ofertas e cupons
               </Link>
+              <a
+                href={
+                  process.env.NEXT_PUBLIC_INSTAGRAM_URL ??
+                  "https://instagram.com/ofertacoradar"
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-zinc-500 transition-colors hover:text-fuchsia-600 dark:text-zinc-400"
+              >
+                <IconInstagram className="h-4 w-4" /> Instagram
+              </a>
             </div>
             <div className="flex flex-col gap-2 text-xs text-zinc-400">
               <p>

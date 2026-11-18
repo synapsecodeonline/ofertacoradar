@@ -7,20 +7,21 @@ import {
   fetchLomadeeCampaigns,
   fetchLomadeeProducts,
 } from "../src/lib/feed";
+import { fetchMercadoLivreAll } from "../src/lib/mercadolivre";
 
 async function main() {
   const apiKey = process.env.LOMADEE_API_KEY;
   const feedUrl = process.env.FEED_URL;
-  if (!apiKey && !feedUrl) {
+  if (!apiKey && !feedUrl && !process.env.ML_CLIENT_ID) {
     console.error(
-      "Defina LOMADEE_API_KEY ou FEED_URL no .env com a fonte de ofertas.",
+      "Defina LOMADEE_API_KEY, FEED_URL ou ML_CLIENT_ID no .env com a fonte de ofertas.",
     );
     process.exit(1);
   }
 
   const baseUrl = process.env.LOMADEE_API_URL || "https://api.lomadee.com.br";
   const importProducts = process.env.LOMADEE_PRODUCTS === "1";
-  let products;
+  let products: import("../src/lib/feed").NormalizedProduct[] = [];
   let orgs: { organizationId: string; name?: string }[] = [];
   let brandSegments = new Map<string, string | undefined>();
 
@@ -72,9 +73,18 @@ async function main() {
         `${catalog.length} produtos afiliados adicionados ao catalogo.`,
       );
     }
-  } else {
+  } else if (feedUrl) {
     console.log(`Baixando feed: ${feedUrl}`);
     products = await fetchFeed(feedUrl!);
+  }
+
+  let mlSynced = false;
+  if (process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET) {
+    console.log("Buscando produtos no Mercado Livre...");
+    const ml = await fetchMercadoLivreAll();
+    products = products.concat(ml);
+    mlSynced = true;
+    console.log(`${ml.length} produtos do Mercado Livre adicionados.`);
   }
   console.log(`${products.length} itens no total.`);
 
@@ -148,26 +158,47 @@ async function main() {
   );
   console.log(`${processed} processados, ${failed} falhas.`);
 
-  // Desativa produtos que sumiram do feed (feed é a fonte da verdade)
+  // Desativa produtos que sumiram da fonte — cada fonte e a verdade so do
+  // seu proprio prefixo (ml: nao pode derrubar Lomadee/feed e vice-versa).
   const seenIds = products.map((p) => p.externalId).filter((x): x is string => !!x);
   const seenUrls = products.map((p) => p.url);
-  const deactivated = await prisma.product.updateMany({
-    where: {
-      active: true,
-      OR: [
-        {
-          AND: [
-            { externalId: { not: null } },
-            { externalId: { notIn: seenIds } },
-          ],
-        },
-        { externalId: null, url: { notIn: seenUrls } },
-      ],
-    },
-    data: { active: false },
-  });
+  let deactivatedCount = 0;
 
-  console.log(`OK: ${processed} processados, ${failed} falhas, ${deactivated.count} desativados.`);
+  if (apiKey || feedUrl) {
+    const nonMlSeen = seenIds.filter((id) => !id.startsWith("ml:"));
+    const d = await prisma.product.updateMany({
+      where: {
+        active: true,
+        OR: [
+          {
+            AND: [
+              { externalId: { not: null } },
+              { NOT: { externalId: { startsWith: "ml:" } } },
+              { externalId: { notIn: nonMlSeen } },
+            ],
+          },
+          { externalId: null, url: { notIn: seenUrls } },
+        ],
+      },
+      data: { active: false },
+    });
+    deactivatedCount += d.count;
+  }
+
+  if (mlSynced) {
+    const mlSeen = seenIds.filter((id) => id.startsWith("ml:"));
+    const d = await prisma.product.updateMany({
+      where: {
+        active: true,
+        externalId: { startsWith: "ml:" },
+        NOT: { externalId: { in: mlSeen } },
+      },
+      data: { active: false },
+    });
+    deactivatedCount += d.count;
+  }
+
+  console.log(`OK: ${processed} processados, ${failed} falhas, ${deactivatedCount} desativados.`);
 }
 
 main()

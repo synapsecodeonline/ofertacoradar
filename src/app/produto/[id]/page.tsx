@@ -4,7 +4,7 @@ import { after } from "next/server";
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { maybeSync } from "@/lib/syncer";
+import { maybeSync, maybeSyncML } from "@/lib/syncer";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { categoryLabel, canonicalCategory } from "@/lib/categories";
@@ -68,7 +68,10 @@ export default async function ProductPage({
     isLoggedIn = false;
   }
 
-  after(() => maybeSync().catch(() => {}));
+  after(() => {
+    maybeSync().catch(() => {});
+    maybeSyncML().catch(() => {});
+  });
 
   const discount = discountPercent(product.price, product.oldPrice);
   const saving =
@@ -107,7 +110,9 @@ export default async function ProductPage({
     ? "camp:"
     : product.externalId?.startsWith("prod:")
       ? "prod:"
-      : null;
+      : product.externalId?.startsWith("ml:")
+        ? "ml:"
+        : null;
   const baseWhere: Prisma.ProductWhereInput = {
     active: true,
     ...(prefix ? { externalId: { startsWith: prefix } } : {}),
