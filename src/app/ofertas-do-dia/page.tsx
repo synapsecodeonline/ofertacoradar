@@ -176,26 +176,24 @@ export default async function OfertasDoDiaPage() {
             </CollapsibleSection>
           )}
 
-          <section>
-            <div className="mb-4 flex items-end justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                  Ranking do dia
-                </p>
-                <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                  Maiores descontos de hoje
-                </h2>
-              </div>
-              <span className="text-sm font-medium text-zinc-400">
-                {topDiscounts.length} ofertas
+          <CollapsibleSection
+            title={
+              <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                <IconTag className="h-4 w-4" /> Ranking do dia
+              </h2>
+            }
+            meta={
+              <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-500/80">
+                Maiores descontos de hoje · {topDiscounts.length} ofertas
               </span>
-            </div>
-            <main className="grid grid-cols-2 gap-4 pb-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            }
+          >
+            <div className="grid grid-cols-2 gap-4 pb-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {topDiscounts.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
-            </main>
-          </section>
+            </div>
+          </CollapsibleSection>
         </>
       )}
 

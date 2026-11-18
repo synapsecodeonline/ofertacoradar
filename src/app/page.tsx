@@ -12,6 +12,7 @@ import {
   IconInstagram,
   IconRefresh,
   IconShield,
+  IconTrophy,
   IconZap,
 } from "@/components/Icons";
 import FeaturedCarousel, {
@@ -229,6 +230,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   const FLASH_WINDOW_MS = 48 * 3_600_000;
   const now = new Date();
+  const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
 
   const [
     pageItems,
@@ -237,6 +239,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     merchants,
     featured,
     flashDeals,
+    rankPool,
+    rankClicks,
     aproveitadasTop,
     brandRows,
     orgs,
@@ -307,6 +311,25 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         ],
       },
       orderBy: { endsAt: "asc" },
+      take: 12,
+    }),
+    // Ranking do dia — pool de candidatos: ofertas ordena por urgencia
+    // (endsAt), fontes de produto por maior desconto
+    prisma.product.findMany({
+      where: listWhere,
+      orderBy:
+        tab === "ofertas"
+          ? [{ endsAt: { sort: "asc", nulls: "last" } }]
+          : [{ discountPct: { sort: "desc", nulls: "last" } }],
+      take: 25,
+    }),
+    // Itens mais clicados nas ultimas 24h (boost no ranking)
+    prisma.product.findMany({
+      where: {
+        ...listWhere,
+        clicks: { some: { createdAt: { gte: dayAgo } } },
+      },
+      orderBy: { clicks: { _count: "desc" } },
       take: 12,
     }),
     // "Aproveitadas agora": itens da fonte ativa com cliques recentes,
@@ -568,6 +591,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       take: 12,
     });
   }
+  // Ranking do dia: score = desconto + urgencia (72h) + cliques 24h.
+  // Funciona para todas as fontes (camp: nao tem discountPct/price).
+  const aproveitadasIds = new Set(aproveitadas.map((p) => p.id));
+  const clickedTodayIds = new Set(rankClicks.map((p) => p.id));
+  const URGENT_MS = 72 * 3_600_000;
+  const rankScore = (p: (typeof rankPool)[number]) =>
+    (p.discountPct ?? 0) +
+    (p.endsAt && p.endsAt.getTime() - now.getTime() < URGENT_MS ? 25 : 0) +
+    (clickedTodayIds.has(p.id) ? 100 : 0);
+  const topDiscounts = [
+    ...rankPool,
+    ...rankClicks.filter((p) => !rankPool.some((r) => r.id === p.id)),
+  ]
+    .filter((p) => !flashIds.has(p.id) && !aproveitadasIds.has(p.id))
+    .sort((a, b) => rankScore(b) - rankScore(a))
+    .slice(0, 10);
+
   const featuredItems: FeaturedItem[] = await Promise.all(
     featured.map(async (p) => ({
       id: p.id,
@@ -784,6 +824,39 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </div>
             </div>
           )}
+        </CollapsibleSection>
+      )}
+
+      {/* Ofertas do dia: ranking dos maiores descontos da fonte ativa */}
+      {topDiscounts.length > 0 && (
+        <CollapsibleSection
+          className="border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-emerald-50 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-emerald-950/30"
+          title={
+            <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+              <IconTrophy className="h-4 w-4" />
+              Ofertas do dia
+            </h2>
+          }
+          meta={
+            <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-500/80">
+              Ranking do dia · {topDiscounts.length} ofertas
+            </span>
+          }
+        >
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+            {topDiscounts.map((p, i) => (
+              <RailCard
+                key={p.id}
+                p={p}
+                className="w-44"
+                corner={
+                  <span className="absolute left-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-extrabold text-white shadow">
+                    {i + 1}
+                  </span>
+                }
+              />
+            ))}
+          </div>
         </CollapsibleSection>
       )}
 
