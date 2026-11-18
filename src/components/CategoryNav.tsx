@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import HashLink from "@/components/HashLink";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface CategoryItem {
@@ -91,13 +91,13 @@ export default function CategoryNav({ items }: { items: CategoryItem[] }) {
                 <span className="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   {active.label}
                 </span>
-                <Link
+                <HashLink
                   href={items[0]?.href ?? "/"}
                   onClick={close}
                   className="shrink-0 text-xs font-medium text-zinc-400 underline-offset-2 transition-colors hover:text-emerald-600 hover:underline"
                 >
                   ver todas
-                </Link>
+                </HashLink>
               </>
             ) : (
               <span className="text-sm font-medium text-zinc-400">
@@ -140,7 +140,7 @@ export default function CategoryNav({ items }: { items: CategoryItem[] }) {
                 {items.map((c) => {
                   const hue = hueOf(c.slug || "todas");
                   return (
-                    <Link
+                    <HashLink
                       key={c.slug}
                       href={c.href}
                       onClick={close}
@@ -169,7 +169,7 @@ export default function CategoryNav({ items }: { items: CategoryItem[] }) {
                       <span className="truncate text-[13px] font-semibold">
                         {c.label}
                       </span>
-                    </Link>
+                    </HashLink>
                   );
                 })}
               </div>

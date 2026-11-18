@@ -19,6 +19,7 @@ import FeaturedCarousel, {
 } from "@/components/FeaturedCarousel";
 import CountdownTimer from "@/components/CountdownTimer";
 import CategoryNav from "@/components/CategoryNav";
+import HashLink from "@/components/HashLink";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
@@ -849,7 +850,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-zinc-400">
             Tipo:
           </span>
-          <Link
+          <HashLink
             href={qs({ tipo: "" }) + "#catalogo"}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               !subtype
@@ -858,12 +859,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             }`}
           >
             Todos
-          </Link>
+          </HashLink>
           {visibleSubs.map((d) => {
             const count = subtypeCounts.get(d.slug) ?? 0;
             const active = subtype === d.slug;
             return (
-              <Link
+              <HashLink
                 key={d.slug}
                 href={qs({ tipo: d.slug }) + "#catalogo"}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -882,7 +883,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 >
                   {count}
                 </span>
-              </Link>
+              </HashLink>
             );
           })}
         </nav>
@@ -934,23 +935,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {(page > 1 || hasNextPage) && (
         <nav className="flex items-center justify-center gap-4 pb-8 text-sm">
           {page > 1 && (
-            <Link
-              href={qs({ pagina: String(page - 1) })}
+            <HashLink
+              href={qs({ pagina: String(page - 1) }) + "#catalogo"}
               className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
             >
               ← Anterior
-            </Link>
+            </HashLink>
           )}
           <span className="text-zinc-500">
             Página {page} de {totalPages}
           </span>
           {hasNextPage && (
-            <Link
-              href={qs({ pagina: String(page + 1) })}
+            <HashLink
+              href={qs({ pagina: String(page + 1) }) + "#catalogo"}
               className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
             >
               Próxima →
-            </Link>
+            </HashLink>
           )}
         </nav>
       )}

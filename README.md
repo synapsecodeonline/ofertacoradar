@@ -73,6 +73,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 - **Hero** com estatísticas reais (produtos, ofertas e lojas), chips de lojas parceiras com logo/nome e carrossel de **ofertas em destaque** (top 5 por desconto da aba/filtros atuais, troca a cada 6s, pausa no hover, setas e dots).
 - **Abas por fonte de afiliado** (`?aba=`): `ofertas` (default, `camp:*` Lomadee), `lojas` (`prod:*` Lomadee), `ml` (`ml:*` Mercado Livre) e `awin` (`aw:*`, só renderiza quando há itens). O catálogo **nunca mistura fontes** — cada aba tem seu próprio grid, filtros, facetas e destaques. Legado: `aba=produtos` → `lojas` (ou `ml`/`awin` conforme `?fonte=`); `?fonte=` sozinho também resolve a aba.
+- **Navegação para o catálogo**: links com `#catalogo` (categorias, subtipos, paginação) usam o componente client `HashLink`, que faz `router.push` com `scroll:false` + `scrollIntoView` — o App Router rolaria pro topo ao trocar search params e ignoraria o hash.
 - **Busca** (`?q=`) em título, descrição e merchant; **filtro de loja** (`?loja=`, merchant case-insensitive); **categoria** (`?categoria=` canônica, casando slugs legados no banco).
 - A separação por fonte é **estrutural** (abas), não visual — por isso não há badge de origem nos cards.
 - **Ordenações** (`?ordem=`): `desconto` (default em Ofertas), `recentes` (default em Produtos), `terminando` e `populares` (por total de cliques). Filtros, busca, loja e ordenação viram query params; mudanças resetam `pagina`.
