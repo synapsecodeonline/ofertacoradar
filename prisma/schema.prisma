@@ -12,8 +12,8 @@ datasource db {
 model Product {
   id           Int      @id @default(autoincrement())
   // Prefixo de fonte de afiliado:
-  //   camp: = oferta/cupom Lomadee | prod: = produto Lomadee
-  //   ml:   = produto Mercado Livre | aw:  = produto Awin
+  //   camp-lomadee: = oferta/cupom Lomadee | prod-lomadee: = produto Lomadee
+  //   ml:          = produto Mercado Livre | aw:           = produto Awin
   externalId   String?  @unique
   title        String
   description  String?

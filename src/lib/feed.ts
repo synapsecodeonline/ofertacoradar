@@ -321,7 +321,7 @@ export function normalizeLomadeeCampaign(
 
   return {
     product: {
-      externalId: `camp:${c.id}`,
+      externalId: `camp-lomadee:${c.id}`,
       title: c.name ?? "Oferta",
       description:
         [c.description, c.code ? `Cupom: ${c.code}` : null]

@@ -106,10 +106,10 @@ export default async function ProductPage({
   if (totalClicks >= 3)
     reasons.push(`${totalClicks} pessoas já aproveitaram esta oferta`);
 
-  const prefix = product.externalId?.startsWith("camp:")
-    ? "camp:"
-    : product.externalId?.startsWith("prod:")
-      ? "prod:"
+  const prefix = product.externalId?.startsWith("camp-lomadee:")
+    ? "camp-lomadee:"
+    : product.externalId?.startsWith("prod-lomadee:")
+      ? "prod-lomadee:"
       : product.externalId?.startsWith("ml:")
         ? "ml:"
         : product.externalId?.startsWith("aw:")

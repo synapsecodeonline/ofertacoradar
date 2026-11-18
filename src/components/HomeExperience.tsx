@@ -47,7 +47,7 @@ const TABS = {
     eyebrow: "Lomadee",
     title: "Produtos Lomadee",
     noun: "produtos",
-    prefix: "prod:",
+    prefix: "prod-lomadee:",
     defaultSort: "recentes",
   },
   ml: {
@@ -209,7 +209,7 @@ export async function HomeExperience({
   // Secao "Ofertas {Fonte}": Lomadee usa camp: (ofertas/cupons);
   // ML/Awin usam os itens com desconto da propria fonte.
   const OFFERS_PREFIX: Record<Tab, string> = {
-    lojas: "camp:",
+    lojas: "camp-lomadee:",
     ml: "ml:",
     awin: "aw:",
   };
@@ -337,7 +337,7 @@ export async function HomeExperience({
           _count: { _all: true },
         })
       : Promise.resolve([]),
-    // Secao de ofertas da fonte (camp: na Lomadee; desconto em ML/Awin)
+    // Secao de ofertas da fonte (camp-lomadee: na Lomadee; desconto em ML/Awin)
     prisma.product.findMany({
       where: offersWhere,
       orderBy:
@@ -353,8 +353,8 @@ export async function HomeExperience({
       { merchant: string; camp: bigint; prod: bigint; ml: bigint; aw: bigint }[]
     >`
       SELECT "merchant",
-        COUNT(*) FILTER (WHERE "externalId" LIKE 'camp:%') AS camp,
-        COUNT(*) FILTER (WHERE "externalId" LIKE 'prod:%') AS prod,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'camp-lomadee:%') AS camp,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'prod-lomadee:%') AS prod,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'ml:%')   AS ml,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'aw:%')   AS aw
       FROM "Product"
@@ -416,7 +416,7 @@ export async function HomeExperience({
     FEATURED_STORES.map((s) => {
       const src = merchantSrc.get(s.merchant);
       const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0 };
-      // Lojas Lomadee inclui ofertas camp: + produtos prod: da rede Lomadee
+      // Lojas Lomadee inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
       const visible =
         t === "lojas"
           ? counts.camp + counts.prod > 0
@@ -529,7 +529,7 @@ export async function HomeExperience({
       )}
 
       {!dayOnly && (<>
-      {/* Ofertas da fonte: camp: na Lomadee; desconto em ML/Awin */}
+      {/* Ofertas da fonte: camp-lomadee: na Lomadee; desconto em ML/Awin */}
       {offersItems.length > 0 && (
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between">

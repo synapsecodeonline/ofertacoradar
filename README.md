@@ -42,7 +42,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 | Rota | Tipo | Descrição |
 |---|---|---|
 | `/` | página | Redirect 307 → `/ofertas-do-dia` (preserva query). |
-| `/ofertas-do-dia` | página | Home dinâmica: modo **dia** (sem params) = ofertas do dia (Terminando em breve + Ranking do dia); modo **catálogo** (`?aba=lojas|ml|awin`) = cabeçalho por fonte + busca + seção Ofertas da fonte + lojas em destaque + categorias + ordenação + grid paginado. O catálogo **nunca mistura fontes**: Lomadee=`camp:`+`prod:`, Mercado Livre=`ml:`, Awin=`aw:`. |
+| `/ofertas-do-dia` | página | Home dinâmica: modo **dia** (sem params) = ofertas do dia (Terminando em breve + Ranking do dia); modo **catálogo** (`?aba=lojas|ml|awin`) = cabeçalho por fonte + busca + seção Ofertas da fonte + lojas em destaque + categorias + ordenação + grid paginado. O catálogo **nunca mistura fontes**: Lomadee=`camp-lomadee:`+`prod-lomadee:`, Mercado Livre=`ml:`, Awin=`aw:`. |
 | `/produto/[id]` | página | Detalhe do item: preço, cupom, countdown, prova social, relacionados, share e JSON-LD. |
 | `/ofertas-do-dia` | página | Curadoria diária: terminando em breve, mais aproveitadas (24h) e maiores descontos. Indexável, no sitemap. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo p/ Instagram (login obrigatório): top produtos ranqueados por cliques 24h + desconto, com `cardUrl` (`/api/card`), `pageUrl` e `caption` prontos. `?count=` (máx 20) e `?size=feed|story`. |
@@ -55,7 +55,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 1. Busca o `Product` ativo; se não existir, redireciona para `/`.
 2. Cria um `Click` assíncrono com `referer` e `userAgent` (truncado em 500 chars).
-3. Se o produto **não** tiver `affiliateUrl` mas tiver `organizationId` (catálogo `prod:*`), chama `POST /affiliate/shortener/url`, cacheia em `TrackedLink` e redireciona para o `lmdee.link` gerado; se falhar, cai na `url` direta.
+3. Se o produto **não** tiver `affiliateUrl` mas tiver `organizationId` (catálogo `prod-lomadee:*`), chama `POST /affiliate/shortener/url`, cacheia em `TrackedLink` e redireciona para o `lmdee.link` gerado; se falhar, cai na `url` direta.
 4. Caso contrário, redireciona para `affiliateUrl ?? url`; `?src=...` vira `utm_source` na URL de destino.
 
 ---
@@ -64,8 +64,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 ### Monetização / Afiliados
 
-- **Ofertas/cupons** (`externalId` `camp:*`): campanhas Lomadee com link `lmdee.link` já rastreado — comissão por conversão.
-- **Catálogo de produtos** (`prod:*`): produtos de lojas afiliadas; o link comissionado é gerado **no clique** via `POST /affiliate/shortener/url` e cacheado em `TrackedLink`.
+- **Ofertas/cupons** (`externalId` `camp-lomadee:*`): campanhas Lomadee com link `lmdee.link` já rastreado — comissão por conversão.
+- **Catálogo de produtos** (`prod-lomadee:*`): produtos de lojas afiliadas; o link comissionado é gerado **no clique** via `POST /affiliate/shortener/url` e cacheado em `TrackedLink`.
 - **Mercado Livre** (`ml:*`): produtos do catálogo ML (API `/products/search` + buy-box winner). Comissão pelo **programa de afiliados próprio do ML** (independente da Lomadee): com `ML_AFFILIATE_TOOL`+`ML_AFFILIATE_WORD` configurados, `/ir/` redireciona para a página de catálogo `/p/MLB{id}` com `matt_tool`/`matt_word` — até 16% conforme categoria, pago via Mercado Pago. Sem as vars, cai no link direto (sem comissão).
 - `/ir/[id]` é o **único caminho de saída** para lojas e registra `Click` sem bloquear o redirect. Produtos `ml:*` têm `organizationId = null` (nunca passam pelo shortener Lomadee); a monetização é exclusiva do programa de afiliados do ML via `matt_tool`/`matt_word`.
 - Disclosure de afiliado no footer, na página do produto, nos CTAs e na seção "Por que confiar" da home.
@@ -73,7 +73,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 ### UX / Conversão
 
 - **Hero** com estatísticas reais (produtos, ofertas e lojas), chips de lojas parceiras com logo/nome e carrossel de **ofertas em destaque** (top 5 por desconto da aba/filtros atuais, troca a cada 6s, pausa no hover, setas e dots).
-- **Telas por fonte de afiliado** (`?aba=`): `lojas` (**Lomadee** — seção Ofertas `camp:*` + catálogo `prod:*`), `ml` (**Mercado Livre** — ofertas com desconto + catálogo `ml:*`) e `awin` (**Awin** — `aw:*`, só renderiza com itens). O catálogo **nunca mistura fontes** — cada tela tem sua seção de ofertas, grid, filtros e facetas. A antiga aba `ofertas` foi removida: `?aba=ofertas`/`aba=produtos` → `lojas` (ou `ml`/`awin` conforme `?fonte=`).
+- **Telas por fonte de afiliado** (`?aba=`): `lojas` (**Lomadee** — seção Ofertas `camp-lomadee:*` + catálogo `prod-lomadee:*`), `ml` (**Mercado Livre** — ofertas com desconto + catálogo `ml:*`) e `awin` (**Awin** — `aw:*`, só renderiza com itens). O catálogo **nunca mistura fontes** — cada tela tem sua seção de ofertas, grid, filtros e facetas. A antiga aba `ofertas` foi removida: `?aba=ofertas`/`aba=produtos` → `lojas` (ou `ml`/`awin` conforme `?fonte=`).
 - **Navegação para o catálogo**: `qs()` sempre anexa `#catalogo` e todo link de filtro (abas por fonte no header e na página, ordenação, categorias, subtipos, paginação, lojas em destaque, busca) passa pelo client `HashLink`/`markScrollTo`. O clique só grava uma flag em `sessionStorage` e o `CatalogScrollOnNav` (montado na home) rola até o elemento **depois** que a navegação comita — o reset de scroll do App Router não apaga mais a rolagem. Flag expira em 15s.
 - **Busca** (`?q=`) em título, descrição e merchant; **filtro de loja** (`?loja=`, merchant case-insensitive); **categoria** (`?categoria=` canônica, casando slugs legados no banco).
 - A separação por fonte é **estrutural** (abas), não visual — por isso não há badge de origem nos cards.
@@ -82,9 +82,8 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - Itens exibidos exigem `active`, `imageUrl`, preço diferente de 0 quando informado e `endsAt` nulo ou futuro.
 - **"Destaques do momento"**: seção retrátil única com dois trilhos **escopados na fonte da aba** — **"Terminando em breve"** (`endsAt` entre agora e +48h, até 12, countdown ao vivo, cupom quando houver) e **"Mais clicadas nas últimas 48h"** (até 12 candidatos filtrados pela fonte, badge de cliques; fallback para maiores descontos da fonte quando não há cliques). Respeita `q`/`categoria`/`loja`; esses itens são removidos do grid principal para não duplicar. Ambos usam o componente `RailCard` compartilhado.
 - **Cards de produto** exibem logo da loja (resolvido por `merchantLogo`: lista de destaque → `Brand.name` → favicon do domínio), selo de origem `ML`/`AW` para fontes não-Lomadee, badge de desconto, cupom, urgência e prova social de cliques dos últimos 30 dias quando ≥ 3.
-- **Home canônica = `/ofertas-do-dia`**: o domínio `/` redireciona (307, via `src/proxy.ts`) preservando query params. A página tem dois modos: **sem params de catálogo** = só as ofertas do dia (Terminando em breve, Mais aproveitadas 24h, Ranking do dia em grade, Instagram); **com `?aba=`/`?loja=`/filtros** = visão completa de catálogo: cabeçalho claro com título da fonte + busca (sem abas — a troca de fonte fica no menu do site), **seção "Ofertas {Fonte}"** (`camp:` na Lomadee; itens com `discountPct>0` em ML/Awin), lojas em destaque, categorias, ordenação e grade. A aba `ofertas` foi removida — `?aba=ofertas` legado cai em `lojas`. Ambos seguidos do `HomeExperience` (`src/components/HomeExperience.tsx`, extraído de `page.tsx`) com `dayOnly` — em modo catálogo mostra cabeçalho da fonte + busca, seção Ofertas da fonte, lojas em destaque, categorias, ordenação e grade; em modo dia (`dayOnly`) renderiza apenas Instagram + transparência.
-- **"Ofertas do dia" / "Ranking do dia"**: seção retrátil na home com os 10 itens mais bem posicionados da fonte ativa. Score = `discountPct` + bônus de urgência (endsAt < 72h) + bônus de cliques nas últimas 24h; exclui itens já exibidos em "Destaques do momento". Na aba Ofertas o pool é ordenado por `endsAt` (camp: não tem preço/desconto).
-- **"Lojas em destaque"**: carrossel **por tela** — Lojas Lomadee mostra lojas com `camp:`+`prod:` (rede Lomadee inteira), ML só `ml:`, Awin só `aw:`. O card mostra **"X ofertas · Y produtos"** (partes zeradas ocultas). Clicar numa loja filtra a tela daquela fonte (`?aba=X&loja=Y`).
+- **Home canônica = `/ofertas-do-dia`**: o domínio `/` redireciona (307, via `src/proxy.ts`) preservando query params. A página tem dois modos: **sem params de catálogo** = só as ofertas do dia (Terminando em breve, Mais aproveitadas 24h, Ranking do dia em grade, Instagram); **com `?aba=`/`?loja=`/filtros** = visão completa de catálogo: cabeçalho claro com título da fonte + busca (sem abas — a troca de fonte fica no menu do site), **seção "Ofertas {Fonte}"** (`camp-lomadee:` na Lomadee; itens com `discountPct>0` em ML/Awin), lojas em destaque, categorias, ordenação e grade. A aba `ofertas` foi removida — `?aba=ofertas` legado cai em `lojas`. Ambos seguidos do `HomeExperience` (`src/components/HomeExperience.tsx`, extraído de `page.tsx`) com `dayOnly` — em modo catálogo mostra cabeçalho da fonte + busca, seção Ofertas da fonte, lojas em destaque, categorias, ordenação e grade; em modo dia (`dayOnly`) renderiza apenas Instagram + transparência.
+- **"Lojas em destaque"**: carrossel **por tela** — Lojas Lomadee mostra lojas com `camp-lomadee:`+`prod-lomadee:` (rede Lomadee inteira), ML só `ml:`, Awin só `aw:`. O card mostra **"X ofertas · Y produtos"** (partes zeradas ocultas). Clicar numa loja filtra a tela daquela fonte (`?aba=X&loja=Y`).
 - **Banner Instagram**: CTA "Ofertas do dia em vídeo" com link para `NEXT_PUBLIC_INSTAGRAM_URL` (default `instagram.com/ofertacoradar`).
 - **Seção "Por que confiar no Ofertaço Radar"**: 4 cards de transparência (preços atualizados, compra na loja oficial, só ofertas reais, aviso de afiliado).
 - Página de produto: breadcrumb, imagem, badges `-%`, cupom copiável, **"Economize R$ X"**, countdown real (<7 dias), lista **"Por que aproveitar agora"** (desconto, economia, cupom, urgência, loja e cliques), selos de confiança, **"como usar o cupom"**, relacionados (mesma loja primeiro, depois mesma categoria), botões **WhatsApp / Copiar link**, botões **"Imagem p/ feed" / "Imagem p/ story"** (`/api/card`) e **CTA fixo no mobile**.
@@ -114,7 +113,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 
 ## Modelo de dados (`prisma/schema.prisma`)
 
-- **Product** — ofertas e produtos: `externalId` (`camp:`/`prod:` Lomadee, `ml:` Mercado Livre, `aw:` Awin — unique), `title`, `description`, `imageUrl`, `price`/`oldPrice`/`discountPct`, `currency` (default `BRL`), `category`, `merchant`, `organizationId`, `url`, `affiliateUrl`, `couponCode`, `endsAt`, `active`, timestamps; índices em `category` e `active`; relação `clicks`.
+- **Product** — ofertas e produtos: `externalId` (`camp-lomadee:`/`prod-lomadee:` Lomadee, `ml:` Mercado Livre, `aw:` Awin — unique), `title`, `description`, `imageUrl`, `price`/`oldPrice`/`discountPct`, `currency` (default `BRL`), `category`, `merchant`, `organizationId`, `url`, `affiliateUrl`, `couponCode`, `endsAt`, `active`, timestamps; índices em `category` e `active`; relação `clicks`.
 - **Click** — cliques em `/ir/[id]`: `productId`, `referer`, `userAgent`, `createdAt`; índice em `productId`.
 - **TrackedLink** — cache `sourceUrl → shortUrl` do shortener (`organizationId`, `createdAt`).
 - **AffiliatedOrg** — organizações afiliadas vistas nas campanhas (`organizationId`, `name`); base para filtrar o catálogo e fallback de merchant.
@@ -149,7 +148,7 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 - **Auth OAuth2 + PKCE**: bootstrap web via `GET /api/ml-auth/start?key=$ML_AUTH_SECRET` → autorização no ML → `GET /api/ml-auth/callback` troca o `code` (com `code_verifier`) e grava tokens no `SyncState` key `ml-token` (`phase` = JSON). Access token ~6h, refresh token ~6 meses — o syncer renova sozinho.
 - **Busca**: `/sites/{site}/search` foi **descontinuado pelo ML** (403 global). Usamos a API de catálogo: `GET /products/search?site_id=MLB&status=active&q=...` → `GET /products/{id}/items?limit=1` (vencedor da buy box, preço + `original_price`) → URL do anúncio via formato curto `produto.mercadolivre.com.br/MLB-{item_id}`. `/items/{id}` é restrito a itens do próprio usuário (403) — por isso a URL é montada.
 - **Sync independente**: `SyncState` key `ml`, fases `q:{índice da query}` + `page`=offset, mesmas regras do Lomadee (budget 45s, TTL 30min, lock 3min). `ML_QUERIES` cobre ~54 termos; `ML_LIMIT=30` por página, até offset 200 por query.
-- Desativação no sync manual é **por fonte**: `ml:*` só é desativado quando o ML rodou naquela execução, e nunca afeta `camp:`/`prod:`/feed.
+- Desativação no sync manual é **por fonte**: `ml:*` só é desativado quando o ML rodou naquela execução, e nunca afeta `camp-lomadee:`/`prod-lomadee:`/feed.
 - **Afiliado ML** (programa "Afiliados e Criadores", até 16% por categoria, pagamento via Mercado Pago a partir de R$30): gere um link no portal `mercadolivre.com.br/afiliados/linkbuilder`, copie os valores de `matt_tool` e `matt_word` do link gerado e configure `ML_AFFILIATE_TOOL`/`ML_AFFILIATE_WORD` na Vercel. Todo link de afiliado ML é a URL do produto + esses dois parâmetros.
 
 Na Vercel essas vars estão configuradas no projeto `ofertacoradar` (time `synapse-code1`).
@@ -224,8 +223,8 @@ prisma/schema.prisma
 - Mercado Livre — fases: `q:{query}` com `page`=offset sobre `ML_QUERIES`; cada página busca catálogo + vencedor de buy box (~10-19s/página).
 - **Budget** de 45s por invocação; ciclo completo a cada **30min** (`lastCycleAt`); lock anti-corrida com `busyAt` (expira em 3min se o worker morrer).
 - `brands`: upserta `Brand` página a página e, ao terminar, limpa `AffiliatedOrg` para reconstruir no ciclo.
-- `campaigns`: upserta ofertas `camp:*` com imagem (`status=onTime`, `channels[].shortUrls[0]` → `affiliateUrl`) e popula `AffiliatedOrg`; páginas com falha são puladas (até 30 falhas consecutivas encerram a fase).
-- `products`: lê `/affiliate/products` e grava apenas itens de `organizationId` presente em `AffiliatedOrg`, com `imageUrl` e `price !== 0`; salva como `prod:*`, **sem** `affiliateUrl` (link comissionado é gerado no clique).
+- `campaigns`: upserta ofertas `camp-lomadee:*` com imagem (`status=onTime`, `channels[].shortUrls[0]` → `affiliateUrl`) e popula `AffiliatedOrg`; páginas com falha são puladas (até 30 falhas consecutivas encerram a fase).
+- `products`: lê `/affiliate/products` e grava apenas itens de `organizationId` presente em `AffiliatedOrg`, com `imageUrl` e `price !== 0`; salva como `prod-lomadee:*`, **sem** `affiliateUrl` (link comissionado é gerado no clique).
 - Não desativa itens que sumiram da fonte (upsert apenas).
 
 ### Manual (`scripts/sync.ts` → `npm run sync`)

@@ -21,11 +21,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Notas
 
 - Next.js 16 com `cacheComponents` desligado (renderização dinâmica simples).
-- Fontes de afiliado (prefixo em `Product.externalId`): `camp:` = oferta/cupom **Lomadee**, `prod:` = produto **Lomadee**, `ml:` = produto **Mercado Livre**, `aw:` = produto **Awin**. `LOMADEE_API_KEY` (API Lomadee) ou `FEED_URL` (XML/JSON genérico → `fetchFeed`, também Lomadee). API tem precedência.
+- Fontes de afiliado (prefixo em `Product.externalId`): `camp-lomadee:` = oferta/cupom **Lomadee**, `prod-lomadee:` = produto **Lomadee**, `ml:` = produto **Mercado Livre**, `aw:` = produto **Awin**. `LOMADEE_API_KEY` (API Lomadee) ou `FEED_URL` (XML/JSON genérico → `fetchFeed`, também Lomadee). API tem precedência.
 - Com `LOMADEE_API_KEY`, o sync importa **campanhas** (`/affiliate/campaigns`, status `onTime`) — são ofertas/cupons com `lmdee.link` já rastreado por canal = comissão. Catalogo de produtos (`/affiliate/products`) só entra com `LOMADEE_PRODUCTS=1` e usa link direto da loja (SEM comissão).
 - API Lomadee: limite de 20 itens/página em brands/campaigns, rate limit 60 req/min, 500 intermitente em algumas páginas (sync pula e segue). Paginação: campaigns/orders usam `meta`, brands usa `pagination`, products usa `count`.
 - Feed XML: campos mapeados de forma tolerante (title/name, price/preco, link/url, image/imagem etc.).
 - Atenção: API de produtos retorna URL direta da loja; link comissionado pode exigir feed XML lomadeezado ou shortener (`POST /affiliate/shortener/url`).
-- Redirect de afiliado: `/ir/[id]` registra clique e redireciona para `affiliateUrl` (ou `url`; produtos `prod:` sem affiliateUrl geram `lmdee.link` via shortener, cacheado em `TrackedLink`).
+- Redirect de afiliado: `/ir/[id]` registra clique e redireciona para `affiliateUrl` (ou `url`; produtos `prod-lomadee:` sem affiliateUrl geram `lmdee.link` via shortener, cacheado em `TrackedLink`).
 - `Product.discountPct` — % de desconto calculado no sync (alimenta ordenação "Maior desconto" e relacionadas). Manter atualizado em `scripts/sync.ts` e `src/lib/syncer.ts`.
 - Home tem abas/ordenação/filtros via query params: `aba` (ofertas|lojas|ml|awin — cada aba e uma fonte, sem misturar), `q`, `categoria`, `loja`, `ordem` (desconto|recentes|terminando|populares), `pagina`. URLs `/ir/` ficam fora do sitemap e são `Disallow` no robots.

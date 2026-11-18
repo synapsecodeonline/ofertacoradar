@@ -215,7 +215,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
       await upsertByExternalId(
         {
           ...p,
-          externalId: `prod:${p.externalId}`,
+          externalId: `prod-lomadee:${p.externalId}`,
           affiliateUrl: undefined,
         },
         p.organizationId ? orgNames.get(p.organizationId) : undefined,

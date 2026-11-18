@@ -64,7 +64,7 @@ async function main() {
           p.price !== 0,
       );
       for (const p of catalog) {
-        p.externalId = `prod:${p.externalId}`;
+        p.externalId = `prod-lomadee:${p.externalId}`;
         // sem link de afiliado pronto: o /ir gera lmdee.link no clique
         p.affiliateUrl = undefined;
       }
