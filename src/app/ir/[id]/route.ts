@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { prisma } from "@/lib/db";
 import { getTrackedUrl } from "@/lib/shortener";
+import { isBot } from "@/lib/bots";
 
 export async function GET(
   request: NextRequest,
@@ -16,9 +17,11 @@ export async function GET(
     return NextResponse.redirect(new URL("/", request.url), 302);
   }
 
-  // registra o clique em background, pulando admin logado.
+  // registra o clique em background, pulando admin logado e bots.
   // Sessao validada via Supabase (autoritativo) — nao atrasa o redirect.
   after(async () => {
+    const userAgent = request.headers.get("user-agent");
+    if (isBot(userAgent)) return;
     try {
       // client montado com os cookies da request — funciona dentro de
       // after(), onde next/headers nao tem escopo
@@ -42,7 +45,7 @@ export async function GET(
         data: {
           productId: product.id,
           referer: request.headers.get("referer"),
-          userAgent: request.headers.get("user-agent")?.slice(0, 500),
+          userAgent: userAgent?.slice(0, 500),
         },
       })
       .catch(() => {});

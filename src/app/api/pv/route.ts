@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/adminSession";
+import { isBot } from "@/lib/bots";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,11 @@ export async function POST(req: Request) {
     }
     // pula assets internos e o proprio endpoint
     if (path.startsWith("/api/") || /\.(png|jpe?g|webp|svg|ico|css|js)$/i.test(path)) {
+      return Response.json({ ok: true });
+    }
+
+    // bots/crawlers nao sao visitas reais
+    if (isBot(req.headers.get("user-agent"))) {
       return Response.json({ ok: true });
     }
 
