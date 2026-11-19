@@ -10,7 +10,8 @@
     "sync": "tsx --env-file=.env scripts/sync.ts",
     "db:push": "prisma db push",
     "postinstall": "prisma generate",
-    "recategorize": "tsx --env-file=.env scripts/recategorize.ts"
+    "recategorize": "tsx --env-file=.env scripts/recategorize.ts",
+    "checklinks": "tsx --env-file=.env scripts/checklinks.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -14,6 +14,11 @@ import {
   ML_LIMIT,
   ML_QUERIES,
 } from "./mercadolivre";
+import {
+  CHECKABLE_PREFIXES,
+  mapLimit,
+  validateProductLink,
+} from "./linkcheck";
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
@@ -54,11 +59,25 @@ async function upsertByExternalId(
     active: true,
   };
   if (!p.externalId) return;
-  await prisma.product.upsert({
-    where: { externalId: p.externalId },
-    create: { ...data, externalId: p.externalId },
-    update: data,
+  // active nao vai no update cego: produto desativado pelo validador de
+  // links (link morto) nao pode voltar so porque o feed ainda lista.
+  // So reativa quando a URL muda de verdade (link novo = merece recheck).
+  const { active: _active, ...rest } = data;
+  const urlChanged = await prisma.product.updateMany({
+    where: { externalId: p.externalId, url: { not: p.url } },
+    data: { ...rest, active: true },
   });
+  if (urlChanged.count === 0) {
+    const sameUrl = await prisma.product.updateMany({
+      where: { externalId: p.externalId, url: p.url },
+      data: rest,
+    });
+    if (sameUrl.count === 0) {
+      await prisma.product.create({
+        data: { ...data, externalId: p.externalId },
+      });
+    }
+  }
 }
 
 async function runCycle(apiKey: string, baseUrl: string) {
@@ -82,6 +101,54 @@ async function runCycle(apiKey: string, baseUrl: string) {
       where: { key: STATE_KEY },
       data: { phase, page },
     });
+
+  // Fase links: validacao rotativa de URLs de parceiros. Roda DEPOIS do
+  // catalogo ser atualizado — produto morto pelo feed nao volta porque o
+  // upsert preserva active=false quando a URL nao muda.
+  // Cursor = page (ultimo id verificado). ml: nunca e checado (anti-bot).
+  if (phase === "links") {
+    while (timeLeft()) {
+      const batch = await prisma.product.findMany({
+        where: {
+          active: true,
+          id: { gt: page },
+          OR: CHECKABLE_PREFIXES.map((pre) => ({
+            externalId: { startsWith: pre },
+          })),
+        },
+        orderBy: { id: "asc" },
+        take: 40,
+        select: { id: true, url: true, affiliateUrl: true },
+      });
+      if (batch.length === 0) {
+        phase = "done";
+        page = 1;
+        break;
+      }
+      const results = await mapLimit(batch, 6, (p) => validateProductLink(p));
+      let dead = 0;
+      for (let i = 0; i < batch.length; i++) {
+        if (results[i] === "dead") {
+          await prisma.product
+            .update({ where: { id: batch[i].id }, data: { active: false } })
+            .then(() => dead++)
+            .catch(() => {});
+        }
+      }
+      page = batch[batch.length - 1].id;
+      await save();
+      if (dead > 0) {
+        console.log(`[syncer] links: ${dead}/${batch.length} com link morto desativados`);
+      }
+    }
+    if (phase === "done") {
+      await prisma.syncState.update({
+        where: { key: STATE_KEY },
+        data: { phase: "done", page: 1, lastCycleAt: new Date() },
+      });
+    }
+    return;
+  }
 
   // Fase 1: marcas (base p/ nome/logo das ofertas)
   const brands = new Map<string, LomadeeBrand>();
@@ -223,7 +290,8 @@ async function runCycle(apiKey: string, baseUrl: string) {
       ).catch(() => {});
     }
     if (items.length < 100) {
-      phase = "done";
+      phase = "links";
+      page = 0; // cursor do validador comeca do id 0
     } else {
       page++;
     }

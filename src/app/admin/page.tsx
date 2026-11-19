@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
 import { SOURCE_LABEL, SOURCE_BADGE, type SourceKey } from "@/lib/sources";
+import { getRevenueReport, type SourceRevenue } from "@/lib/reports";
 import AdminSyncButton from "@/components/AdminSyncButton";
 
 export const dynamic = "force-dynamic";
@@ -111,6 +112,56 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">{title}</h2>
       {children}
     </section>
+  );
+}
+
+const REVENUE_LABEL: Record<string, string> = {
+  lomadee: "Lomadee",
+  mercadolivre: "Mercado Livre",
+  awin: "Awin",
+};
+
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function RevenueRow({ r }: { r: SourceRevenue }) {
+  const label = REVENUE_LABEL[r.source] ?? r.source;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-4 py-3 dark:border-zinc-800">
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-extrabold">{label}</span>
+        {r.available ? (
+          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+            API conectada
+          </span>
+        ) : (
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-zinc-500 dark:bg-zinc-800">
+            sem API pública
+          </span>
+        )}
+      </div>
+      {r.available ? (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <span className="text-zinc-500">
+            Pedidos: <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{r.orders}</b>
+          </span>
+          <span className="text-zinc-500">
+            Vendas: <b className="tabular-nums text-zinc-800 dark:text-zinc-200">{brl(r.sales ?? 0)}</b>
+          </span>
+          <span className="text-zinc-500">
+            Comissão:{" "}
+            <b className="tabular-nums text-emerald-600 dark:text-emerald-400">
+              {brl(r.commission ?? 0)}
+            </b>
+          </span>
+          <span className="text-xs text-zinc-400">
+            aprov. {brl(r.commissionApproved ?? 0)} · pend. {brl(r.commissionPending ?? 0)}
+          </span>
+        </div>
+      ) : (
+        <span className="text-xs text-zinc-400">{r.reason}</span>
+      )}
+    </div>
   );
 }
 
@@ -270,6 +321,9 @@ export default async function AdminPage() {
     prisma.syncState.findMany(),
   ]);
 
+  // Comissao real das fontes (cache de 1h dentro de reports.ts)
+  const revenue = await getRevenueReport(30);
+
   // ---- series diarias ----
   const fillDays = (rows: { day: Date; n: bigint }[]) => {
     const m = new Map(rows.map((r) => [r.day.toISOString().slice(0, 10), Number(r.n)]));
@@ -404,6 +458,22 @@ export default async function AdminPage() {
             <p className="mt-1 text-2xl font-extrabold tabular-nums">{k.value.toLocaleString("pt-BR")}</p>
           </div>
         ))}
+      </div>
+
+      {/* Receita / comissao estimada */}
+      <div className="mb-8">
+        <Card title="Receita / comissão estimada — 30 dias">
+          <div className="flex flex-col gap-3">
+            {revenue.map((r) => (
+              <RevenueRow key={r.source} r={r} />
+            ))}
+          </div>
+          <p className="mt-4 text-[11px] text-zinc-400">
+            Comissão Lomadee vem da API de pedidos (dados reais, podem incluir
+            pedidos ainda pendentes de aprovação). ML e Awin não expõem API
+            pública de ganhos.
+          </p>
+        </Card>
       </div>
 
       {/* Graficos diarios */}
