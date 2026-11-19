@@ -319,7 +319,7 @@ async function runMLCycle() {
 }
 
 // Chamado via after() junto do maybeSyncLomadee: nunca bloqueia a resposta
-export async function maybeSyncML() {
+export async function maybeSyncML(force = false) {
   if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) return;
 
   await prisma.syncState.upsert({
@@ -336,6 +336,7 @@ export async function maybeSyncML() {
   const lockFresh =
     state.busyAt && now - state.busyAt.getTime() < LOCK_STALE_MS;
   const cycleFresh =
+    !force &&
     state.phase === "done" &&
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
@@ -365,7 +366,7 @@ export async function maybeSyncML() {
 }
 
 // Chamado via after() nas paginas: nunca bloqueia a resposta
-export async function maybeSyncLomadee() {
+export async function maybeSyncLomadee(force = false) {
   const apiKey = process.env.LOMADEE_API_KEY;
   if (!apiKey) return;
   const baseUrl = process.env.LOMADEE_API_URL ?? "https://api.lomadee.com.br";
@@ -382,6 +383,7 @@ export async function maybeSyncLomadee() {
   const lockFresh =
     state.busyAt && now - state.busyAt.getTime() < LOCK_STALE_MS;
   const cycleFresh =
+    !force &&
     state.phase === "done" &&
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;

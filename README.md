@@ -47,6 +47,10 @@ Sem `LOMADEE_API_KEY`, use `FEED_URL` apontando para um feed XML/JSON de ofertas
 | `/ofertas-do-dia` | página | Curadoria diária: terminando em breve, mais aproveitadas (24h) e maiores descontos. Indexável, no sitemap. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo p/ Instagram (login obrigatório): top produtos ranqueados por cliques 24h + desconto, com `cardUrl` (`/api/card`), `pageUrl` e `caption` prontos. `?count=` (máx 20) e `?size=feed|story`. |
 | `/ir/[id]` | route handler | Redirect 302 para a loja/oferta, registrando `Click`. Suporta `?src=` → `utm_source` no destino final. |
+| `/admin` | página | Painel restrito a logados: KPIs de cliques/visitas, gráficos diários, cliques por fonte/dia da semana/horário/dispositivo/categoria, páginas de origem, top produtos/lojas, terminando em breve, produtos sem imagem, alertas de sync e status das fontes. Botão "Sincronizar agora" + export CSV. |
+| `/api/pv` | route handler | Recebe pageviews do `PageViewTracker` e grava em `Click` com produto sentinela `internal:pageview` (o role do banco não tem DDL para tabela própria). |
+| `/api/admin/sync` | route handler | POST (login): força ciclo de sync Lomadee+ML. |
+| `/api/admin/export` | route handler | GET (login): CSV dos cliques dos últimos 30 dias. |
 | `/api/card/[id]` | route handler | PNG de divulgação via `next/og`: `?size=feed` (1080×1080, default) ou `?size=story` (1080×1920). |
 | `/sitemap.xml` | metadata route | Home + até 5.000 produtos ativos. |
 | `/robots.txt` | metadata route | Libera tudo exceto `/ir/`; aponta para o sitemap. |

@@ -3,12 +3,15 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
+import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
 import { SOURCE_LABEL, SOURCE_BADGE, type SourceKey } from "@/lib/sources";
+import AdminSyncButton from "@/components/AdminSyncButton";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 
 function sourceSql(col: string) {
   return `CASE
@@ -18,18 +21,25 @@ function sourceSql(col: string) {
     ELSE 'outros' END`;
 }
 
+const SRC_CASE = sourceSql('p."externalId"');
+// Cliques de afiliado = todos menos os pageviews (produto sentinela)
+const NOT_PV = (pvId: number) => `c."productId" <> ${pvId}`;
+
 function BarChart({
   data,
   labels,
+  color = "fill-emerald-500/80",
 }: {
   data: number[];
   labels: string[];
+  color?: string;
 }) {
   const max = Math.max(1, ...data);
   const W = 720;
-  const H = 180;
+  const H = 160;
   const pad = 8;
   const bw = (W - pad * 2) / Math.max(1, data.length);
+  const step = Math.max(1, Math.ceil(labels.length / 12));
   return (
     <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full">
       {data.map((v, i) => {
@@ -38,41 +48,20 @@ function BarChart({
         const y = H - h;
         return (
           <g key={i}>
-            <rect
-              x={x}
-              y={y}
-              width={bw * 0.7}
-              height={Math.max(1, h)}
-              rx={2}
-              className="fill-emerald-500/80"
-            >
-              <title>{`${labels[i]}: ${v} cliques`}</title>
+            <rect x={x} y={y} width={bw * 0.7} height={Math.max(1, h)} rx={2} className={color}>
+              <title>{`${labels[i]}: ${v}`}</title>
             </rect>
             {v > 0 && (
-              <text
-                x={x + (bw * 0.7) / 2}
-                y={y - 3}
-                textAnchor="middle"
-                className="fill-zinc-400"
-                fontSize={9}
-              >
+              <text x={x + (bw * 0.7) / 2} y={y - 3} textAnchor="middle" className="fill-zinc-400" fontSize={9}>
                 {v}
               </text>
             )}
           </g>
         );
       })}
-      {/* labels: 1 a cada ~5 dias */}
       {labels.map((l, i) =>
-        i % Math.ceil(labels.length / 10) === 0 ? (
-          <text
-            key={i}
-            x={pad + i * bw + bw * 0.35}
-            y={H + 14}
-            textAnchor="middle"
-            className="fill-zinc-400"
-            fontSize={9}
-          >
+        i % step === 0 ? (
+          <text key={i} x={pad + i * bw + bw * 0.35} y={H + 14} textAnchor="middle" className="fill-zinc-400" fontSize={9}>
             {l}
           </text>
         ) : null,
@@ -81,29 +70,47 @@ function BarChart({
   );
 }
 
-function HBar({ label, value, max, badge }: { label: string; value: number; max: number; badge?: string }) {
+function HBar({
+  label,
+  value,
+  max,
+  badge,
+  sub,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  badge?: string;
+  sub?: string;
+}) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      {badge && (
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${badge}`}>
+      {badge ? (
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${badge}`}>
+          {label}
+        </span>
+      ) : (
+        <span className="w-32 shrink-0 truncate text-xs font-semibold text-zinc-600 dark:text-zinc-300" title={label}>
           {label}
         </span>
       )}
-      {!badge && (
-        <span className="w-28 truncate text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-          {label}
-        </span>
-      )}
-      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <div
-          className="h-full rounded-full bg-emerald-500"
-          style={{ width: `${Math.max(2, (value / max) * 100)}%` }}
-        />
+      <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(2, (value / max) * 100)}%` }} />
       </div>
-      <span className="w-14 text-right text-xs font-bold tabular-nums text-zinc-500">
+      <span className="shrink-0 text-right text-xs font-bold tabular-nums text-zinc-500">
         {value.toLocaleString("pt-BR")}
+        {sub && <span className="ml-1 font-medium text-zinc-400">{sub}</span>}
       </span>
     </div>
+  );
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -116,68 +123,178 @@ export default async function AdminPage() {
   const d1 = new Date(now.getTime() - DAY_MS);
   const d7 = new Date(now.getTime() - 7 * DAY_MS);
   const d30 = new Date(now.getTime() - 30 * DAY_MS);
+  const in72h = new Date(now.getTime() + 72 * HOUR_MS);
 
-  const srcCase = sourceSql('p."externalId"');
+  const pv = await prisma.product.findUnique({
+    where: { externalId: PV_EXTERNAL_ID },
+    select: { id: true },
+  });
+  const pvId = pv?.id ?? -1;
 
   const [
+    pvDay,
     clicksDay,
     clicksTotal,
     clicks24h,
     clicks7d,
+    pvTotal,
+    pv24h,
+    pv7d,
     clicksBySrc,
+    clicksByDow,
+    clicksByHour,
+    topReferers,
+    devices,
+    clicksByCategory,
     topProducts,
     topMerchants,
+    endingCount,
+    endingTop,
+    noImage,
+    lastUpdate,
     syncStates,
   ] = await Promise.all([
+    // pageviews por dia (30d)
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS n
-       FROM "Click" WHERE "createdAt" >= $1
+       FROM "Click" WHERE "productId" = ${pvId} AND "createdAt" >= $1
        GROUP BY 1 ORDER BY 1`,
       d30,
     ),
-    prisma.click.count(),
-    prisma.click.count({ where: { createdAt: { gte: d1 } } }),
-    prisma.click.count({ where: { createdAt: { gte: d7 } } }),
-    prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
-      `SELECT ${srcCase} AS src, COUNT(*) AS n
-       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
-       WHERE c."createdAt" >= $1 GROUP BY 1 ORDER BY 2 DESC`,
+    // cliques afiliado por dia (30d)
+    prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
+      `SELECT date_trunc('day', c."createdAt") AS day, COUNT(*) AS n
+       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY 1 ORDER BY 1`,
       d30,
     ),
-    prisma.$queryRawUnsafe<
-      { id: number; title: string; merchant: string | null; n: bigint }[]
-    >(
+    prisma.click.count({ where: { NOT: { productId: pvId } } }),
+    prisma.click.count({ where: { createdAt: { gte: d1 }, NOT: { productId: pvId } } }),
+    prisma.click.count({ where: { createdAt: { gte: d7 }, NOT: { productId: pvId } } }),
+    prisma.click.count({ where: { productId: pvId } }),
+    prisma.click.count({ where: { productId: pvId, createdAt: { gte: d1 } } }),
+    prisma.click.count({ where: { productId: pvId, createdAt: { gte: d7 } } }),
+    // cliques por fonte (30d)
+    prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
+      `SELECT ${SRC_CASE} AS src, COUNT(*) AS n
+       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
+       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1 GROUP BY 1 ORDER BY 2 DESC`,
+      d30,
+    ),
+    // cliques por dia da semana (30d)
+    prisma.$queryRawUnsafe<{ dow: number; n: bigint }[]>(
+      `SELECT EXTRACT(ISODOW FROM c."createdAt")::int AS dow, COUNT(*) AS n
+       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY 1 ORDER BY 1`,
+      d30,
+    ),
+    // cliques por hora do dia (30d)
+    prisma.$queryRawUnsafe<{ hr: number; n: bigint }[]>(
+      `SELECT EXTRACT(HOUR FROM c."createdAt")::int AS hr, COUNT(*) AS n
+       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY 1 ORDER BY 1`,
+      d30,
+    ),
+    // paginas que mais geram clique (referer do /ir)
+    prisma.$queryRawUnsafe<{ referer: string; n: bigint }[]>(
+      `SELECT c.referer, COUNT(*) AS n
+       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+         AND c.referer IS NOT NULL AND c.referer <> ''
+       GROUP BY c.referer ORDER BY n DESC LIMIT 10`,
+      d30,
+    ),
+    // dispositivo estimado pelo user-agent
+    prisma.$queryRawUnsafe<{ dev: string; n: bigint }[]>(
+      `SELECT CASE
+         WHEN c."userAgent" ~* 'bot|crawl|spider|slurp|facebookexternal' THEN 'bot'
+         WHEN c."userAgent" ~* 'mobile|android|iphone' THEN 'mobile'
+         ELSE 'desktop' END AS dev,
+         COUNT(*) AS n
+       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY 1 ORDER BY 2 DESC`,
+      d30,
+    ),
+    // cliques por categoria (30d)
+    prisma.$queryRawUnsafe<{ cat: string | null; n: bigint }[]>(
+      `SELECT p.category AS cat, COUNT(*) AS n
+       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
+       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY p.category ORDER BY n DESC LIMIT 10`,
+      d30,
+    ),
+    // top produtos / lojas (30d)
+    prisma.$queryRawUnsafe<{ id: number; title: string; merchant: string | null; n: bigint }[]>(
       `SELECT p.id, p.title, p.merchant, COUNT(*) AS n
        FROM "Click" c JOIN "Product" p ON p.id = c."productId"
-       WHERE c."createdAt" >= $1
-       GROUP BY p.id, p.title, p.merchant
-       ORDER BY n DESC LIMIT 10`,
+       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       GROUP BY p.id, p.title, p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
     ),
     prisma.$queryRawUnsafe<{ merchant: string; n: bigint }[]>(
       `SELECT p.merchant, COUNT(*) AS n
        FROM "Click" c JOIN "Product" p ON p.id = c."productId"
-       WHERE c."createdAt" >= $1 AND p.merchant IS NOT NULL
+       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1 AND p.merchant IS NOT NULL
        GROUP BY p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
+    ),
+    // ofertas terminando em <72h
+    prisma.product.count({
+      where: {
+        active: true,
+        imageUrl: { not: null },
+        endsAt: { gte: now, lte: in72h },
+      },
+    }),
+    prisma.$queryRawUnsafe<{ id: number; title: string; n: bigint }[]>(
+      `SELECT p.id, p.title, COUNT(c.id) AS n
+       FROM "Product" p LEFT JOIN "Click" c ON c."productId" = p.id
+         AND c."createdAt" >= $2
+       WHERE p.active AND p."imageUrl" IS NOT NULL
+         AND p."endsAt" >= $1 AND p."endsAt" <= $3
+       GROUP BY p.id, p.title ORDER BY n DESC LIMIT 5`,
+      now,
+      d30,
+      in72h,
+    ),
+    // produtos ativos sem imagem, por fonte
+    prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
+      `SELECT ${sourceSql('"externalId"')} AS src, COUNT(*) AS n
+       FROM "Product" WHERE active AND "imageUrl" IS NULL
+       GROUP BY 1 ORDER BY 2 DESC`,
+    ),
+    // ultima atualizacao por fonte (saude do catalogo)
+    prisma.$queryRawUnsafe<{ src: string; last: Date | null }[]>(
+      `SELECT ${sourceSql('"externalId"')} AS src, MAX("updatedAt") AS last
+       FROM "Product" GROUP BY 1`,
     ),
     prisma.syncState.findMany(),
   ]);
 
-  // Preenche dias faltantes do grafico (30 dias)
-  const dayMap = new Map(
-    clicksDay.map((r) => [r.day.toISOString().slice(0, 10), Number(r.n)]),
-  );
-  const chartDays: { label: string; n: number }[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * DAY_MS);
-    const key = d.toISOString().slice(0, 10);
-    chartDays.push({
-      label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-      n: dayMap.get(key) ?? 0,
-    });
-  }
-  const clicks30d = chartDays.reduce((a, d) => a + d.n, 0);
+  // ---- series diarias ----
+  const fillDays = (rows: { day: Date; n: bigint }[]) => {
+    const m = new Map(rows.map((r) => [r.day.toISOString().slice(0, 10), Number(r.n)]));
+    const out: { label: string; n: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * DAY_MS);
+      out.push({
+        label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        n: m.get(d.toISOString().slice(0, 10)) ?? 0,
+      });
+    }
+    return out;
+  };
+  const clicksSeries = fillDays(clicksDay);
+  const pvSeries = fillDays(pvDay);
+  const clicks30d = clicksSeries.reduce((a, d) => a + d.n, 0);
+  const pv30d = pvSeries.reduce((a, d) => a + d.n, 0);
+
+  // ---- dia da semana / hora ----
+  const DOW = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const dowMap = new Map(clicksByDow.map((r) => [r.dow, Number(r.n)]));
+  const dowData = [1, 2, 3, 4, 5, 6, 7].map((d) => dowMap.get(d) ?? 0);
+  const hrMap = new Map(clicksByHour.map((r) => [r.hr, Number(r.n)]));
+  const hrData = Array.from({ length: 24 }, (_, h) => hrMap.get(h) ?? 0);
+  const hrLabels = Array.from({ length: 24 }, (_, h) => `${h}h`);
 
   const srcLabel = (s: string) =>
     s === "outros" ? "Outros" : SOURCE_LABEL[s as SourceKey] ?? s;
@@ -186,114 +303,192 @@ export default async function AdminPage() {
       ? SOURCE_BADGE[s as SourceKey]
       : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300";
 
-  const maxSrcClick = Math.max(1, ...clicksBySrc.map((r) => Number(r.n)));
-  const maxMerchant = Math.max(1, ...topMerchants.map((r) => Number(r.n)));
-  // SyncState guarda tambem segredos (ml-token = OAuth ML). So exibe
-  // chaves de fonte conhecidas — nunca renderiza tokens.
-  const SYNC_LABELS: Record<string, string> = {
-    main: "Lomadee",
-    ml: "Mercado Livre",
-  };
+  // ---- alertas ----
+  const alerts: { tone: "red" | "amber"; text: string }[] = [];
+  const SYNC_LABELS: Record<string, string> = { main: "Lomadee", ml: "Mercado Livre" };
   const syncStatesSafe = syncStates.filter((s) => s.key in SYNC_LABELS);
+  for (const s of syncStatesSafe) {
+    const name = SYNC_LABELS[s.key];
+    if (s.busyAt && now.getTime() - s.busyAt.getTime() > 3 * 60_000) {
+      alerts.push({ tone: "red", text: `Sync de ${name} travado (trava com mais de 3min).` });
+    } else if (s.phase !== "done" && (!s.lastCycleAt || now.getTime() - s.lastCycleAt.getTime() > 2 * HOUR_MS)) {
+      alerts.push({ tone: "amber", text: `Sync de ${name} sem ciclo completo há mais de 2h (fase: ${s.phase}).` });
+    }
+  }
+  const lastUpdMap = new Map(lastUpdate.map((r) => [r.src, r.last]));
+  for (const [src, last] of lastUpdMap) {
+    if (src === "outros" || !last) continue;
+    if (now.getTime() - last.getTime() > 7 * DAY_MS) {
+      alerts.push({ tone: "amber", text: `Fonte ${srcLabel(src)} sem produtos atualizados há mais de 7 dias.` });
+    }
+  }
+  if (clicks24h === 0) {
+    alerts.push({ tone: "amber", text: "Nenhum clique de afiliado nas últimas 24h." });
+  }
+
+  // ---- helpers de exibicao ----
+  const maxNum = (...arrs: { n: bigint | number }[][]) =>
+    Math.max(1, ...arrs.flat().map((r) => Number(r.n)));
+
+  const maxSrc = maxNum(clicksBySrc);
+  const maxDow = maxNum(clicksByDow.map((r) => ({ n: r.n })));
+  const maxHr = maxNum(clicksByHour);
+  const maxRef = maxNum(topReferers);
+  const maxCat = maxNum(clicksByCategory);
+  const maxDev = maxNum(devices);
+  const maxMerchant = maxNum(topMerchants);
 
   const kpis = [
     { label: "Cliques 24h", value: clicks24h },
-    { label: "Cliques 7 dias", value: clicks7d },
-    { label: "Cliques 30 dias", value: clicks30d },
-    { label: "Total de cliques", value: clicksTotal },
+    { label: "Cliques 7d", value: clicks7d },
+    { label: "Cliques 30d", value: clicks30d },
+    { label: "Total cliques", value: clicksTotal },
+    { label: "Visitas 24h", value: pv24h },
+    { label: "Visitas 7d", value: pv7d },
+    { label: "Visitas 30d", value: pv30d },
+    { label: "Total visitas", value: pvTotal },
   ];
+
+  const catLabel = (c: string | null) =>
+    c ? c.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Sem categoria";
+  const devLabel: Record<string, string> = { mobile: "Mobile", desktop: "Desktop", bot: "Bots" };
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-      <header className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-            Painel
-          </p>
-          <h1 className="text-3xl font-extrabold tracking-tight">
-            Estatísticas do site
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Logado como {data.user.email}
-          </p>
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Painel</p>
+          <h1 className="text-3xl font-extrabold tracking-tight">Estatísticas do site</h1>
+          <p className="mt-1 text-sm text-zinc-500">Logado como {data.user.email}</p>
         </div>
-        <Link
-          href="/ofertas-do-dia"
-          className="rounded-full bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:bg-zinc-900"
-        >
-          ← Voltar ao site
-        </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/admin/export"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            Exportar CSV
+          </a>
+          <AdminSyncButton />
+          <Link
+            href="/ofertas-do-dia"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            ← Site
+          </Link>
+        </div>
       </header>
+
+      {/* Alertas */}
+      {alerts.length > 0 && (
+        <div className="mb-6 flex flex-col gap-2">
+          {alerts.map((a, i) => (
+            <div
+              key={i}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+                a.tone === "red"
+                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+                  : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+              }`}
+            >
+              {a.text}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpis.map((k) => (
-          <div
-            key={k.label}
-            className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-              {k.label}
-            </p>
-            <p className="mt-1 text-2xl font-extrabold tabular-nums">
-              {k.value.toLocaleString("pt-BR")}
-            </p>
+          <div key={k.label} className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">{k.label}</p>
+            <p className="mt-1 text-2xl font-extrabold tabular-nums">{k.value.toLocaleString("pt-BR")}</p>
           </div>
         ))}
       </div>
 
-      {/* Grafico de cliques/dia */}
-      <section className="mb-8 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-          Cliques por dia — últimos 30 dias
-        </h2>
-        <BarChart data={chartDays.map((d) => d.n)} labels={chartDays.map((d) => d.label)} />
-      </section>
+      {/* Graficos diarios */}
+      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+        <Card title="Cliques por dia — 30 dias">
+          <BarChart data={clicksSeries.map((d) => d.n)} labels={clicksSeries.map((d) => d.label)} />
+        </Card>
+        <Card title="Visitas por dia — 30 dias">
+          <BarChart
+            data={pvSeries.map((d) => d.n)}
+            labels={pvSeries.map((d) => d.label)}
+            color="fill-sky-500/80"
+          />
+        </Card>
+      </div>
 
-      <div className="mb-8">
-        {/* Cliques por fonte */}
-        <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-            Cliques por fonte — 30 dias
-          </h2>
-          <div className="flex flex-col gap-2.5">
-            {clicksBySrc.length === 0 && (
-              <p className="text-sm text-zinc-400">Sem cliques no período.</p>
-            )}
-            {clicksBySrc.map((r) => (
-              <HBar
-                key={r.src}
-                label={srcLabel(r.src)}
-                badge={srcBadge(r.src)}
-                value={Number(r.n)}
-                max={maxSrcClick}
-              />
+      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+        {/* Dia da semana */}
+        <Card title="Cliques por dia da semana — 30 dias">
+          <div className="flex flex-col gap-2">
+            {DOW.slice(1).map((d, i) => (
+              <HBar key={d} label={d} value={dowData[i]} max={maxDow} />
             ))}
           </div>
-        </section>
+        </Card>
+        {/* Horario */}
+        <Card title="Cliques por horário — 30 dias">
+          <BarChart data={hrData} labels={hrLabels} color="fill-violet-500/80" />
+        </Card>
+      </div>
+
+      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+        {/* Origem */}
+        <Card title="Páginas que mais geram clique — 30 dias">
+          <div className="flex flex-col gap-2">
+            {topReferers.length === 0 && <p className="text-sm text-zinc-400">Sem dados.</p>}
+            {topReferers.map((r) => (
+              <HBar key={r.referer} label={r.referer} value={Number(r.n)} max={maxRef} />
+            ))}
+          </div>
+        </Card>
+        {/* Dispositivo */}
+        <Card title="Dispositivo — 30 dias">
+          <div className="flex flex-col gap-2">
+            {devices.map((d) => (
+              <HBar key={d.dev} label={devLabel[d.dev] ?? d.dev} value={Number(d.n)} max={maxDev} />
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+        {/* Categoria */}
+        <Card title="Cliques por categoria — 30 dias">
+          <div className="flex flex-col gap-2">
+            {clicksByCategory.map((c) => (
+              <HBar key={c.cat ?? "null"} label={catLabel(c.cat)} value={Number(c.n)} max={maxCat} />
+            ))}
+          </div>
+        </Card>
+        {/* Fonte */}
+        <Card title="Cliques por fonte — 30 dias">
+          <div className="flex flex-col gap-2">
+            {clicksBySrc.length === 0 && <p className="text-sm text-zinc-400">Sem cliques.</p>}
+            {clicksBySrc.map((r) => (
+              <HBar key={r.src} label={srcLabel(r.src)} badge={srcBadge(r.src)} value={Number(r.n)} max={maxSrc} />
+            ))}
+          </div>
+        </Card>
       </div>
 
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
         {/* Top produtos */}
-        <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-            Produtos mais clicados — 30 dias
-          </h2>
-          <ol className="flex flex-col gap-2">
+        <Card title="Produtos mais clicados — 30 dias">
+          <ol className="flex flex-col gap-1">
             {topProducts.map((p, i) => (
               <li key={p.id}>
                 <Link
                   href={`/produto/${p.id}`}
                   className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                 >
-                  <span className="w-6 text-center text-sm font-extrabold text-zinc-300">
-                    {i + 1}
-                  </span>
+                  <span className="w-6 text-center text-sm font-extrabold text-zinc-300">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{p.title}</p>
-                    <p className="truncate text-xs text-zinc-400">
-                      {p.merchant ?? "—"}
-                    </p>
+                    <p className="truncate text-xs text-zinc-400">{p.merchant ?? "—"}</p>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                     {Number(p.n)}
@@ -301,74 +496,78 @@ export default async function AdminPage() {
                 </Link>
               </li>
             ))}
-            {topProducts.length === 0 && (
-              <p className="text-sm text-zinc-400">Sem cliques no período.</p>
-            )}
+            {topProducts.length === 0 && <p className="text-sm text-zinc-400">Sem cliques.</p>}
           </ol>
-        </section>
-
+        </Card>
         {/* Top lojas */}
-        <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-            Lojas mais clicadas — 30 dias
-          </h2>
-          <div className="flex flex-col gap-2.5">
+        <Card title="Lojas mais clicadas — 30 dias">
+          <div className="flex flex-col gap-2">
             {topMerchants.map((m) => (
-              <HBar
-                key={m.merchant}
-                label={m.merchant}
-                value={Number(m.n)}
-                max={maxMerchant}
-              />
+              <HBar key={m.merchant} label={m.merchant} value={Number(m.n)} max={maxMerchant} />
             ))}
-            {topMerchants.length === 0 && (
-              <p className="text-sm text-zinc-400">Sem cliques no período.</p>
-            )}
+            {topMerchants.length === 0 && <p className="text-sm text-zinc-400">Sem cliques.</p>}
           </div>
-        </section>
+        </Card>
       </div>
 
-      {/* Status do sync */}
-      <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-          Sincronização das fontes
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {syncStatesSafe.length === 0 && (
-            <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
-          )}
-          {syncStatesSafe.map((s) => (
-            <div
-              key={s.key}
-              className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold">
-                  {SYNC_LABELS[s.key]}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                    s.busyAt
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                  }`}
+      <div className="mb-8 grid gap-4 lg:grid-cols-3">
+        {/* Terminando em breve */}
+        <Card title="Terminando em breve">
+          <p className="mb-3 text-3xl font-extrabold tabular-nums">{endingCount}</p>
+          <p className="mb-3 text-xs text-zinc-500">ofertas ativas com fim em menos de 72h</p>
+          <ol className="flex flex-col gap-1">
+            {endingTop.map((p, i) => (
+              <li key={p.id}>
+                <Link
+                  href={`/produto/${p.id}`}
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                 >
-                  {s.busyAt ? "sincronizando" : "ocioso"}
-                </span>
+                  <span className="text-xs font-extrabold text-zinc-300">{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{p.title}</span>
+                  <span className="text-xs font-bold text-zinc-400">{Number(p.n)} cliques</span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </Card>
+        {/* Sem imagem */}
+        <Card title="Produtos sem imagem">
+          <div className="flex flex-col gap-2">
+            {noImage.length === 0 && <p className="text-sm text-zinc-400">Nenhum. Catálogo limpo.</p>}
+            {noImage.map((r) => (
+              <HBar key={r.src} label={srcLabel(r.src)} badge={srcBadge(r.src)} value={Number(r.n)} max={Math.max(1, ...noImage.map((x) => Number(x.n)))} />
+            ))}
+          </div>
+        </Card>
+        {/* Sync */}
+        <Card title="Sincronização das fontes">
+          <div className="flex flex-col gap-2.5">
+            {syncStatesSafe.length === 0 && <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>}
+            {syncStatesSafe.map((s) => (
+              <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold">{SYNC_LABELS[s.key]}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                      s.busyAt
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                    }`}
+                  >
+                    {s.busyAt ? "sincronizando" : "ocioso"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  fase: {s.phase} · página {s.page}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  último ciclo: {s.lastCycleAt ? s.lastCycleAt.toLocaleString("pt-BR") : "nunca"}
+                </p>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
-                fase: {s.phase} · página {s.page}
-              </p>
-              <p className="text-xs text-zinc-500">
-                último ciclo:{" "}
-                {s.lastCycleAt
-                  ? s.lastCycleAt.toLocaleString("pt-BR")
-                  : "nunca"}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

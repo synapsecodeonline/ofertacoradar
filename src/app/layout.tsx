@@ -7,6 +7,7 @@ import { IconInstagram, IconTag } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
 import HashLink from "@/components/HashLink";
 import AuthButton from "@/components/AuthButton";
+import PageViewTracker from "@/components/PageViewTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -187,6 +188,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </div>
         </footer>
+        <PageViewTracker />
       </body>
     </html>
   );
