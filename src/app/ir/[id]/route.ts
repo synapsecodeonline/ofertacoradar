@@ -45,8 +45,16 @@ export async function GET(
   }
 
   // Produtos do catalogo nao tem link de afiliado pronto:
-  // gera um lmdee.link rastreado na hora (cacheado) ou cai na URL direta
-  if (!product.affiliateUrl && product.organizationId) {
+  // gera um lmdee.link rastreado na hora (cacheado) ou cai na URL direta.
+  // Excecao Rovitex: o lmdee.link adiciona ?lmdeeTracking= e o site deles
+  // responde 404 em qualquer URL com esse parametro — link direto funciona.
+  let rovitex = false;
+  try {
+    rovitex = /(^|\.)rovitex\.com\.br/.test(new URL(product.url).hostname);
+  } catch {
+    rovitex = product.url.includes("rovitex.com.br");
+  }
+  if (!product.affiliateUrl && product.organizationId && !rovitex) {
     const tracked = await getTrackedUrl(product.url, product.organizationId);
     return NextResponse.redirect(tracked ?? product.url, 302);
   }
