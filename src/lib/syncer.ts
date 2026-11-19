@@ -132,13 +132,16 @@ async function runCycle(apiKey: string, baseUrl: string) {
   const save = () =>
     prisma.syncState.update({
       where: { key: STATE_KEY },
-      data: { phase, page },
+      // busyAt como heartbeat: mantem a trava fresca enquanto ha
+      // progresso — sem isso ciclos longos (>3min) pareciam "travados"
+      // e a trava expirava permitindo syncs duplicados.
+      data: { phase, page, busyAt: new Date() },
     });
 
   // Fase links: validacao rotativa de URLs de parceiros. Roda DEPOIS do
   // catalogo ser atualizado — produto morto pelo feed nao volta porque o
   // upsert preserva active=false quando a URL nao muda.
-  // Cursor = page (ultimo id verificado). ml: nunca e checado (anti-bot).
+  // Cursor = page (ultimo id verificado). ml: validado via API oficial.
   if (phase === "links") {
     while (timeLeft()) {
       const batch = await prisma.product.findMany({
@@ -377,7 +380,8 @@ async function runMLCycle() {
   const save = () =>
     prisma.syncState.update({
       where: { key: ML_STATE_KEY },
-      data: { phase: `q:${qi}`, page },
+      // heartbeat da trava (ver runCycle)
+      data: { phase: `q:${qi}`, page, busyAt: new Date() },
     });
 
   let consecutiveFailures = 0;
