@@ -5,7 +5,7 @@ import { discountPercent, formatPrice } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
 import CountdownTimer from "@/components/CountdownTimer";
-import { IconFlame, IconTag, IconZap } from "@/components/Icons";
+import { IconTag, IconZap } from "@/components/Icons";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { HomeExperience } from "@/components/HomeExperience";
 import { ALL_SOURCES, SOURCE_PREFIX, sourceBadgeOf } from "@/lib/sources";
@@ -41,6 +41,8 @@ const CATALOG_PARAMS = [
   "fonte",
 ] as const;
 
+const RANKING_PAGE_SIZE = 24;
+
 export default async function OfertasDoDiaPage({
   searchParams,
 }: {
@@ -53,9 +55,10 @@ export default async function OfertasDoDiaPage({
     const v = sp[k];
     return typeof v === "string" ? v !== "" : Array.isArray(v) && v.length > 0;
   });
+  const rpage = Math.max(1, Number(sp.rpage) || 1);
   const now = new Date();
-  const [topDiscounts, endingSoon] = await Promise.all([
-    // Top descontos de cada fonte (ate 8 por fonte) -> merge ordenado.
+  const [topDiscountsAll, endingSoon] = await Promise.all([
+    // Top descontos de cada fonte -> merge ordenado e paginado.
     // Garante que Mercado Livre/Awin aparecam mesmo com poucos descontos.
     Promise.all(
       ALL_SOURCES.map((src) =>
@@ -66,14 +69,13 @@ export default async function OfertasDoDiaPage({
             externalId: { startsWith: SOURCE_PREFIX[src] },
           },
           orderBy: { discountPct: "desc" },
-          take: 8,
+          take: 30,
         }),
       ),
     ).then((groups) =>
       groups
         .flat()
-        .sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0))
-        .slice(0, 24),
+        .sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0)),
     ),
     prisma.product.findMany({
       where: {
@@ -85,7 +87,27 @@ export default async function OfertasDoDiaPage({
     }),
   ]);
 
-  const total = topDiscounts.length + endingSoon.length;
+  const rankingTotalPages = Math.max(
+    1,
+    Math.ceil(topDiscountsAll.length / RANKING_PAGE_SIZE),
+  );
+  const rpageSafe = Math.min(rpage, rankingTotalPages);
+  const topDiscounts = topDiscountsAll.slice(
+    (rpageSafe - 1) * RANKING_PAGE_SIZE,
+    rpageSafe * RANKING_PAGE_SIZE,
+  );
+  const rankingQs = (page: number) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (typeof v === "string" && v !== "") p.set(k, v);
+    }
+    if (page > 1) p.set("rpage", String(page));
+    else p.delete("rpage");
+    const s = p.toString();
+    return s ? `/ofertas-do-dia?${s}` : "/ofertas-do-dia";
+  };
+
+  const total = topDiscountsAll.length + endingSoon.length;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
@@ -180,22 +202,51 @@ export default async function OfertasDoDiaPage({
           )}
 
           <CollapsibleSection
+            className="border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
             title={
-              <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-                <IconTag className="h-4 w-4" /> Ranking do dia
-              </h2>
+              <span className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                  Ofertas do dia
+                </span>
+                <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
+                  Ranking do dia
+                </span>
+              </span>
             }
             meta={
-              <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-500/80">
-                Maiores descontos de hoje · {topDiscounts.length} ofertas
+              <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                Maiores descontos · {topDiscountsAll.length} ofertas
               </span>
             }
           >
-            <div className="grid grid-cols-2 gap-4 pb-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 pb-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {topDiscounts.map((p) => (
                 <ProductCard key={p.id} product={p} showSource />
               ))}
             </div>
+            {rankingTotalPages > 1 && (
+              <nav className="flex items-center justify-center gap-4 pt-4 text-sm">
+                {rpageSafe > 1 && (
+                  <Link
+                    href={rankingQs(rpageSafe - 1)}
+                    className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                  >
+                    ← Anterior
+                  </Link>
+                )}
+                <span className="text-zinc-500">
+                  Página {rpageSafe} de {rankingTotalPages}
+                </span>
+                {rpageSafe < rankingTotalPages && (
+                  <Link
+                    href={rankingQs(rpageSafe + 1)}
+                    className="rounded-full bg-white px-4 py-2 font-medium shadow-sm hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                  >
+                    Próxima →
+                  </Link>
+                )}
+              </nav>
+            )}
           </CollapsibleSection>
         </>
       )}
