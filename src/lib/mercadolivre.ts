@@ -1,10 +1,11 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { syncPrisma as prisma } from "./db";
 import type { NormalizedProduct } from "./feed";
 
 // ---- Mercado Livre (api.mercadolibre.com) ----
-// Auth: OAuth2. Tokens ficam no SyncState (key "ml-token", phase = JSON)
-// porque env vars nao podem ser reescritas em serverless e o role do app
-// nao tem DDL para criar tabela propria.
+// Auth: OAuth2. Tokens ficam no SyncState (key "ml-token"), cifrados em
+// repouso com AES-256-GCM (chave derivada do ML_CLIENT_SECRET) porque env
+// vars nao podem ser reescritas em serverless e o role do app nao tem DDL.
 // Bootstrap via web: /api/ml-auth/start -> /api/ml-auth/callback.
 //
 // NOTA: /sites/{site}/search foi descontinuado pelo ML (403 para todos os
@@ -40,6 +41,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const TOKEN_STATE_KEY = "ml-token";
 
+// ---- Criptografia dos tokens em repouso ----
+// Formato: "v1:<iv>:<tag>:<dados>" (base64). Le JSON legado sem prefixo.
+function tokenKey() {
+  return createHash("sha256")
+    .update(`ml-oauth:${process.env.ML_CLIENT_SECRET ?? ""}`)
+    .digest();
+}
+function encryptToken(json: string): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", tokenKey(), iv);
+  const data = Buffer.concat([c.update(json, "utf8"), c.final()]);
+  return `v1:${iv.toString("base64")}:${c.getAuthTag().toString("base64")}:${data.toString("base64")}`;
+}
+function decryptToken(s: string): string {
+  const [v, iv, tag, data] = s.split(":");
+  if (v !== "v1" || !iv || !tag || !data) throw new Error("token: formato invalido");
+  const d = createDecipheriv("aes-256-gcm", tokenKey(), Buffer.from(iv, "base64"));
+  d.setAuthTag(Buffer.from(tag, "base64"));
+  return Buffer.concat([d.update(Buffer.from(data, "base64")), d.final()]).toString("utf8");
+}
+
 interface StoredTokens {
   accessToken: string;
   refreshToken: string;
@@ -52,7 +74,8 @@ async function readTokens(): Promise<StoredTokens | null> {
     .catch(() => null);
   if (!row?.phase) return null;
   try {
-    return JSON.parse(row.phase) as StoredTokens;
+    const raw = row.phase.startsWith("v1:") ? decryptToken(row.phase) : row.phase;
+    return JSON.parse(raw) as StoredTokens;
   } catch {
     return null;
   }
@@ -68,10 +91,11 @@ export async function saveMlTokens(
     refreshToken,
     expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
   };
+  const sealed = encryptToken(JSON.stringify(payload));
   await prisma.syncState.upsert({
     where: { key: TOKEN_STATE_KEY },
-    create: { key: TOKEN_STATE_KEY, phase: JSON.stringify(payload) },
-    update: { phase: JSON.stringify(payload) },
+    create: { key: TOKEN_STATE_KEY, phase: sealed },
+    update: { phase: sealed },
   });
 }
 
