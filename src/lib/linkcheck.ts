@@ -1,5 +1,6 @@
 import { syncPrisma as prisma } from "./db";
 import { getMlAccessToken } from "./mercadolivre";
+import { getTrackedUrl } from "./shortener";
 
 // Validador de links de parceiros.
 // Usa GET (nao HEAD — lojas respondem 200 no HEAD e 404 no GET) e le so o
@@ -229,6 +230,7 @@ export async function validateProductLink(p: {
   affiliateUrl: string | null;
   title?: string | null;
   externalId?: string | null;
+  organizationId?: string | null;
 }): Promise<LinkStatus> {
   // expectProduct so para catalogo de produtos (prod:/aw:). Ofertas
   // camp-lomadee: apontam para categoria/home por configuracao da rede.
@@ -242,6 +244,22 @@ export async function validateProductLink(p: {
   // ml: vai pela API oficial do ML, nao por HTTP
   if (p.externalId?.startsWith("ml:")) {
     return checkMlProduct(p.externalId.slice(3));
+  }
+  // prod-lomadee: valida o lmdee.link REAL (o que o usuario clica).
+  // O shortener adiciona utm_source/utm_medium/lmdeeTracking no destino
+  // e algumas lojas (Rovitex) dao 404 com esses params — probe na URL
+  // crua nao detecta isso.
+  if (p.externalId?.startsWith("prod-lomadee:") && p.organizationId) {
+    const tracked = await getTrackedUrl(p.url, p.organizationId);
+    if (tracked) {
+      const st = await checkUrl(tracked, opts);
+      if (st === "dead") {
+        await new Promise((r) => setTimeout(r, 1_500));
+        return checkUrl(tracked, opts);
+      }
+      return st;
+    }
+    // sem shortener: cai no probe lmdeeTracking abaixo
   }
   const first = await checkUrl(linkTargetOf(p), opts);
   // Lojas instaveis (Rovitex) respondem 404 intermitente pro mesmo link —

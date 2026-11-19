@@ -29,6 +29,7 @@ async function main() {
       affiliateUrl: true,
       merchant: true,
       externalId: true,
+      organizationId: true,
     },
     orderBy: { id: "asc" },
   });

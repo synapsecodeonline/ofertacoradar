@@ -157,6 +157,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
           url: true,
           affiliateUrl: true,
           externalId: true,
+          organizationId: true,
         },
       });
       if (batch.length === 0) {

@@ -10,7 +10,7 @@ async function main() {
       active: false,
       OR: CHECKABLE_PREFIXES.map((pre) => ({ externalId: { startsWith: pre } })),
     },
-    select: { id: true, title: true, url: true, affiliateUrl: true, merchant: true, externalId: true },
+    select: { id: true, title: true, url: true, affiliateUrl: true, merchant: true, externalId: true, organizationId: true },
   });
   console.log(`${prods.length} produtos inativos para revalidar.`);
   const revive: number[] = [];
