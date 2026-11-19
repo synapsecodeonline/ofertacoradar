@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/adminSession";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +42,19 @@ export async function POST(req: Request) {
       return Response.json({ ok: true });
     }
 
-    // nao contabiliza pageview do proprio admin logado
+    // nao contabiliza pageview do proprio admin logado.
+    // 1) atalho: cookie de sessao presente -> pula sem chamar a API
+    // 2) sem cookie detectavel, valida a sessao de verdade via Supabase
+    //    (o nome/chunk do cookie pode variar — getUser e autoritativo)
     if (hasAdminSession(req.headers.get("cookie"))) {
       return Response.json({ ok: true });
+    }
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      if (data.user) return Response.json({ ok: true });
+    } catch {
+      // falha na auth nao deve impedir a contagem do pageview
     }
 
     const productId = await pvProductId();

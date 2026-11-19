@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { prisma } from "@/lib/db";
 import { getTrackedUrl } from "@/lib/shortener";
-import { hasAdminSession } from "@/lib/adminSession";
 
 export async function GET(
   request: NextRequest,
@@ -16,9 +16,28 @@ export async function GET(
     return NextResponse.redirect(new URL("/", request.url), 302);
   }
 
-  // nao contabiliza clique do proprio admin logado
-  if (!hasAdminSession(request.headers.get("cookie"))) {
-    prisma.click
+  // registra o clique em background, pulando admin logado.
+  // Sessao validada via Supabase (autoritativo) — nao atrasa o redirect.
+  after(async () => {
+    try {
+      // client montado com os cookies da request — funciona dentro de
+      // after(), onde next/headers nao tem escopo
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll: () => request.cookies.getAll(),
+            setAll: () => {},
+          },
+        },
+      );
+      const { data } = await supabase.auth.getUser();
+      if (data.user) return;
+    } catch {
+      // falha na auth nao impede o registro do clique
+    }
+    await prisma.click
       .create({
         data: {
           productId: product.id,
@@ -27,7 +46,7 @@ export async function GET(
         },
       })
       .catch(() => {});
-  }
+  });
 
   // Mercado Livre: programa de afiliados proprio (independente da Lomadee).
   // Com ML_AFFILIATE_TOOL/WORD configurados, manda para a pagina de catalogo
