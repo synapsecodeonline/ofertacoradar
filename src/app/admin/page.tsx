@@ -376,12 +376,9 @@ export default async function AdminPage() {
 
   // ---- alertas ----
   const alerts: { tone: "red" | "amber"; text: string }[] = [];
-  // Ciclo completo esperado por fonte: ML demora mais (31+ queries).
-  // "Sem ciclo" so alerta quando NAO ha sync rodando — busyAt fresco
-  // significa que esta trabalhando, nao travado.
-  const SYNC_SOURCES: Record<string, { name: string; maxCycleMs: number }> = {
-    main: { name: "Lomadee", maxCycleMs: 3 * HOUR_MS },
-    ml: { name: "Mercado Livre", maxCycleMs: 12 * HOUR_MS },
+  const SYNC_SOURCES: Record<string, { name: string }> = {
+    main: { name: "Lomadee" },
+    ml: { name: "Mercado Livre" },
   };
   // Linhas auxiliares do sync: `${key}:beat` = ultimo sinal de vida,
   // `${key}:err` = ultimo erro registrado pela fonte.
@@ -410,15 +407,9 @@ export default async function AdminPage() {
       });
     } else if (err?.busyAt && now.getTime() - err.busyAt.getTime() < 60 * 60_000) {
       alerts.push({ tone: "amber", text: `Sync de ${cfg.name} com erro recente: ${err.phase}` });
-    } else if (
-      s.phase !== "done" &&
-      (!s.lastCycleAt || now.getTime() - s.lastCycleAt.getTime() > cfg.maxCycleMs)
-    ) {
-      alerts.push({
-        tone: "amber",
-        text: `Sync de ${cfg.name} sem ciclo completo há mais de ${Math.round(cfg.maxCycleMs / HOUR_MS)}h (fase: ${s.phase}).`,
-      });
     }
+    // Ciclo completo demorado NAO e alerta: o badge "desatualizado" ja
+    // reflete a saude real do catalogo (freshness dos produtos).
   }
   const lastUpdMap = new Map(lastUpdate.map((r) => [r.src, r.last]));
   for (const [src, last] of lastUpdMap) {
@@ -427,9 +418,7 @@ export default async function AdminPage() {
       alerts.push({ tone: "amber", text: `Fonte ${srcLabel(src)} sem produtos atualizados há mais de 7 dias.` });
     }
   }
-  if (clicks24h === 0) {
-    alerts.push({ tone: "amber", text: "Nenhum clique de afiliado nas últimas 24h." });
-  }
+  // "Sem cliques 24h" nao e alerta: catalogo novo / pouco trafego e normal.
 
   // ---- helpers de exibicao ----
   const maxNum = (...arrs: { n: bigint | number }[][]) =>
@@ -535,7 +524,6 @@ export default async function AdminPage() {
               .filter((s) => s.key in SYNC_SOURCES)
               .map((s) => {
               const cfg = SYNC_SOURCES[s.key];
-              const cycleAge = s.lastCycleAt ? now.getTime() - s.lastCycleAt.getTime() : null;
               const busyFresh =
                 !!s.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000;
               const beatAt = beatMap.get(s.key)?.busyAt ?? null;
@@ -543,7 +531,12 @@ export default async function AdminPage() {
               const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
               const err = errMap.get(s.key);
               const errRecent = !!err?.busyAt && now.getTime() - err.busyAt.getTime() < 24 * 3_600_000;
-              const cycleFresh = cycleAge !== null && cycleAge < cfg.maxCycleMs;
+              // saude real do catalogo = quando os PRODUTOS da fonte
+              // foram atualizados pela ultima vez (nao o ciclo interno)
+              const prodSrc = s.key === "main" ? "lomadee" : s.key;
+              const prodLast = lastUpdMap.get(prodSrc) ?? null;
+              const prodAge = prodLast ? now.getTime() - prodLast.getTime() : null;
+              const catalogFresh = prodAge !== null && prodAge < 24 * 3_600_000;
               // status agregado: o que importa e o catalogo estar em dia
               // e a fonte estar respondendo — nao o estado interno do ciclo
               const status = busyFresh
@@ -552,7 +545,7 @@ export default async function AdminPage() {
                   ? { label: "parado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" }
                   : errRecent
                     ? { label: "com erro", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" }
-                    : cycleFresh
+                    : catalogFresh
                       ? { label: "atualizado", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" }
                       : { label: "desatualizado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" };
               return (
@@ -572,8 +565,7 @@ export default async function AdminPage() {
                     fase: {s.phase} · página {s.page}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    catálogo atualizado: {timeAgo(s.lastCycleAt, now)}
-                    {s.lastCycleAt && ` (${s.lastCycleAt.toLocaleString("pt-BR")})`}
+                    produtos atualizados: {timeAgo(prodLast, now)}
                   </p>
                   <p className="text-xs text-zinc-500">
                     última atividade do sync: {timeAgo(beatAt ?? s.busyAt, now)}
