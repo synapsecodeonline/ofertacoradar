@@ -34,12 +34,26 @@ const LOCK_STALE_MS = 3 * 60_000; // trava expira se o worker morrer
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Bloqueio manual de lojistas: produto dessas URLs nem entra no banco.
+// Rovitex: catalogo desatualizado na Lomadee, links quebram no site
+// deles — bloqueado ate o usuario dar o sinal.
+const BLOCKED_URL_PARTS = ["rovitex.com.br"];
+const BLOCKED_MERCHANTS = ["rovitex"];
+
 async function upsertByExternalId(
   p: NormalizedProduct,
   merchantFallback?: string,
   segment?: string | null,
 ) {
   const merchant = p.merchant ?? merchantFallback ?? null;
+  if (
+    BLOCKED_URL_PARTS.some(
+      (b) => p.url.includes(b) || (p.affiliateUrl ?? "").includes(b),
+    ) ||
+    (merchant ?? "").toLowerCase().includes(BLOCKED_MERCHANTS[0])
+  ) {
+    return;
+  }
   const category = resolveCategory(p.category, p.title, merchant, segment);
   const data = {
     title: p.title,
