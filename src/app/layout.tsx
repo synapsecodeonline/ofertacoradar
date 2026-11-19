@@ -109,12 +109,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 Cupons
               </Link>
-              <Link
-                href="/"
-                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Catálogo
-              </Link>
               </nav>
               <AuthButton />
               <ThemeToggle />
@@ -139,12 +133,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
                 Cupons
-              </Link>
-              <Link
-                href="/"
-                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
-              >
-                Catálogo
               </Link>
           </nav>
         </header>
@@ -179,9 +167,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </Link>
               <Link href="/cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Cupons do dia
-              </Link>
-              <Link href="/" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Catálogo
               </Link>
               <a
                 href={
