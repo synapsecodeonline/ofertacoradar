@@ -68,10 +68,14 @@ export default async function ProductPage({
     isLoggedIn = false;
   }
 
-  after(() => {
-    maybeSyncLomadee().catch(() => {});
-    maybeSyncML().catch(() => {});
-  });
+  // Retornar a promise e obrigatorio: sem isso o after() resolve na
+  // hora e a function congela apos a resposta, matando o sync.
+  after(() =>
+    Promise.all([
+      maybeSyncLomadee().catch(() => {}),
+      maybeSyncML().catch(() => {}),
+    ]),
+  );
 
   const discount = discountPercent(product.price, product.oldPrice);
   const saving =

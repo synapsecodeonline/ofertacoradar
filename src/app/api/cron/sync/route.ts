@@ -13,9 +13,13 @@ export async function GET(request: NextRequest) {
   if (!secret || request.nextUrl.searchParams.get("key") !== secret) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  after(() => {
-    maybeSyncLomadee().catch(() => {});
-    maybeSyncML().catch(() => {});
-  });
+  // IMPORTANTE: retornar a promise — sem isso o after() resolve na hora,
+  // a function congela apos a resposta e o sync morre no meio.
+  after(() =>
+    Promise.all([
+      maybeSyncLomadee().catch(() => {}),
+      maybeSyncML().catch(() => {}),
+    ]),
+  );
   return Response.json({ ok: true });
 }

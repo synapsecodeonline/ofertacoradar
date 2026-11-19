@@ -51,11 +51,15 @@ export default async function OfertasDoDiaPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sp = await searchParams;
-  // Sync das fontes a cada pageview (nunca bloqueia a resposta)
-  after(() => {
-    maybeSyncLomadee().catch(() => {});
-    maybeSyncML().catch(() => {});
-  });
+  // Sync das fontes a cada pageview (nunca bloqueia a resposta).
+  // Retornar a promise e obrigatorio: sem isso o after() resolve na
+  // hora e a function congela logo apos a resposta, matando o sync.
+  after(() =>
+    Promise.all([
+      maybeSyncLomadee().catch(() => {}),
+      maybeSyncML().catch(() => {}),
+    ]),
+  );
   // Sem params de catalogo = tela "Ofertas do dia" (so o dia).
   // Com ?aba=/?loja=/filtros = visao completa de catalogo.
   const catalogMode = CATALOG_PARAMS.some((k) => {

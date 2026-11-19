@@ -233,11 +233,15 @@ export async function HomeExperience({
     ],
   };
 
-  // Sync incremental em background: nao bloqueia a resposta
-  after(() => {
-    maybeSyncLomadee().catch(() => {});
-    maybeSyncML().catch(() => {});
-  });
+  // Sync incremental em background: nao bloqueia a resposta.
+  // Retornar a promise e obrigatorio: sem isso o after() resolve na
+  // hora e a function congela apos a resposta, matando o sync.
+  after(() =>
+    Promise.all([
+      maybeSyncLomadee().catch(() => {}),
+      maybeSyncML().catch(() => {}),
+    ]),
+  );
 
   const FLASH_WINDOW_MS = 48 * 3_600_000;
   const now = new Date();
