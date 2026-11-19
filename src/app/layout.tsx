@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import HashLink from "@/components/HashLink";
 import AuthButton from "@/components/AuthButton";
 import PageViewTracker from "@/components/PageViewTracker";
+import DbStatusBanner from "@/components/DbStatusBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -133,6 +134,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </Link>
           </nav>
         </header>
+        <DbStatusBanner />
         {children}
         <footer className="mt-auto border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-start sm:justify-between">
