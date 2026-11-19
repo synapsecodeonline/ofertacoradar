@@ -3,14 +3,12 @@ import { after } from "next/server";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
-import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
-import CountdownTimer from "@/components/CountdownTimer";
-import { IconTag, IconZap } from "@/components/Icons";
+import { IconTag } from "@/components/Icons";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { HomeExperience } from "@/components/HomeExperience";
-import { ALL_SOURCES, SOURCE_PREFIX, sourceBadgeOf } from "@/lib/sources";
+import { ALL_SOURCES, SOURCE_PREFIX } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +65,7 @@ export default async function OfertasDoDiaPage({
     return typeof v === "string" ? v !== "" : Array.isArray(v) && v.length > 0;
   });
   const rpage = Math.max(1, Number(sp.rpage) || 1);
-  const now = new Date();
-  const [topDiscountsAll, endingSoon] = await Promise.all([
+  const [topDiscountsAll] = await Promise.all([
     // Top descontos de cada fonte -> merge ordenado e paginado.
     // Garante que Mercado Livre/Awin aparecam mesmo com poucos descontos.
     Promise.all(
@@ -88,14 +85,6 @@ export default async function OfertasDoDiaPage({
         .flat()
         .sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0)),
     ),
-    prisma.product.findMany({
-      where: {
-        ...VALID,
-        endsAt: { gte: now, lte: new Date(now.getTime() + 48 * 3_600_000) },
-      },
-      orderBy: { endsAt: "asc" },
-      take: 12,
-    }),
   ]);
 
   const rankingTotalPages = Math.max(
@@ -118,7 +107,7 @@ export default async function OfertasDoDiaPage({
     return s ? `/ofertas-do-dia?${s}` : "/ofertas-do-dia";
   };
 
-  const total = topDiscountsAll.length + endingSoon.length;
+  const total = topDiscountsAll.length;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
@@ -146,72 +135,8 @@ export default async function OfertasDoDiaPage({
         </p>
       ) : (
         <>
-          {endingSoon.length > 0 && (
-            <CollapsibleSection
-              className="border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50 dark:border-amber-900/40 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-amber-950/30"
-              title={
-                <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-                  <IconZap className="h-4 w-4" /> Terminando em breve
-                </h2>
-              }
-              meta={
-                <span className="text-xs font-medium text-amber-600/80 dark:text-amber-500/80">
-                  {endingSoon.length} ofertas
-                </span>
-              }
-            >
-              <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
-                {endingSoon.map((p) => {
-                  const badge = sourceBadgeOf(p.externalId);
-                  return (
-                  <Link
-                    key={p.id}
-                    href={`/produto/${p.id}`}
-                    className="group flex w-52 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-amber-200/60 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/40 dark:bg-zinc-900"
-                  >
-                    <div className="relative aspect-[4/3] bg-zinc-50 dark:bg-zinc-950">
-                      {p.imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imgSrc(p.imageUrl)}
-                          alt={p.title}
-                          className="h-full w-full object-contain p-2"
-                        />
-                      )}
-                      {(() => {
-                        const d =
-                          p.discountPct ??
-                          discountPercent(p.price, p.oldPrice);
-                        return d !== null ? (
-                          <span className="absolute left-1.5 top-1.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-                            -{d}%
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-                    <div className="flex flex-1 flex-col gap-1 p-2.5">
-                      {badge && (
-                        <span className={`w-fit rounded px-1 py-px text-[9px] font-extrabold uppercase tracking-wider ${badge.className}`}>
-                          {badge.label}
-                        </span>
-                      )}
-                      <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
-                        {p.title}
-                      </h3>
-                      {p.price != null && (
-                        <span className="mt-auto text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                          {formatPrice(p.price, p.currency)}
-                        </span>
-                      )}
-                      {p.endsAt && <CountdownTimer endsAt={p.endsAt.toISOString()} />}
-                    </div>
-                  </Link>
-                  );
-                })}
-              </div>
-            </CollapsibleSection>
-          )}
-
+          {/* "Terminando em breve" so tinha cupons (unica fonte com endsAt)
+              — agora vive na pagina /cupons. */}
           <CollapsibleSection
             className="border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
             title={
