@@ -20,8 +20,8 @@ const UA =
 // Marcadores de pagina morta — conferidos so no <title> e <h1> para
 // evitar falso positivo com "404" solto no corpo do HTML.
 const DEAD_HEADING = [
-  /p[áa]gina n[ãa]o encontrada/i,
-  /produto n[ãa]o encontrado/i,
+  /p[áa]gina n[ãa]o (foi )?encontrada/i,
+  /produto n[ãa]o (foi )?encontrado/i,
   /item n[ãa]o encontrado/i,
   /p[áa]gina inexistente/i,
   /p[áa]gina n[ãa]o existe/i,
@@ -29,10 +29,22 @@ const DEAD_HEADING = [
   /erro 404/i,
   /page not found/i,
   /product not found/i,
-  /n[ãa]o encontramos/i,
+  /n[ãa]o (foi )?encontrad[ao]/i,
   /link n[ãa]o (encontrado|dispon[íi]vel|inv[áa]lido)/i,
-  /\boops\b/i,
+  /\boops?\b/i,
   /p[áa]gina indispon[íi]vel/i,
+];
+
+// Frases de "nao encontrado" que aparecem no CORPO da pagina (nao so em
+// title/h1). So padroes longos e inequivocos — "Ops!" sozinho nao serve
+// porque lojas usam isso ate em widget de carrinho vazio.
+const BODY_DEAD = [
+  /p[áa]gina n[ãa]o (foi )?encontrada/i,
+  /produto n[ãa]o (foi )?encontrado/i,
+  /item n[ãa]o encontrado/i,
+  /page not found/i,
+  /product not found/i,
+  /n[ãa]o foi encontrada/i,
 ];
 
 // Soft-404: algumas lojas (Rovitex) redirecionam produto morto para uma
@@ -143,10 +155,21 @@ export async function checkUrl(
   const heading = headingText(html);
   if (DEAD_HEADING.some((re) => re.test(heading))) return "dead";
 
+  const hasProduct = PRODUCT_MARKERS.some((re) => re.test(html));
+
+  // Mensagem de "nao encontrado" no corpo (ex.: "Ops! A página não foi
+  // encontrada. Por favor, utilize o menu...") — cobre lojas que servem
+  // a pagina de erro com HTTP 200. So desativa se a pagina nao tem cara
+  // de produto (template/JS de erro embutido nao derruba pagina real).
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+  if (!hasProduct && BODY_DEAD.some((re) => re.test(text))) return "dead";
+
   // Soft-404: pagina final sem cara de produto e sem relacao com o titulo
-  if (opts?.expectProduct && opts.productTitle) {
-    const hasProduct = PRODUCT_MARKERS.some((re) => re.test(html));
-    if (!hasProduct && titleSimilarity(opts.productTitle, heading) < 0.4) {
+  if (opts?.expectProduct && opts.productTitle && !hasProduct) {
+    if (titleSimilarity(opts.productTitle, heading) < 0.4) {
       return "dead";
     }
   }
