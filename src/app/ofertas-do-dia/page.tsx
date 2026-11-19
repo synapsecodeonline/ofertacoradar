@@ -111,10 +111,15 @@ export default async function OfertasDoDiaPage({
   const mpage = Math.max(1, Number(sp.mpage) || 1);
 
   const [lomadeeAll, mlAll] = await Promise.all([
-    // Ofertas/cupons Lomadee: os que expiram primeiro no topo
+    // Ofertas Lomadee = produtos prod-lomadee: com desconto (cupons
+    // camp-lomadee: ficam na pagina /cupons)
     prisma.product.findMany({
-      where: { ...VALID, externalId: { startsWith: "camp-lomadee:" } },
-      orderBy: [{ endsAt: { sort: "asc", nulls: "last" } }, { id: "desc" }],
+      where: {
+        ...VALID,
+        externalId: { startsWith: "prod-lomadee:" },
+        discountPct: { gt: 0 },
+      },
+      orderBy: { discountPct: "desc" },
     }),
     // Mercado Livre: ranking por maior desconto
     prisma.product.findMany({
@@ -182,7 +187,7 @@ export default async function OfertasDoDiaPage({
               }
               meta={
                 <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {lomadeeAll.length} ofertas
+                  Maiores descontos · {lomadeeAll.length} produtos
                 </span>
               }
             >

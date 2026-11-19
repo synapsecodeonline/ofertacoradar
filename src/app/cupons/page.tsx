@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Cupons de desconto",
+    title: "Cupons do dia",
     description:
-      "Cupons e ofertas exclusivas das lojas parceiras. Copie o cupom e aproveite o desconto no checkout.",
+      "Cupons e ofertas exclusivas do dia nas lojas parceiras. Copie o cupom e aproveite o desconto no checkout.",
     alternates: { canonical: `${siteUrl()}/cupons` },
   };
 }
@@ -75,10 +75,10 @@ export default async function CuponsPage({
             Início
           </Link>
           <span>/</span>
-          <span className="text-zinc-500">Cupons</span>
+          <span className="text-zinc-500">Cupons do dia</span>
         </nav>
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Cupons de desconto
+          Cupons do dia
         </h1>
         <p className="max-w-xl text-sm text-zinc-500">
           Ofertas e códigos promocionais das lojas parceiras. Copie o cupom e
@@ -96,7 +96,7 @@ export default async function CuponsPage({
           title={
             <span className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Cupons
+                Cupons do dia
               </span>
               <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
                 Ofertas ativas
