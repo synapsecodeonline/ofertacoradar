@@ -383,16 +383,35 @@ export default async function AdminPage() {
     main: { name: "Lomadee", maxCycleMs: 3 * HOUR_MS },
     ml: { name: "Mercado Livre", maxCycleMs: 12 * HOUR_MS },
   };
+  // Linhas auxiliares do sync: `${key}:beat` = ultimo sinal de vida,
+  // `${key}:err` = ultimo erro registrado pela fonte.
+  const beatMap = new Map(
+    syncStates.filter((s) => s.key.endsWith(":beat")).map((s) => [s.key.slice(0, -5), s]),
+  );
+  const errMap = new Map(
+    syncStates.filter((s) => s.key.endsWith(":err")).map((s) => [s.key.slice(0, -4), s]),
+  );
+
   for (const s of syncStates) {
     const cfg = SYNC_SOURCES[s.key];
     if (!cfg) continue;
     const busyAge = s.busyAt ? now.getTime() - s.busyAt.getTime() : null;
     const busyFresh = busyAge !== null && busyAge < 3 * 60_000;
+    const beatAt = beatMap.get(s.key)?.busyAt ?? null;
+    const beatAge = beatAt ? now.getTime() - beatAt.getTime() : null;
+    const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
+    const err = errMap.get(s.key);
     if (busyAge !== null && busyAge > 3 * 60_000) {
       alerts.push({ tone: "red", text: `Sync de ${cfg.name} travado (trava com mais de 3min).` });
+    } else if (!active) {
+      alerts.push({
+        tone: "red",
+        text: `Sync de ${cfg.name} parado — sem atividade há ${beatAge !== null ? timeAgo(beatAt, now) : "muito tempo"}. Verifique o agendador (cron) e a conexão.`,
+      });
+    } else if (err?.busyAt && now.getTime() - err.busyAt.getTime() < 60 * 60_000) {
+      alerts.push({ tone: "amber", text: `Sync de ${cfg.name} com erro recente: ${err.phase}` });
     } else if (
       s.phase !== "done" &&
-      !busyFresh &&
       (!s.lastCycleAt || now.getTime() - s.lastCycleAt.getTime() > cfg.maxCycleMs)
     ) {
       alerts.push({
@@ -512,41 +531,62 @@ export default async function AdminPage() {
             {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
               <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
             )}
-            {syncStates.filter((s) => s.key in SYNC_SOURCES).map((s) => {
+            {syncStates
+              .filter((s) => s.key in SYNC_SOURCES)
+              .map((s) => {
               const cfg = SYNC_SOURCES[s.key];
               const cycleAge = s.lastCycleAt ? now.getTime() - s.lastCycleAt.getTime() : null;
-              const fresh =
-                s.busyAt ||
-                (cycleAge !== null && cycleAge < 10 * 60_000);
+              const busyFresh =
+                !!s.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000;
+              const beatAt = beatMap.get(s.key)?.busyAt ?? null;
+              const beatAge = beatAt ? now.getTime() - beatAt.getTime() : null;
+              const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
+              const err = errMap.get(s.key);
+              const errRecent = !!err?.busyAt && now.getTime() - err.busyAt.getTime() < 24 * 3_600_000;
+              const cycleFresh = cycleAge !== null && cycleAge < cfg.maxCycleMs;
+              // status agregado: o que importa e o catalogo estar em dia
+              // e a fonte estar respondendo — nao o estado interno do ciclo
+              const status = busyFresh
+                ? { label: "sincronizando", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" }
+                : !active
+                  ? { label: "parado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" }
+                  : errRecent
+                    ? { label: "com erro", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" }
+                    : cycleFresh
+                      ? { label: "atualizado", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" }
+                      : { label: "desatualizado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" };
               return (
                 <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <span className="font-extrabold">{cfg.name}</span>
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                        s.busyAt
-                          ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                          : fresh
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                      }`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${status.cls}`}
                     >
-                      {s.busyAt && (
+                      {busyFresh && (
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
                       )}
-                      {s.busyAt ? "sincronizando" : fresh ? "em dia" : "desatualizado"}
+                      {status.label}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
                     fase: {s.phase} · página {s.page}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    último ciclo completo: {timeAgo(s.lastCycleAt, now)}
+                    catálogo atualizado: {timeAgo(s.lastCycleAt, now)}
                     {s.lastCycleAt && ` (${s.lastCycleAt.toLocaleString("pt-BR")})`}
                   </p>
-                  {s.busyAt && (
+                  <p className="text-xs text-zinc-500">
+                    última atividade do sync: {timeAgo(beatAt ?? s.busyAt, now)}
+                  </p>
+                  {busyFresh && (
                     <p className="text-xs text-zinc-500">
                       trabalhando desde {timeAgo(s.busyAt, now)}
+                    </p>
+                  )}
+                  {errRecent && (
+                    <p className="mt-1 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                      erro: {err!.phase}
+                      {err!.busyAt && ` (${timeAgo(err!.busyAt, now)})`}
                     </p>
                   )}
                 </div>

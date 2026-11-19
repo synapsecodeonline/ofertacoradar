@@ -394,7 +394,10 @@ async function runMLCycle() {
       // pula a query em vez de abortar o ciclo
       qi++;
       page = 1;
-      if (++consecutiveFailures > 10) break;
+      if (++consecutiveFailures > 10) {
+        await noteError(ML_STATE_KEY, "API do Mercado Livre sem resposta");
+        break;
+      }
       await save();
       await sleep(400);
       continue;
@@ -454,6 +457,40 @@ function busyFresh(busyAt: Date | null): boolean {
   return !!busyAt && Date.now() - busyAt.getTime() < LOCK_STALE_MS;
 }
 
+// Sinal de vida fora da trava: busyAt vira null entre blocos de 45s,
+// entao guardamos a ultima atividade em linhas auxiliares do SyncState
+// (sem migracao de schema): `${key}:beat` e `${key}:err`.
+const beatKey = (k: string) => `${k}:beat`;
+const errKey = (k: string) => `${k}:err`;
+
+async function beat(key: string) {
+  const bk = beatKey(key);
+  await prisma.syncState
+    .upsert({
+      where: { key: bk },
+      create: { key: bk, busyAt: new Date() },
+      update: { busyAt: new Date() },
+    })
+    .catch(() => {});
+}
+
+async function noteError(key: string, msg: string) {
+  const ek = errKey(key);
+  await prisma.syncState
+    .upsert({
+      where: { key: ek },
+      create: { key: ek, phase: msg.slice(0, 200), busyAt: new Date() },
+      update: { phase: msg.slice(0, 200), busyAt: new Date() },
+    })
+    .catch(() => {});
+}
+
+async function clearError(key: string) {
+  await prisma.syncState
+    .delete({ where: { key: errKey(key) } })
+    .catch(() => {});
+}
+
 // Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
 // Sem isso, fases longas sem checkpoint deixam busyAt velho -> alerta
 // "travado" falso e trava expira permitindo sync duplicado.
@@ -462,6 +499,7 @@ function startHeartbeat(key: string) {
     prisma.syncState
       .update({ where: { key }, data: { busyAt: new Date() } })
       .catch(() => {});
+    beat(key);
   }, 30_000);
   hb.unref?.();
   return hb;
@@ -472,14 +510,18 @@ async function releaseLock(key: string, hb: ReturnType<typeof setInterval>) {
   await prisma.syncState
     .update({ where: { key }, data: { busyAt: null } })
     .catch(() => {});
+  // registra o fim do bloco como atividade — o proximo cron retoma
+  await beat(key);
 }
 
 async function runMLLocked() {
   const hb = startHeartbeat(ML_STATE_KEY);
   try {
     await runMLCycle();
+    await clearError(ML_STATE_KEY);
   } catch (e) {
     console.error("[syncer:ml] ciclo falhou:", e);
+    await noteError(ML_STATE_KEY, e instanceof Error ? e.message : String(e));
   } finally {
     await releaseLock(ML_STATE_KEY, hb);
   }
@@ -489,8 +531,10 @@ async function runLomadeeLocked(apiKey: string, baseUrl: string) {
   const hb = startHeartbeat(STATE_KEY);
   try {
     await runCycle(apiKey, baseUrl);
+    await clearError(STATE_KEY);
   } catch (e) {
     console.error("[syncer] ciclo falhou:", e);
+    await noteError(STATE_KEY, e instanceof Error ? e.message : String(e));
   } finally {
     await releaseLock(STATE_KEY, hb);
   }
