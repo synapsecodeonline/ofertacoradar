@@ -9,8 +9,10 @@ import { syncPrisma as prisma } from "./db";
 //   dead    -> 404/410 ou titulo/h1 de "pagina/produto nao encontrado"
 //   unknown -> antibot (403/429), timeout, erro de rede, verificacao ML
 //              -> NUNCA desativa nesses casos (falso positivo caro)
+//   direct  -> URL direta ok, mas quebra com ?lmdeeTracking= (param que o
+//              lmdee.link adiciona) — produto precisa de link direto no /ir/
 
-export type LinkStatus = "ok" | "dead" | "unknown";
+export type LinkStatus = "ok" | "dead" | "unknown" | "direct";
 
 const TIMEOUT_MS = 12_000;
 const MAX_BODY_BYTES = 96 * 1024;
@@ -218,9 +220,35 @@ export async function validateProductLink(p: {
   const first = await checkUrl(linkTargetOf(p), opts);
   // Lojas instaveis (Rovitex) respondem 404 intermitente pro mesmo link —
   // so desativa se o "morto" se confirmar numa segunda tentativa.
-  if (first !== "dead") return first;
-  await new Promise((r) => setTimeout(r, 1_500));
-  return checkUrl(linkTargetOf(p), opts);
+  if (first === "dead") {
+    await new Promise((r) => setTimeout(r, 1_500));
+    return checkUrl(linkTargetOf(p), opts);
+  }
+  // Probe lmdeeTracking: o lmdee.link sempre adiciona ?lmdeeTracking= na
+  // URL final. Se a loja da 404 com esse param, o link de afiliado nao
+  // funciona — o produto deve ir direto (affiliateUrl = url).
+  if (expectProduct && first === "ok" && p.url) {
+    const probeUrl = withLmdeeTracking(p.url);
+    if (probeUrl !== p.url) {
+      const probe = await checkUrl(probeUrl, opts);
+      if (probe === "dead") {
+        await new Promise((r) => setTimeout(r, 1_500));
+        const probe2 = await checkUrl(probeUrl, opts);
+        if (probe2 === "dead") return "direct";
+      }
+    }
+  }
+  return first;
+}
+
+function withLmdeeTracking(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.set("lmdeeTracking", "1");
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 // Processa uma lista com concorrencia limitada (educada com os sites).
