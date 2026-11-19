@@ -202,10 +202,13 @@ export default async function AdminPage() {
 
   const maxSrcClick = Math.max(1, ...clicksBySrc.map((r) => Number(r.n)));
   const maxMerchant = Math.max(1, ...topMerchants.map((r) => Number(r.n)));
-  const syncLabel: Record<string, string> = {
+  // SyncState guarda tambem segredos (ml-token = OAuth ML). So exibe
+  // chaves de fonte conhecidas — nunca renderiza tokens.
+  const SYNC_LABELS: Record<string, string> = {
     main: "Lomadee",
     ml: "Mercado Livre",
   };
+  const syncStatesSafe = syncStates.filter((s) => s.key in SYNC_LABELS);
 
   const kpis = [
     { label: "Cliques 24h", value: clicks24h },
@@ -375,17 +378,17 @@ export default async function AdminPage() {
           Sincronização das fontes
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {syncStates.length === 0 && (
+          {syncStatesSafe.length === 0 && (
             <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
           )}
-          {syncStates.map((s) => (
+          {syncStatesSafe.map((s) => (
             <div
               key={s.key}
               className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800"
             >
               <div className="flex items-center justify-between">
                 <span className="font-extrabold">
-                  {syncLabel[s.key] ?? s.key}
+                  {SYNC_LABELS[s.key]}
                 </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
