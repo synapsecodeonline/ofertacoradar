@@ -52,6 +52,8 @@ export const metadata: Metadata = {
       "Cupons, ofertas e produtos selecionados das melhores lojas.",
   },
   robots: { index: true, follow: true },
+  // verificacao do canal na Lomadee
+  other: { lomadee: "2324685" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
