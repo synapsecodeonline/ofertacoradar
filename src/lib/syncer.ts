@@ -29,7 +29,7 @@ import {
 //   ml:   = produto Mercado Livre | aw:  = produto Awin
 const STATE_KEY = "main";
 const BUDGET_MS = 45_000; // tempo maximo de trabalho por invocacao
-const CYCLE_TTL_MS = 30 * 60_000; // intervalo entre ciclos completos
+const CYCLE_TTL_MS = 60_000; // novo ciclo completo a cada 1 minuto
 const LOCK_STALE_MS = 3 * 60_000; // trava expira se o worker morrer
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

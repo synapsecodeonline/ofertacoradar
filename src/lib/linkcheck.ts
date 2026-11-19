@@ -90,23 +90,30 @@ function headingText(html: string): string {
   return `${title} ${h1s}`.replace(/<[^>]+>/g, " ");
 }
 
-async function readPrefix(res: Response, maxBytes: number): Promise<string> {
-  if (!res.body) return "";
+async function readPrefix(
+  res: Response,
+  maxBytes: number,
+): Promise<{ text: string; truncated: boolean }> {
+  if (!res.body) return { text: "", truncated: false };
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let out = "";
   let received = 0;
+  let done = false;
   try {
     while (received < maxBytes) {
-      const { done, value } = await reader.read();
-      if (done) break;
+      const { done: d, value } = await reader.read();
+      if (d) {
+        done = true;
+        break;
+      }
       out += decoder.decode(value, { stream: true });
       received += value.byteLength;
     }
   } finally {
     await reader.cancel().catch(() => {});
   }
-  return out;
+  return { text: out, truncated: !done };
 }
 
 export async function checkUrl(
@@ -149,7 +156,7 @@ export async function checkUrl(
   // Nao-HTML com 200 (imagem, pdf, etc.) esta vivo
   if (!/html|xml|text/i.test(contentType)) return "ok";
 
-  const html = await readPrefix(res, MAX_BODY_BYTES);
+  const { text: html, truncated } = await readPrefix(res, MAX_BODY_BYTES);
   if (!html) return "ok";
 
   const heading = headingText(html);
@@ -157,19 +164,19 @@ export async function checkUrl(
 
   const hasProduct = PRODUCT_MARKERS.some((re) => re.test(html));
 
-  // Mensagem de "nao encontrado" no corpo (ex.: "Ops! A página não foi
-  // encontrada. Por favor, utilize o menu...") — cobre lojas que servem
-  // a pagina de erro com HTTP 200. So desativa se a pagina nao tem cara
-  // de produto (template/JS de erro embutido nao derruba pagina real).
-  const text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ");
-  if (!hasProduct && BODY_DEAD.some((re) => re.test(text))) return "dead";
-
-  // Soft-404: pagina final sem cara de produto e sem relacao com o titulo
-  if (opts?.expectProduct && opts.productTitle && !hasProduct) {
-    if (titleSimilarity(opts.productTitle, heading) < 0.4) {
+  // Soft-404: pagina final sem cara de produto e sem relacao com o titulo.
+  // So avalia quando o HTML foi lido por completo — SPA pesada tipo
+  // VTEX/Malwee trunca em 96KB sem <title> e nao da pra julgar (unknown).
+  if (!hasProduct && !truncated) {
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ");
+    if (BODY_DEAD.some((re) => re.test(text))) return "dead";
+  }
+  if (opts?.expectProduct && opts.productTitle) {
+    if (!heading.trim()) return "unknown";
+    if (!hasProduct && titleSimilarity(opts.productTitle, heading) < 0.4) {
       return "dead";
     }
   }
