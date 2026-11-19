@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { after } from "next/server";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
+import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
@@ -49,6 +51,11 @@ export default async function OfertasDoDiaPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sp = await searchParams;
+  // Sync das fontes a cada pageview (nunca bloqueia a resposta)
+  after(() => {
+    maybeSyncLomadee().catch(() => {});
+    maybeSyncML().catch(() => {});
+  });
   // Sem params de catalogo = tela "Ofertas do dia" (so o dia).
   // Com ?aba=/?loja=/filtros = visao completa de catalogo.
   const catalogMode = CATALOG_PARAMS.some((k) => {
