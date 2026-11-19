@@ -211,10 +211,16 @@ export async function validateProductLink(p: {
   const expectProduct =
     !!p.externalId &&
     (p.externalId.startsWith("prod-lomadee:") || p.externalId.startsWith("aw:"));
-  return checkUrl(linkTargetOf(p), {
+  const opts = {
     expectProduct,
     productTitle: p.title ?? undefined,
-  });
+  };
+  const first = await checkUrl(linkTargetOf(p), opts);
+  // Lojas instaveis (Rovitex) respondem 404 intermitente pro mesmo link —
+  // so desativa se o "morto" se confirmar numa segunda tentativa.
+  if (first !== "dead") return first;
+  await new Promise((r) => setTimeout(r, 1_500));
+  return checkUrl(linkTargetOf(p), opts);
 }
 
 // Processa uma lista com concorrencia limitada (educada com os sites).
