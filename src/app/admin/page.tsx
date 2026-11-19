@@ -323,6 +323,7 @@ export default async function AdminPage() {
     prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
       `SELECT ${sourceSql('"externalId"')} AS src, COUNT(*) AS n
        FROM "Product" WHERE active AND "imageUrl" IS NULL
+         AND "externalId" <> 'internal:pageview'
        GROUP BY 1 ORDER BY 2 DESC`,
     ),
     // ultima atualizacao por fonte (saude do catalogo)
