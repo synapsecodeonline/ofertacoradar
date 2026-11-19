@@ -127,10 +127,7 @@ export default async function AdminPage() {
     clicksBySrc,
     topProducts,
     topMerchants,
-    prodBySrc,
     syncStates,
-    totalProducts,
-    activeProducts,
   ] = await Promise.all([
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS n
@@ -164,18 +161,7 @@ export default async function AdminPage() {
        GROUP BY p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
     ),
-    prisma.$queryRawUnsafe<
-      { src: string; total: bigint; active: bigint; disc: bigint }[]
-    >(
-      `SELECT ${sourceSql('"externalId"')} AS src,
-              COUNT(*) AS total,
-              COUNT(*) FILTER (WHERE active) AS active,
-              COUNT(*) FILTER (WHERE "discountPct" > 0) AS disc
-       FROM "Product" GROUP BY 1`,
-    ),
     prisma.syncState.findMany(),
-    prisma.product.count(),
-    prisma.product.count({ where: { active: true } }),
   ]);
 
   // Preenche dias faltantes do grafico (30 dias)
@@ -215,8 +201,6 @@ export default async function AdminPage() {
     { label: "Cliques 7 dias", value: clicks7d },
     { label: "Cliques 30 dias", value: clicks30d },
     { label: "Total de cliques", value: clicksTotal },
-    { label: "Produtos ativos", value: activeProducts },
-    { label: "Total de produtos", value: totalProducts },
   ];
 
   return (
@@ -242,7 +226,7 @@ export default async function AdminPage() {
       </header>
 
       {/* KPIs */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpis.map((k) => (
           <div
             key={k.label}
@@ -266,7 +250,7 @@ export default async function AdminPage() {
         <BarChart data={chartDays.map((d) => d.n)} labels={chartDays.map((d) => d.label)} />
       </section>
 
-      <div className="mb-8 grid gap-4 lg:grid-cols-2">
+      <div className="mb-8">
         {/* Cliques por fonte */}
         <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
@@ -284,34 +268,6 @@ export default async function AdminPage() {
                 value={Number(r.n)}
                 max={maxSrcClick}
               />
-            ))}
-          </div>
-        </section>
-
-        {/* Produtos por fonte */}
-        <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-            Produtos por fonte
-          </h2>
-          <div className="flex flex-col gap-2.5">
-            {prodBySrc.map((r) => (
-              <div
-                key={r.src}
-                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 px-3 py-2.5 text-sm dark:border-zinc-800"
-              >
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${srcBadge(r.src)}`}
-                >
-                  {srcLabel(r.src)}
-                </span>
-                <span className="text-xs text-zinc-500">
-                  {Number(r.active).toLocaleString("pt-BR")} ativos ·{" "}
-                  {Number(r.disc).toLocaleString("pt-BR")} c/ desconto
-                </span>
-                <span className="font-extrabold tabular-nums">
-                  {Number(r.total).toLocaleString("pt-BR")}
-                </span>
-              </div>
             ))}
           </div>
         </section>
