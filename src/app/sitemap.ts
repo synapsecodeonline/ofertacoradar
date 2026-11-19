@@ -8,9 +8,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const staticRoutes: MetadataRoute.Sitemap = [
     {
-      url: `${base}/ofertas-do-dia`,
+      url: `${base}/`,
       changeFrequency: "hourly",
       priority: 0.9,
+    },
+    {
+      url: `${base}/cupons`,
+      changeFrequency: "hourly",
+      priority: 0.8,
     },
   ];
 

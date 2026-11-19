@@ -25,7 +25,7 @@ async function pvProductId(): Promise<number> {
   return created.id;
 }
 
-// POST /api/pv { path: "/ofertas-do-dia?aba=ml" }
+// POST /api/pv { path: "/?aba=ml" }
 // Registra um pageview como Click no produto sentinela.
 export async function POST(req: Request) {
   try {

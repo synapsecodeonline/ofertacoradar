@@ -1,20 +1,26 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { HomeExperience } from "@/components/HomeExperience";
+import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-// A home canonica e /ofertas-do-dia — preserva todos os query params
-// (aba, q, categoria, loja, ordem, tipo, pagina) no redirect.
-export default async function Home({
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: "Ofertaço Radar — ofertas e cupons das melhores lojas",
+    template: `%s | Ofertaço Radar`,
+  },
+  description:
+    "Ofertas verificadas das lojas parceiras: produtos com desconto, cupons e promoções das melhores lojas.",
+  alternates: { canonical: siteUrl() },
+};
+
+// A home É o catálogo: abas por fonte (Lomadee, Mercado Livre, Awin),
+// busca e filtros — tudo ranqueado por desconto.
+export default function Home({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const sp = await searchParams;
-  const p = new URLSearchParams();
-  for (const [k, v] of Object.entries(sp)) {
-    const val = Array.isArray(v) ? v[0] : v;
-    if (val) p.set(k, val);
-  }
-  const qs = p.toString();
-  redirect(`/ofertas-do-dia${qs ? `?${qs}` : ""}`);
+  return <HomeExperience searchParams={searchParams} />;
 }

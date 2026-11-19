@@ -71,7 +71,7 @@ export default async function CuponsPage({
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8">
       <header className="flex flex-col gap-2">
         <nav className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
-          <Link href="/ofertas-do-dia" className="transition-colors hover:text-emerald-600">
+          <Link href="/" className="transition-colors hover:text-emerald-600">
             Início
           </Link>
           <span>/</span>

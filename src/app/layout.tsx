@@ -81,7 +81,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="sticky top-0 z-10 border-b border-zinc-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
             <Link
-              href="/ofertas-do-dia"
+              href="/"
               className="group flex items-center gap-2 text-lg font-extrabold tracking-tight"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm transition-transform group-hover:scale-105">
@@ -92,13 +92,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <HashLink
-                href="/ofertas-do-dia?aba=lomadee"
+                href="/?aba=lomadee"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas Lomadee
               </HashLink>
               <HashLink
-                href="/ofertas-do-dia?aba=ml"
+                href="/?aba=ml"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lojas Mercado Livre
@@ -110,10 +110,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Cupons
               </Link>
               <Link
-                href="/ofertas-do-dia"
+                href="/"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Ofertas do dia
+                Catálogo
               </Link>
               </nav>
               <AuthButton />
@@ -123,13 +123,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* Menu mobile: fileira de pills com scroll horizontal */}
           <nav className="flex items-center gap-1 overflow-x-auto border-t border-zinc-200/60 px-4 py-2 [scrollbar-width:none] dark:border-zinc-800/60 sm:hidden [&::-webkit-scrollbar]:hidden">
               <HashLink
-                href="/ofertas-do-dia?aba=lomadee"
+                href="/?aba=lomadee"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
                 Lojas Lomadee
               </HashLink>
               <HashLink
-                href="/ofertas-do-dia?aba=ml"
+                href="/?aba=ml"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
                 Lojas Mercado Livre
@@ -141,10 +141,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Cupons
               </Link>
               <Link
-                href="/ofertas-do-dia"
+                href="/"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
-                Ofertas do dia
+                Catálogo
               </Link>
           </nav>
         </header>
@@ -171,17 +171,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Navegação
               </p>
-              <Link href="/ofertas-do-dia?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Ofertas e cupons Lomadee
-              </Link>
-              <Link href="/ofertas-do-dia?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Lomadee
               </Link>
-              <Link href="/ofertas-do-dia?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+              <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Mercado Livre
               </Link>
-              <Link href="/ofertas-do-dia" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Ofertas do dia
+              <Link href="/cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Cupons do dia
+              </Link>
+              <Link href="/" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Catálogo
               </Link>
               <a
                 href={

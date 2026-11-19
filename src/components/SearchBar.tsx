@@ -17,13 +17,13 @@ export default function SearchBar({
   const go = (p: URLSearchParams) => {
     p.delete("pagina");
     const s = p.toString();
-    router.push(s ? `/ofertas-do-dia?${s}` : "/ofertas-do-dia", { scroll: false });
+    router.push(s ? `/?${s}` : "/", { scroll: false });
     scrollToCatalogOnNav();
   };
 
   return (
     <form
-      action="/ofertas-do-dia"
+      action="/"
       method="get"
       onSubmit={(e) => {
         e.preventDefault();
@@ -34,7 +34,7 @@ export default function SearchBar({
         }
         p.delete("pagina");
         const s = p.toString();
-        router.push(s ? `/ofertas-do-dia?${s}` : "/ofertas-do-dia", { scroll: false });
+        router.push(s ? `/?${s}` : "/", { scroll: false });
         scrollToCatalogOnNav();
       }}
       className="mt-5 flex w-full max-w-2xl flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white p-2 shadow-lg shadow-zinc-900/5 sm:flex-row dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20"

@@ -464,7 +464,7 @@ export default async function AdminPage() {
           </a>
           <AdminSyncButton />
           <Link
-            href="/ofertas-do-dia"
+            href="/"
             className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
           >
             ← Site

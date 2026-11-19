@@ -8,7 +8,7 @@ export default function BackButton({ label = "Voltar" }: { label?: string }) {
     <button
       onClick={() => {
         if (window.history.length > 1) router.back();
-        else router.push("/ofertas-do-dia");
+        else router.push("/");
       }}
       className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
     >

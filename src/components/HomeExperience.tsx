@@ -46,18 +46,18 @@ const TABS = {
   lomadee: {
     label: "Lojas Lomadee",
     eyebrow: "Lomadee",
-    title: "Produtos Lomadee",
-    noun: "produtos",
+    title: "Ofertas Lomadee",
+    noun: "ofertas",
     prefix: "prod-lomadee:",
-    defaultSort: "recentes",
+    defaultSort: "desconto",
   },
   ml: {
     label: "Lojas Mercado Livre",
     eyebrow: "Mercado Livre",
-    title: "Produtos Mercado Livre",
-    noun: "produtos",
+    title: "Ofertas Mercado Livre",
+    noun: "ofertas",
     prefix: "ml:",
-    defaultSort: "recentes",
+    defaultSort: "desconto",
   },
   awin: {
     label: "Awin",
@@ -70,6 +70,8 @@ const TABS = {
 } as const;
 type Tab = keyof typeof TABS;
 const TAB_ORDER = Object.keys(TABS) as Tab[];
+// Abas de oferta: sempre ranking por desconto — ?ordem= nao se aplica
+const RANKED_TABS: Tab[] = ["lomadee", "ml"];
 
 function orderByFor(sort: SortKey) {
   switch (sort) {
@@ -181,7 +183,17 @@ export async function HomeExperience({
       : cfg.defaultSort;
 
   // Cada aba filtra um unico prefixo de fonte — nada de misturar.
-  const sourceCond = { externalId: { startsWith: cfg.prefix } };
+  // Lomadee inclui cupons camp-lomadee: alem dos produtos prod-lomadee:
+  // ("todas as ofertas validas" da aba).
+  const sourceCond =
+    tab === "lomadee"
+      ? {
+          OR: [
+            { externalId: { startsWith: "prod-lomadee:" } },
+            { externalId: { startsWith: "camp-lomadee:" } },
+          ],
+        }
+      : { externalId: { startsWith: cfg.prefix } };
   const searchFilter = query
     ? {
         OR: [
@@ -259,7 +271,7 @@ export async function HomeExperience({
   ] = await Promise.all([
     prisma.product.findMany({
       where: listWhere,
-      orderBy: orderByFor(sort),
+      orderBy: orderByFor(RANKED_TABS.includes(tab) ? "desconto" : sort),
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -399,7 +411,8 @@ export async function HomeExperience({
     countByMerchant.set(r.merchant, total);
     merchantSrc.set(r.merchant, { camp, prod, ml, aw });
     for (const t of TAB_ORDER) {
-      const n = { camp, prod, ml, aw }[SRC_KEY[t]];
+      // Lomadee conta produtos + cupons (mesma regra do sourceCond)
+      const n = t === "lomadee" ? camp + prod : { camp, prod, ml, aw }[SRC_KEY[t]];
       if (n <= 0) continue;
       tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
     }
@@ -479,7 +492,7 @@ export async function HomeExperience({
     }
     const s = p.toString();
     // Toda mudanca de filtro leva a altura do catalogo (HashLink cuida do scroll)
-    return s ? `/ofertas-do-dia?${s}#catalogo` : "/ofertas-do-dia#catalogo";
+    return s ? `/?${s}#catalogo` : "/#catalogo";
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -535,7 +548,7 @@ export async function HomeExperience({
 
       {!dayOnly && (<>
       {/* Ofertas da fonte: removidas das abas Lomadee/ML — ofertas ficam
-          centralizadas em /ofertas-do-dia e /cupons. Awin ainda nao tem
+          centralizadas em / e /cupons. Awin ainda nao tem
           itens, entao a secao so renderiza se aparecer algo. */}
       {tab === "awin" && offersItems.length > 0 && (
         <CollapsibleSection
@@ -566,8 +579,8 @@ export async function HomeExperience({
       )}
 
       {/* Lojas em destaque: apenas lojas com produtos ativos.
-          Removida da aba Mercado Livre (catalogo puro). */}
-      {tab !== "ml" && featuredStores.length > 0 && (
+          So na aba Awin — Lomadee/ML sao catalogo ranqueado puro. */}
+      {tab === "awin" && featuredStores.length > 0 && (
         <CollapsibleSection
           defaultOpen={false}
           className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
@@ -593,7 +606,7 @@ export async function HomeExperience({
               return (
                 <HashLink
                   key={s.merchant}
-                  href={`/ofertas-do-dia?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
+                  href={`/?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
                   className="group flex aspect-square flex-col items-center justify-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -701,7 +714,13 @@ export async function HomeExperience({
         </nav>
       )}
 
-      {/* Ordenacao: entre categorias e catalogo */}
+      {/* Ordenacao: entre categorias e catalogo.
+          Lomadee/ML sao sempre ranking — seletor so faz sentido na Awin. */}
+      {RANKED_TABS.includes(tab) ? (
+        <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
+          Ranking por maior desconto
+        </p>
+      ) : (
       <div className="mb-5 flex flex-wrap items-center justify-center gap-1.5 text-xs">
         <span className="mr-1 font-semibold text-zinc-500 dark:text-zinc-400">
           Ordenar por
@@ -722,6 +741,7 @@ export async function HomeExperience({
           ))}
         </div>
       </div>
+      )}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
@@ -744,12 +764,6 @@ export async function HomeExperience({
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                 {cfg.title}
               </h2>
-              <Link
-                href="/ofertas-do-dia"
-                className="mt-0.5 text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
-              >
-                Ver ofertas do dia →
-              </Link>
             </div>
             <span className="text-sm font-medium text-zinc-400">
               {items.length}
