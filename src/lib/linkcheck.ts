@@ -1,4 +1,5 @@
 import { syncPrisma as prisma } from "./db";
+import { getMlAccessToken } from "./mercadolivre";
 
 // Validador de links de parceiros.
 // Usa GET (nao HEAD — lojas respondem 200 no HEAD e 404 no GET) e le so o
@@ -192,13 +193,36 @@ export function linkTargetOf(p: {
   return p.affiliateUrl ?? p.url;
 }
 
-// Prefixos validados: Lomadee (prod/camp) e Awin. ml: fica de fora —
-// o anti-bot do ML torna qualquer checagem server-side inconclusiva.
+// Prefixos validados: Lomadee (prod/camp), Awin e Mercado Livre.
+// ml: e validado via API oficial do ML (nao por HTTP — o site tem
+// anti-bot que tornaria qualquer scrape inconclusivo).
 export const CHECKABLE_PREFIXES = [
   "prod-lomadee:",
   "camp-lomadee:",
   "aw:",
+  "ml:",
 ] as const;
+
+const ML_API = "https://api.mercadolibre.com";
+
+// Valida produto de catalogo do ML pela API oficial:
+// /products/{catalogId} existe e tem pelo menos 1 item ativo.
+async function checkMlProduct(catalogId: string): Promise<LinkStatus> {
+  const token = await getMlAccessToken();
+  if (!token) return "unknown";
+  try {
+    const res = await fetch(`${ML_API}/products/${catalogId}/items?limit=1`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (res.status === 404 || res.status === 410) return "dead";
+    if (!res.ok) return "unknown";
+    const data = (await res.json()) as { results?: unknown[] };
+    return (data.results?.length ?? 0) > 0 ? "ok" : "dead";
+  } catch {
+    return "unknown";
+  }
+}
 
 export async function validateProductLink(p: {
   url: string;
@@ -215,6 +239,10 @@ export async function validateProductLink(p: {
     expectProduct,
     productTitle: p.title ?? undefined,
   };
+  // ml: vai pela API oficial do ML, nao por HTTP
+  if (p.externalId?.startsWith("ml:")) {
+    return checkMlProduct(p.externalId.slice(3));
+  }
   const first = await checkUrl(linkTargetOf(p), opts);
   // Lojas instaveis (Rovitex) respondem 404 intermitente pro mesmo link —
   // so desativa se o "morto" se confirmar numa segunda tentativa.
