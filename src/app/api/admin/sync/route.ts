@@ -1,11 +1,12 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
+import { startAllSyncs } from "@/lib/syncer";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/admin/sync — forca um ciclo de sync das fontes (admin only).
-// after() mantem a function viva depois da resposta.
+// POST /api/admin/sync — forca um ciclo de sync de TODAS as fontes (admin).
+// Adquire a trava na hora e devolve o status por fonte; o trabalho roda
+// em after() e o card de sync no /admin mostra a fase ao vivo.
 export async function POST() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
@@ -13,12 +14,19 @@ export async function POST() {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 
-  after(() => {
-    maybeSyncLomadee(true).catch(() => {});
-    maybeSyncML(true).catch(() => {});
-  });
+  let sync;
+  try {
+    sync = await startAllSyncs();
+  } catch (e) {
+    return Response.json(
+      { error: `Falha ao iniciar sync: ${String(e).slice(0, 200)}` },
+      { status: 500 },
+    );
+  }
 
-  return Response.json({ ok: true, started: true });
+  after(() => sync.run().catch(() => {}));
+
+  return Response.json({ ok: true, sources: sync.results });
 }
 
 export async function GET() {

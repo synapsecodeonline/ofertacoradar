@@ -433,6 +433,131 @@ async function runMLCycle() {
   }
 }
 
+// ---- Trava + heartbeat compartilhados ----
+
+async function acquireLock(key: string): Promise<boolean> {
+  const locked = await prisma.syncState.updateMany({
+    where: {
+      key,
+      OR: [
+        { busyAt: null },
+        { busyAt: { lt: new Date(Date.now() - LOCK_STALE_MS) } },
+      ],
+    },
+    data: { busyAt: new Date() },
+  });
+  return locked.count > 0;
+}
+
+function busyFresh(busyAt: Date | null): boolean {
+  return !!busyAt && Date.now() - busyAt.getTime() < LOCK_STALE_MS;
+}
+
+// Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
+// Sem isso, fases longas sem checkpoint deixam busyAt velho -> alerta
+// "travado" falso e trava expira permitindo sync duplicado.
+function startHeartbeat(key: string) {
+  const hb = setInterval(() => {
+    prisma.syncState
+      .update({ where: { key }, data: { busyAt: new Date() } })
+      .catch(() => {});
+  }, 30_000);
+  hb.unref?.();
+  return hb;
+}
+
+async function releaseLock(key: string, hb: ReturnType<typeof setInterval>) {
+  clearInterval(hb);
+  await prisma.syncState
+    .update({ where: { key }, data: { busyAt: null } })
+    .catch(() => {});
+}
+
+async function runMLLocked() {
+  const hb = startHeartbeat(ML_STATE_KEY);
+  try {
+    await runMLCycle();
+  } catch (e) {
+    console.error("[syncer:ml] ciclo falhou:", e);
+  } finally {
+    await releaseLock(ML_STATE_KEY, hb);
+  }
+}
+
+async function runLomadeeLocked(apiKey: string, baseUrl: string) {
+  const hb = startHeartbeat(STATE_KEY);
+  try {
+    await runCycle(apiKey, baseUrl);
+  } catch (e) {
+    console.error("[syncer] ciclo falhou:", e);
+  } finally {
+    await releaseLock(STATE_KEY, hb);
+  }
+}
+
+// ---- Sync manual de todas as fontes (botao do /admin) ----
+
+export type SyncSourceStatus = "started" | "busy" | "skipped";
+
+export interface ForcedSyncResult {
+  results: { source: "lomadee" | "ml" | "awin"; status: SyncSourceStatus }[];
+  // roda as fontes adquiridas — chamar dentro de after()
+  run: () => Promise<void>;
+}
+
+// Adquire a trava de cada fonte disponível e devolve o status na hora.
+// O trabalho pesado fica para run() (executar via after() na rota).
+export async function startAllSyncs(): Promise<ForcedSyncResult> {
+  const results: ForcedSyncResult["results"] = [];
+  const tasks: (() => Promise<void>)[] = [];
+
+  const apiKey = process.env.LOMADEE_API_KEY;
+  const baseUrl = process.env.LOMADEE_API_URL ?? "https://api.lomadee.com.br";
+  if (!apiKey) {
+    results.push({ source: "lomadee", status: "skipped" });
+  } else {
+    await prisma.syncState.upsert({
+      where: { key: STATE_KEY },
+      create: { key: STATE_KEY },
+      update: {},
+    });
+    const st = await prisma.syncState.findUnique({ where: { key: STATE_KEY } });
+    if (busyFresh(st?.busyAt ?? null) || !(await acquireLock(STATE_KEY))) {
+      results.push({ source: "lomadee", status: "busy" });
+    } else {
+      results.push({ source: "lomadee", status: "started" });
+      tasks.push(() => runLomadeeLocked(apiKey, baseUrl));
+    }
+  }
+
+  if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) {
+    results.push({ source: "ml", status: "skipped" });
+  } else {
+    await prisma.syncState.upsert({
+      where: { key: ML_STATE_KEY },
+      create: { key: ML_STATE_KEY, phase: "q:0", page: 1 },
+      update: {},
+    });
+    const st = await prisma.syncState.findUnique({ where: { key: ML_STATE_KEY } });
+    if (busyFresh(st?.busyAt ?? null) || !(await acquireLock(ML_STATE_KEY))) {
+      results.push({ source: "ml", status: "busy" });
+    } else {
+      results.push({ source: "ml", status: "started" });
+      tasks.push(() => runMLLocked());
+    }
+  }
+
+  // Awin ainda nao tem sincronizador implementado
+  results.push({ source: "awin", status: "skipped" });
+
+  return {
+    results,
+    run: async () => {
+      await Promise.all(tasks.map((t) => t()));
+    },
+  };
+}
+
 // Chamado via after() junto do maybeSyncLomadee: nunca bloqueia a resposta
 export async function maybeSyncML(force = false) {
   if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) return;
@@ -456,40 +581,9 @@ export async function maybeSyncML(force = false) {
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
   if (lockFresh || cycleFresh) return;
+  if (!(await acquireLock(ML_STATE_KEY))) return;
 
-  const locked = await prisma.syncState.updateMany({
-    where: {
-      key: ML_STATE_KEY,
-      OR: [
-        { busyAt: null },
-        { busyAt: { lt: new Date(now - LOCK_STALE_MS) } },
-      ],
-    },
-    data: { busyAt: new Date(now) },
-  });
-  if (locked.count === 0) return;
-
-  // Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
-  // Sem isso, fases longas sem checkpoint (lote de links, paginas de
-  // catalogo) deixam busyAt velho -> alerta "travado" falso e trava
-  // expira permitindo sync duplicado.
-  const heartbeat = setInterval(() => {
-    prisma.syncState
-      .update({ where: { key: ML_STATE_KEY }, data: { busyAt: new Date() } })
-      .catch(() => {});
-  }, 30_000);
-  heartbeat.unref?.();
-
-  try {
-    await runMLCycle();
-  } catch (e) {
-    console.error("[syncer:ml] ciclo falhou:", e);
-  } finally {
-    clearInterval(heartbeat);
-    await prisma.syncState
-      .update({ where: { key: ML_STATE_KEY }, data: { busyAt: null } })
-      .catch(() => {});
-  }
+  await runMLLocked();
 }
 
 // Chamado via after() nas paginas: nunca bloqueia a resposta
@@ -515,35 +609,7 @@ export async function maybeSyncLomadee(force = false) {
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
   if (lockFresh || cycleFresh) return;
+  if (!(await acquireLock(STATE_KEY))) return;
 
-  const locked = await prisma.syncState.updateMany({
-    where: {
-      key: STATE_KEY,
-      OR: [
-        { busyAt: null },
-        { busyAt: { lt: new Date(now - LOCK_STALE_MS) } },
-      ],
-    },
-    data: { busyAt: new Date(now) },
-  });
-  if (locked.count === 0) return;
-
-  // Heartbeat (ver maybeSyncML)
-  const heartbeat = setInterval(() => {
-    prisma.syncState
-      .update({ where: { key: STATE_KEY }, data: { busyAt: new Date() } })
-      .catch(() => {});
-  }, 30_000);
-  heartbeat.unref?.();
-
-  try {
-    await runCycle(apiKey, baseUrl);
-  } catch (e) {
-    console.error("[syncer] ciclo falhou:", e);
-  } finally {
-    clearInterval(heartbeat);
-    await prisma.syncState
-      .update({ where: { key: STATE_KEY }, data: { busyAt: null } })
-      .catch(() => {});
-  }
+  await runLomadeeLocked(apiKey, baseUrl);
 }

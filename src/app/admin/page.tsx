@@ -118,7 +118,7 @@ function HBar({
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <h2 className="mb-4 text-sm font-extrabold uppercase tracking-widest text-zinc-500">{title}</h2>
@@ -369,6 +369,11 @@ export default async function AdminPage() {
       ? SOURCE_BADGE[s as SourceKey]
       : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300";
 
+  // sync ativo agora? -> auto-refresh mais rapido + badge pulsante
+  const syncBusy = syncStates.some(
+    (s) => s.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000,
+  );
+
   // ---- alertas ----
   const alerts: { tone: "red" | "amber"; text: string }[] = [];
   // Ciclo completo esperado por fonte: ML demora mais (31+ queries).
@@ -458,7 +463,7 @@ export default async function AdminPage() {
           </Link>
         </div>
       </header>
-      <AdminAutoRefresh seconds={60} />
+      <AdminAutoRefresh seconds={syncBusy ? 15 : 60} />
 
       {/* Alertas */}
       {alerts.length > 0 && (
@@ -490,7 +495,19 @@ export default async function AdminPage() {
 
       {/* Sync das fontes — sempre visivel no topo */}
       <div className="mb-8">
-        <Card title="Sincronização das fontes">
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              Sincronização das fontes
+              {syncBusy && (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+              )}
+            </span>
+          }
+        >
           <div className="flex flex-col gap-2.5">
             {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
               <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
@@ -506,7 +523,7 @@ export default async function AdminPage() {
                   <div className="flex items-center justify-between">
                     <span className="font-extrabold">{cfg.name}</span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
                         s.busyAt
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
                           : fresh
@@ -514,6 +531,9 @@ export default async function AdminPage() {
                             : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                       }`}
                     >
+                      {s.busyAt && (
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                      )}
                       {s.busyAt ? "sincronizando" : fresh ? "em dia" : "desatualizado"}
                     </span>
                   </div>
