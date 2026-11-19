@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { hasAdminSession } from "@/lib/adminSession";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,11 @@ export async function POST(req: Request) {
     }
     // pula assets internos e o proprio endpoint
     if (path.startsWith("/api/") || /\.(png|jpe?g|webp|svg|ico|css|js)$/i.test(path)) {
+      return Response.json({ ok: true });
+    }
+
+    // nao contabiliza pageview do proprio admin logado
+    if (hasAdminSession(req.headers.get("cookie"))) {
       return Response.json({ ok: true });
     }
 

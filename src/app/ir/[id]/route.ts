@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getTrackedUrl } from "@/lib/shortener";
+import { hasAdminSession } from "@/lib/adminSession";
 
 export async function GET(
   request: NextRequest,
@@ -15,15 +16,18 @@ export async function GET(
     return NextResponse.redirect(new URL("/", request.url), 302);
   }
 
-  prisma.click
-    .create({
-      data: {
-        productId: product.id,
-        referer: request.headers.get("referer"),
-        userAgent: request.headers.get("user-agent")?.slice(0, 500),
-      },
-    })
-    .catch(() => {});
+  // nao contabiliza clique do proprio admin logado
+  if (!hasAdminSession(request.headers.get("cookie"))) {
+    prisma.click
+      .create({
+        data: {
+          productId: product.id,
+          referer: request.headers.get("referer"),
+          userAgent: request.headers.get("user-agent")?.slice(0, 500),
+        },
+      })
+      .catch(() => {});
+  }
 
   // Mercado Livre: programa de afiliados proprio (independente da Lomadee).
   // Com ML_AFFILIATE_TOOL/WORD configurados, manda para a pagina de catalogo
