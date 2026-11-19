@@ -63,20 +63,47 @@ async function upsertByExternalId(
   // links (link morto) nao pode voltar so porque o feed ainda lista.
   // So reativa quando a URL muda de verdade (link novo = merece recheck).
   const { active: _active, ...rest } = data;
+  // updatedAt explicito: a reconciliacao com o feed depende dele
+  const touch = { ...rest, updatedAt: new Date() };
   const urlChanged = await prisma.product.updateMany({
     where: { externalId: p.externalId, url: { not: p.url } },
-    data: { ...rest, active: true },
+    data: { ...touch, active: true },
   });
   if (urlChanged.count === 0) {
     const sameUrl = await prisma.product.updateMany({
       where: { externalId: p.externalId, url: p.url },
-      data: rest,
+      data: touch,
     });
     if (sameUrl.count === 0) {
       await prisma.product.create({
         data: { ...data, externalId: p.externalId },
       });
     }
+  }
+}
+
+// Inicio do ciclo atual (marcado na fase brands). A reconciliacao usa
+// updatedAt dos produtos: quem o feed ainda retorna recebe timestamp
+// novo a cada ciclo; quem sumiu fica velho e e desativado.
+const META_KEY = "meta";
+
+async function reconcileLomadeeFeed() {
+  const meta = await prisma.syncState.findUnique({ where: { key: META_KEY } });
+  const since = meta?.lastCycleAt;
+  if (!since) return;
+  const d = await prisma.product.updateMany({
+    where: {
+      active: true,
+      updatedAt: { lt: since },
+      OR: [
+        { externalId: { startsWith: "prod-lomadee:" } },
+        { externalId: { startsWith: "camp-lomadee:" } },
+      ],
+    },
+    data: { active: false },
+  });
+  if (d.count > 0) {
+    console.log(`[syncer] ${d.count} itens Lomadee ausentes do feed desativados`);
   }
 }
 
@@ -89,6 +116,12 @@ async function runCycle(apiKey: string, baseUrl: string) {
     await prisma.syncState.update({
       where: { key: STATE_KEY },
       data: { phase: "brands", page: 1, orgsCleared: false },
+    });
+    // marca o inicio do ciclo para a reconciliacao do feed
+    await prisma.syncState.upsert({
+      where: { key: META_KEY },
+      create: { key: META_KEY, lastCycleAt: new Date() },
+      update: { lastCycleAt: new Date() },
     });
     phase = "brands";
     page = 1;
@@ -267,6 +300,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
   );
   if (orgIds.size === 0) {
     phase = "done";
+    await reconcileLomadeeFeed();
     await prisma.syncState.update({
       where: { key: STATE_KEY },
       data: { phase: "done", page: 1, lastCycleAt: new Date() },
@@ -296,6 +330,8 @@ async function runCycle(apiKey: string, baseUrl: string) {
       ).catch(() => {});
     }
     if (items.length < 100) {
+      // catalogo varrido: o que nao foi visto neste ciclo saiu do feed
+      await reconcileLomadeeFeed();
       phase = "links";
       page = 0; // cursor do validador comeca do id 0
     } else {
