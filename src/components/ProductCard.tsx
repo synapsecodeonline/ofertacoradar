@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@prisma/client";
-import { discountPercent, formatPrice } from "@/lib/format";
+import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { merchantLogo } from "@/lib/store-logo";
 import { sourceBadgeOf } from "@/lib/sources";
@@ -37,7 +37,7 @@ export default async function ProductCard({
       <div className="relative aspect-square bg-zinc-50 dark:bg-zinc-950">
         {product.imageUrl ? (
           <Image
-            src={product.imageUrl}
+            src={imgSrc(product.imageUrl)!}
             alt={product.title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

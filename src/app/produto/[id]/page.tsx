@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
-import { discountPercent, formatPrice } from "@/lib/format";
+import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { categoryLabel, canonicalCategory } from "@/lib/categories";
 import { siteUrl, SITE_NAME } from "@/lib/site";
@@ -202,7 +202,7 @@ export default async function ProductPage({
           {product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={product.imageUrl}
+              src={imgSrc(product.imageUrl)}
               alt={product.title}
               className="h-full w-full object-contain p-10"
             />

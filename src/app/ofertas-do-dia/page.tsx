@@ -3,7 +3,7 @@ import { after } from "next/server";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
-import { discountPercent, formatPrice } from "@/lib/format";
+import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
 import CountdownTimer from "@/components/CountdownTimer";
@@ -169,7 +169,7 @@ export default async function OfertasDoDiaPage({
                       {p.imageUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={p.imageUrl}
+                          src={imgSrc(p.imageUrl)}
                           alt={p.title}
                           className="h-full w-full object-contain p-2"
                         />

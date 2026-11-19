@@ -225,7 +225,44 @@ async function checkMlProduct(catalogId: string): Promise<LinkStatus> {
   }
 }
 
+// Imagem quebrada = produto nao esta "100% ok" -> desativa.
+// So desativa em falha clara (404/410 ou HTML no lugar de imagem);
+// timeout/403/CDN lenta = unknown, mantem.
+async function imageDead(rawUrl: string): Promise<boolean> {
+  const url = rawUrl.trim().replace(/ /g, "%20");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(10_000),
+        headers: { "user-agent": UA },
+        redirect: "follow",
+      });
+      if (res.status === 404 || res.status === 410) return attempt === 1;
+      const ct = res.headers.get("content-type") ?? "";
+      if (/text\/html/.test(ct)) return attempt === 1;
+      return false; // ok ou status ambiguo -> nao desativa
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 export async function validateProductLink(p: {
+  url: string;
+  affiliateUrl: string | null;
+  title?: string | null;
+  externalId?: string | null;
+  organizationId?: string | null;
+  imageUrl?: string | null;
+}): Promise<LinkStatus> {
+  const st = await checkProductLink(p);
+  if (st !== "ok" || !p.imageUrl) return st;
+  if (await imageDead(p.imageUrl)) return "dead";
+  return st;
+}
+
+async function checkProductLink(p: {
   url: string;
   affiliateUrl: string | null;
   title?: string | null;

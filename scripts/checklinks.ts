@@ -30,6 +30,7 @@ async function main() {
       merchant: true,
       externalId: true,
       organizationId: true,
+      imageUrl: true,
     },
     orderBy: { id: "asc" },
   });

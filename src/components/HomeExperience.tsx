@@ -16,7 +16,7 @@ import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
 import CollapsibleSection from "@/components/CollapsibleSection";
-import { discountPercent, formatPrice } from "@/lib/format";
+import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
 import { Suspense, type ReactNode } from "react";
 import type { Product } from "@prisma/client";
@@ -109,7 +109,7 @@ function RailCard({
         {p.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={p.imageUrl}
+            src={imgSrc(p.imageUrl)}
             alt={p.title}
             className="h-full w-full object-contain p-2"
           />

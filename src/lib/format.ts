@@ -15,3 +15,9 @@ export function discountPercent(price?: number | null, oldPrice?: number | null)
 export function discountPctOf(p: { price?: number | null; oldPrice?: number | null }) {
   return discountPercent(p.price, p.oldPrice);
 }
+
+// URLs de imagem de alguns feeds (ex: VTEX/Moto BR) vem com espacos
+// crus no nome do arquivo — o browser nem sempre encoda e a imagem quebra.
+export function imgSrc(u: string | null | undefined): string | undefined {
+  return u ? u.trim().replace(/ /g, "%20") : undefined;
+}
