@@ -7,12 +7,24 @@ import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
 import { SOURCE_LABEL, SOURCE_BADGE, type SourceKey } from "@/lib/sources";
 import { getRevenueReport, type SourceRevenue } from "@/lib/reports";
 import AdminSyncButton from "@/components/AdminSyncButton";
+import AdminAutoRefresh from "@/components/AdminAutoRefresh";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
+
+function timeAgo(d: Date | null | undefined, now: Date): string {
+  if (!d) return "nunca";
+  const s = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 1000));
+  if (s < 60) return `há ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m}min`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
 
 function sourceSql(col: string) {
   return `CASE
@@ -446,6 +458,7 @@ export default async function AdminPage() {
           </Link>
         </div>
       </header>
+      <AdminAutoRefresh seconds={60} />
 
       {/* Alertas */}
       {alerts.length > 0 && (
@@ -473,6 +486,54 @@ export default async function AdminPage() {
             <p className="mt-1 text-2xl font-extrabold tabular-nums">{k.value.toLocaleString("pt-BR")}</p>
           </div>
         ))}
+      </div>
+
+      {/* Sync das fontes — sempre visivel no topo */}
+      <div className="mb-8">
+        <Card title="Sincronização das fontes">
+          <div className="flex flex-col gap-2.5">
+            {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
+              <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
+            )}
+            {syncStates.filter((s) => s.key in SYNC_SOURCES).map((s) => {
+              const cfg = SYNC_SOURCES[s.key];
+              const cycleAge = s.lastCycleAt ? now.getTime() - s.lastCycleAt.getTime() : null;
+              const fresh =
+                s.busyAt ||
+                (cycleAge !== null && cycleAge < 10 * 60_000);
+              return (
+                <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold">{cfg.name}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                        s.busyAt
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                          : fresh
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                      }`}
+                    >
+                      {s.busyAt ? "sincronizando" : fresh ? "em dia" : "desatualizado"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    fase: {s.phase} · página {s.page}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    último ciclo completo: {timeAgo(s.lastCycleAt, now)}
+                    {s.lastCycleAt && ` (${s.lastCycleAt.toLocaleString("pt-BR")})`}
+                  </p>
+                  {s.busyAt && (
+                    <p className="text-xs text-zinc-500">
+                      trabalhando desde {timeAgo(s.busyAt, now)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
       </div>
 
       {/* Receita / comissao estimada */}
@@ -621,36 +682,6 @@ export default async function AdminPage() {
             {noImage.length === 0 && <p className="text-sm text-zinc-400">Nenhum. Catálogo limpo.</p>}
             {noImage.map((r) => (
               <HBar key={r.src} label={srcLabel(r.src)} badge={srcBadge(r.src)} value={Number(r.n)} max={Math.max(1, ...noImage.map((x) => Number(x.n)))} />
-            ))}
-          </div>
-        </Card>
-        {/* Sync */}
-        <Card title="Sincronização das fontes">
-          <div className="flex flex-col gap-2.5">
-            {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
-              <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
-            )}
-            {syncStates.filter((s) => s.key in SYNC_SOURCES).map((s) => (
-              <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold">{SYNC_SOURCES[s.key].name}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                      s.busyAt
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                    }`}
-                  >
-                    {s.busyAt ? "sincronizando" : "ocioso"}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-zinc-500">
-                  fase: {s.phase} · página {s.page}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  último ciclo: {s.lastCycleAt ? s.lastCycleAt.toLocaleString("pt-BR") : "nunca"}
-                </p>
-              </div>
             ))}
           </div>
         </Card>
