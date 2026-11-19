@@ -104,6 +104,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Lojas Mercado Livre
               </HashLink>
               <Link
+                href="/cupons"
+                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cupons
+              </Link>
+              <Link
                 href="/ofertas-do-dia"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
@@ -128,6 +134,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 Lojas Mercado Livre
               </HashLink>
+              <Link
+                href="/cupons"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
+              >
+                Cupons
+              </Link>
               <Link
                 href="/ofertas-do-dia"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
