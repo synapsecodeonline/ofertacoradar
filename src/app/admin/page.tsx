@@ -359,14 +359,29 @@ export default async function AdminPage() {
 
   // ---- alertas ----
   const alerts: { tone: "red" | "amber"; text: string }[] = [];
-  const SYNC_LABELS: Record<string, string> = { main: "Lomadee", ml: "Mercado Livre" };
-  const syncStatesSafe = syncStates.filter((s) => s.key in SYNC_LABELS);
-  for (const s of syncStatesSafe) {
-    const name = SYNC_LABELS[s.key];
-    if (s.busyAt && now.getTime() - s.busyAt.getTime() > 3 * 60_000) {
-      alerts.push({ tone: "red", text: `Sync de ${name} travado (trava com mais de 3min).` });
-    } else if (s.phase !== "done" && (!s.lastCycleAt || now.getTime() - s.lastCycleAt.getTime() > 2 * HOUR_MS)) {
-      alerts.push({ tone: "amber", text: `Sync de ${name} sem ciclo completo há mais de 2h (fase: ${s.phase}).` });
+  // Ciclo completo esperado por fonte: ML demora mais (31+ queries).
+  // "Sem ciclo" so alerta quando NAO ha sync rodando — busyAt fresco
+  // significa que esta trabalhando, nao travado.
+  const SYNC_SOURCES: Record<string, { name: string; maxCycleMs: number }> = {
+    main: { name: "Lomadee", maxCycleMs: 3 * HOUR_MS },
+    ml: { name: "Mercado Livre", maxCycleMs: 12 * HOUR_MS },
+  };
+  for (const s of syncStates) {
+    const cfg = SYNC_SOURCES[s.key];
+    if (!cfg) continue;
+    const busyAge = s.busyAt ? now.getTime() - s.busyAt.getTime() : null;
+    const busyFresh = busyAge !== null && busyAge < 3 * 60_000;
+    if (busyAge !== null && busyAge > 3 * 60_000) {
+      alerts.push({ tone: "red", text: `Sync de ${cfg.name} travado (trava com mais de 3min).` });
+    } else if (
+      s.phase !== "done" &&
+      !busyFresh &&
+      (!s.lastCycleAt || now.getTime() - s.lastCycleAt.getTime() > cfg.maxCycleMs)
+    ) {
+      alerts.push({
+        tone: "amber",
+        text: `Sync de ${cfg.name} sem ciclo completo há mais de ${Math.round(cfg.maxCycleMs / HOUR_MS)}h (fase: ${s.phase}).`,
+      });
     }
   }
   const lastUpdMap = new Map(lastUpdate.map((r) => [r.src, r.last]));
@@ -612,11 +627,13 @@ export default async function AdminPage() {
         {/* Sync */}
         <Card title="Sincronização das fontes">
           <div className="flex flex-col gap-2.5">
-            {syncStatesSafe.length === 0 && <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>}
-            {syncStatesSafe.map((s) => (
+            {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
+              <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
+            )}
+            {syncStates.filter((s) => s.key in SYNC_SOURCES).map((s) => (
               <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold">{SYNC_LABELS[s.key]}</span>
+                  <span className="font-extrabold">{SYNC_SOURCES[s.key].name}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
                       s.busyAt

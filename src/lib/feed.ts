@@ -182,7 +182,11 @@ export async function fetchLomadeeProducts(
   while (products.length < maxProducts) {
     const res = await fetch(
       `${baseUrl}/affiliate/products?page=${page}&limit=${limit}&isAvailable=true`,
-      { headers: { "x-api-key": apiKey }, cache: "no-store" },
+      {
+        headers: { "x-api-key": apiKey },
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      },
     );
     if (!res.ok) {
       throw new Error(`Lomadee API respondeu ${res.status}: ${await res.text()}`);
@@ -234,6 +238,7 @@ async function lomadeeGet<T>(
     const res = await fetch(`${baseUrl}${path}?${qs}`, {
       headers: { "x-api-key": apiKey },
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     });
     if (res.ok) return res.json() as Promise<T>;
     lastError = `Lomadee API ${path} respondeu ${res.status}: ${await res.text()}`;
@@ -422,7 +427,10 @@ export async function fetchLomadeeProductsPage(
 }
 
 export async function fetchFeed(url: string): Promise<NormalizedProduct[]> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
+  });
   if (!res.ok) throw new Error(`Feed respondeu ${res.status} ${res.statusText}`);
   const text = await res.text();
 

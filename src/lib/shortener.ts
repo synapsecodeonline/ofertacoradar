@@ -25,6 +25,7 @@ export async function getTrackedUrl(
         organizationId,
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { shortUrls?: string[] }[];

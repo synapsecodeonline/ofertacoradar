@@ -119,6 +119,7 @@ async function refreshAccessToken(): Promise<string | null> {
       refresh_token: row.refreshToken,
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
     console.error(
@@ -188,6 +189,7 @@ async function mlGet<T>(path: string, token: string): Promise<T | null> {
   const res = await fetch(`${API}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) return null;
   return (await res.json()) as T;
