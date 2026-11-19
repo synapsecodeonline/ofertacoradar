@@ -118,7 +118,13 @@ async function runCycle(apiKey: string, baseUrl: string) {
         },
         orderBy: { id: "asc" },
         take: 40,
-        select: { id: true, url: true, affiliateUrl: true },
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          affiliateUrl: true,
+          externalId: true,
+        },
       });
       if (batch.length === 0) {
         phase = "done";

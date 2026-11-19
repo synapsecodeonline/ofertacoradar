@@ -35,6 +35,41 @@ const DEAD_HEADING = [
   /p[áa]gina indispon[íi]vel/i,
 ];
 
+// Soft-404: algumas lojas (Rovitex) redirecionam produto morto para uma
+// pagina de categoria/busca com HTTP 200 e titulo normal. Para itens que
+// deveriam ser pagina de produto, exigimos marcador de produto OU
+// titulo final parecido com o titulo do produto.
+const PRODUCT_MARKERS = [
+  /"@type"\s*:\s*"Product"/i,
+  /property="og:type"[^>]*content=["']product["']/i,
+  /itemprop="price"/i,
+  /"priceCurrency"/i,
+  /"availability"\s*:\s*"https?:\/\//i,
+];
+
+function normWords(s: string): Set<string> {
+  return new Set(
+    s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+}
+
+// Fracao das palavras do titulo do produto presentes no titulo/h1 final.
+// Categoria generica ("Blusas e Camisetas") da ~0; pagina do produto da ~1.
+function titleSimilarity(productTitle: string, heading: string): number {
+  const want = normWords(productTitle);
+  if (want.size === 0) return 1;
+  const got = normWords(heading);
+  let hit = 0;
+  for (const w of want) if (got.has(w)) hit++;
+  return hit / want.size;
+}
+
 function headingText(html: string): string {
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
   const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)]
@@ -62,7 +97,10 @@ async function readPrefix(res: Response, maxBytes: number): Promise<string> {
   return out;
 }
 
-export async function checkUrl(rawUrl: string): Promise<LinkStatus> {
+export async function checkUrl(
+  rawUrl: string,
+  opts?: { expectProduct?: boolean; productTitle?: string },
+): Promise<LinkStatus> {
   let url: string;
   try {
     url = new URL(rawUrl).toString();
@@ -104,6 +142,14 @@ export async function checkUrl(rawUrl: string): Promise<LinkStatus> {
 
   const heading = headingText(html);
   if (DEAD_HEADING.some((re) => re.test(heading))) return "dead";
+
+  // Soft-404: pagina final sem cara de produto e sem relacao com o titulo
+  if (opts?.expectProduct && opts.productTitle) {
+    const hasProduct = PRODUCT_MARKERS.some((re) => re.test(html));
+    if (!hasProduct && titleSimilarity(opts.productTitle, heading) < 0.4) {
+      return "dead";
+    }
+  }
   return "ok";
 }
 
@@ -127,8 +173,18 @@ export const CHECKABLE_PREFIXES = [
 export async function validateProductLink(p: {
   url: string;
   affiliateUrl: string | null;
+  title?: string | null;
+  externalId?: string | null;
 }): Promise<LinkStatus> {
-  return checkUrl(linkTargetOf(p));
+  // expectProduct so para catalogo de produtos (prod:/aw:). Ofertas
+  // camp-lomadee: apontam para categoria/home por configuracao da rede.
+  const expectProduct =
+    !!p.externalId &&
+    (p.externalId.startsWith("prod-lomadee:") || p.externalId.startsWith("aw:"));
+  return checkUrl(linkTargetOf(p), {
+    expectProduct,
+    productTitle: p.title ?? undefined,
+  });
 }
 
 // Processa uma lista com concorrencia limitada (educada com os sites).

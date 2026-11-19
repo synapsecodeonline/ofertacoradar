@@ -22,7 +22,14 @@ async function main() {
         externalId: { startsWith: pre },
       })),
     },
-    select: { id: true, title: true, url: true, affiliateUrl: true, merchant: true },
+    select: {
+      id: true,
+      title: true,
+      url: true,
+      affiliateUrl: true,
+      merchant: true,
+      externalId: true,
+    },
     orderBy: { id: "asc" },
   });
 
