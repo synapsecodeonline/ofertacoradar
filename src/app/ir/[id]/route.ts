@@ -46,8 +46,8 @@ export async function GET(
 
   // Produtos do catalogo nao tem link de afiliado pronto:
   // gera um lmdee.link rastreado na hora (cacheado) ou cai na URL direta.
-  // Excecao: produtos flagados pelo validador com affiliateUrl == url
-  // (lojas que dao 404 com ?lmdeeTracking=) caem no link direto abaixo.
+  // Todo produto ativo foi validado com lmdeeTracking — se a loja quebra
+  // com o parametro, o validador ja desativou o produto.
   if (!product.affiliateUrl && product.organizationId) {
     const tracked = await getTrackedUrl(product.url, product.organizationId);
     return NextResponse.redirect(tracked ?? product.url, 302);

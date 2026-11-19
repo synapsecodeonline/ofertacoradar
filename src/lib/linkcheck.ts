@@ -9,10 +9,8 @@ import { syncPrisma as prisma } from "./db";
 //   dead    -> 404/410 ou titulo/h1 de "pagina/produto nao encontrado"
 //   unknown -> antibot (403/429), timeout, erro de rede, verificacao ML
 //              -> NUNCA desativa nesses casos (falso positivo caro)
-//   direct  -> URL direta ok, mas quebra com ?lmdeeTracking= (param que o
-//              lmdee.link adiciona) — produto precisa de link direto no /ir/
 
-export type LinkStatus = "ok" | "dead" | "unknown" | "direct";
+export type LinkStatus = "ok" | "dead" | "unknown";
 
 const TIMEOUT_MS = 12_000;
 const MAX_BODY_BYTES = 96 * 1024;
@@ -225,8 +223,8 @@ export async function validateProductLink(p: {
     return checkUrl(linkTargetOf(p), opts);
   }
   // Probe lmdeeTracking: o lmdee.link sempre adiciona ?lmdeeTracking= na
-  // URL final. Se a loja da 404 com esse param, o link de afiliado nao
-  // funciona — o produto deve ir direto (affiliateUrl = url).
+  // URL final. Todo produto exibido precisa passar com esse parametro —
+  // se a loja da 404 com ele, o produto nao pode ficar no site.
   if (expectProduct && first === "ok" && p.url) {
     const probeUrl = withLmdeeTracking(p.url);
     if (probeUrl !== p.url) {
@@ -234,7 +232,7 @@ export async function validateProductLink(p: {
       if (probe === "dead") {
         await new Promise((r) => setTimeout(r, 1_500));
         const probe2 = await checkUrl(probeUrl, opts);
-        if (probe2 === "dead") return "direct";
+        if (probe2 === "dead") return "dead";
       }
     }
   }

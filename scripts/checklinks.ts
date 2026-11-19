@@ -38,17 +38,14 @@ async function main() {
   let ok = 0;
   let dead = 0;
   let unknown = 0;
-  let direct = 0;
   const deadIds: number[] = [];
-  const directIds: number[] = [];
-  const reviveIds: number[] = [];
   const deadSamples: string[] = [];
 
   const results = await mapLimit(products, CONCURRENCY, async (p, i) => {
     const status = await validateProductLink(p);
     if ((i + 1) % BATCH_LOG === 0) {
       console.log(
-        `  ${i + 1}/${products.length} — ok:${ok} mortos:${dead} diretos:${direct} inconclusivos:${unknown}`,
+        `  ${i + 1}/${products.length} — ok:${ok} mortos:${dead} inconclusivos:${unknown}`,
       );
     }
     if (status === "dead") {
@@ -57,20 +54,15 @@ async function main() {
       if (deadSamples.length < 30) {
         deadSamples.push(`${p.merchant ?? "?"} — ${p.title.slice(0, 60)}`);
       }
-    } else if (status === "direct") {
-      direct++;
-      directIds.push(p.id);
     } else if (status === "ok") {
       ok++;
-      // loja voltou a aguentar lmdeeTracking: remove flag de link direto
-      if (p.affiliateUrl === p.url) reviveIds.push(p.id);
     } else {
       unknown++;
     }
     return status;
   });
 
-  // Desativa mortos, marca link-direto e limpa flags obsoletas
+  // Desativa mortos em lotes
   const CHUNK = 500;
   for (let i = 0; i < deadIds.length; i += CHUNK) {
     await prisma.product.updateMany({
@@ -78,25 +70,11 @@ async function main() {
       data: { active: false },
     });
   }
-  for (const p of products) {
-    if (directIds.includes(p.id)) {
-      await prisma.product.update({
-        where: { id: p.id },
-        data: { affiliateUrl: p.url },
-      });
-    } else if (reviveIds.includes(p.id)) {
-      await prisma.product.update({
-        where: { id: p.id },
-        data: { affiliateUrl: null },
-      });
-    }
-  }
 
   console.log("\n=== Resultado ===");
-  console.log(`validos:              ${ok}`);
-  console.log(`mortos->off:          ${dead}`);
-  console.log(`link direto (sem com): ${direct}`);
-  console.log(`inconclusivos:        ${unknown} (mantidos ativos)`);
+  console.log(`validos:        ${ok}`);
+  console.log(`mortos->off:    ${dead}`);
+  console.log(`inconclusivos:  ${unknown} (mantidos ativos)`);
   if (deadSamples.length) {
     console.log("\nAmostra dos desativados:");
     for (const s of deadSamples) console.log(`  - ${s}`);

@@ -118,11 +118,7 @@ async function main() {
       merchant,
       organizationId: p.organizationId ?? null,
       url: p.url,
-      // prod-lomadee sem affiliateUrl do feed: preserva flag "link direto"
-      affiliateUrl:
-        override ??
-        p.affiliateUrl ??
-        (p.externalId?.startsWith("prod-lomadee:") ? undefined : null),
+      affiliateUrl: override ?? p.affiliateUrl ?? null,
       couponCode: p.couponCode,
       endsAt: p.endsAt,
       active: true,

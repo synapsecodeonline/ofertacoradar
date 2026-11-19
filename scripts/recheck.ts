@@ -14,14 +14,11 @@ async function main() {
   });
   console.log(`${prods.length} produtos inativos para revalidar.`);
   const revive: number[] = [];
-  const directIds: number[] = [];
-  const reviveClear: number[] = [];
-  let ok = 0, dead = 0, unk = 0, dir = 0;
+  let ok = 0, dead = 0, unk = 0;
   await mapLimit(prods, 8, async (p) => {
     const s = await validateProductLink(p);
     if (s === "dead") dead++;
-    else if (s === "direct") { dir++; revive.push(p.id); directIds.push(p.id); }
-    else if (s === "ok") { ok++; revive.push(p.id); if (p.affiliateUrl === p.url) reviveClear.push(p.id); }
+    else if (s === "ok") { ok++; revive.push(p.id); }
     else { unk++; revive.push(p.id); }
   });
   for (let i = 0; i < revive.length; i += 500) {
@@ -30,14 +27,7 @@ async function main() {
       data: { active: true },
     });
   }
-  for (const id of directIds) {
-    const p = prods.find((x) => x.id === id)!;
-    await prisma.product.update({ where: { id }, data: { affiliateUrl: p.url } });
-  }
-  for (const id of reviveClear) {
-    await prisma.product.update({ where: { id }, data: { affiliateUrl: null } });
-  }
-  console.log(`reativados: ${revive.length} (ok:${ok} diretos:${dir} inconclusivos:${unk}) | continuam off: ${dead}`);
+  console.log(`reativados: ${revive.length} (ok:${ok} inconclusivos:${unk}) | continuam off: ${dead}`);
   await prisma.$disconnect();
 }
 main();

@@ -53,11 +53,7 @@ async function upsertByExternalId(
     merchant,
     organizationId: p.organizationId ?? null,
     url: p.url,
-    // prod-lomadee sem affiliateUrl do feed: preserva flag "link direto"
-    // marcada pelo validador (loja que quebra com lmdeeTracking)
-    affiliateUrl:
-      p.affiliateUrl ??
-      (p.externalId?.startsWith("prod-lomadee:") ? undefined : null),
+    affiliateUrl: p.affiliateUrl ?? null,
     couponCode: p.couponCode,
     endsAt: p.endsAt,
     active: true,
@@ -170,32 +166,18 @@ async function runCycle(apiKey: string, baseUrl: string) {
       }
       const results = await mapLimit(batch, 6, (p) => validateProductLink(p));
       let dead = 0;
-      let direct = 0;
       for (let i = 0; i < batch.length; i++) {
-        const p = batch[i];
-        const st = results[i];
-        if (st === "dead") {
+        if (results[i] === "dead") {
           await prisma.product
-            .update({ where: { id: p.id }, data: { active: false } })
+            .update({ where: { id: batch[i].id }, data: { active: false } })
             .then(() => dead++)
-            .catch(() => {});
-        } else if (st === "direct") {
-          // loja quebra com lmdeeTracking: /ir/ vai direto na url
-          await prisma.product
-            .update({ where: { id: p.id }, data: { affiliateUrl: p.url } })
-            .then(() => direct++)
-            .catch(() => {});
-        } else if (st === "ok" && p.affiliateUrl === p.url) {
-          // loja voltou a aguentar o param: volta pro lmdee.link (comissao)
-          await prisma.product
-            .update({ where: { id: p.id }, data: { affiliateUrl: null } })
             .catch(() => {});
         }
       }
       page = batch[batch.length - 1].id;
       await save();
-      if (dead > 0 || direct > 0) {
-        console.log(`[syncer] links: ${dead} mortos, ${direct} p/ link direto`);
+      if (dead > 0) {
+        console.log(`[syncer] links: ${dead}/${batch.length} com link morto desativados`);
       }
     }
     if (phase === "done") {
