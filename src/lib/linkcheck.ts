@@ -237,10 +237,19 @@ async function imageDead(rawUrl: string): Promise<boolean> {
         headers: { "user-agent": UA },
         redirect: "follow",
       });
-      if (res.status === 404 || res.status === 410) return attempt === 1;
+      // 404/410 e 400 (VTEX responde 400 JSON "Conta Inativa" para
+      // imagem morta) = imagem quebrada de verdade. Confirmado 2x.
+      if (res.status === 404 || res.status === 410 || res.status === 400) {
+        if (attempt === 1) return true;
+        await new Promise((r) => setTimeout(r, 1_500));
+        continue;
+      }
+      // 403/429/CDN com rate-limit = ambiguo, NUNCA desativa
+      if (!res.ok) return false;
       const ct = res.headers.get("content-type") ?? "";
+      // 200 servindo HTML no lugar da imagem = quebrada de verdade
       if (/text\/html/.test(ct)) return attempt === 1;
-      return false; // ok ou status ambiguo -> nao desativa
+      return false;
     } catch {
       return false;
     }
