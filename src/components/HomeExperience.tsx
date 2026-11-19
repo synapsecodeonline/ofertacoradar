@@ -534,8 +534,10 @@ export async function HomeExperience({
       )}
 
       {!dayOnly && (<>
-      {/* Ofertas da fonte: camp-lomadee: na Lomadee; desconto em ML/Awin */}
-      {offersItems.length > 0 && (
+      {/* Ofertas da fonte: removidas das abas Lomadee/ML — ofertas ficam
+          centralizadas em /ofertas-do-dia e /cupons. Awin ainda nao tem
+          itens, entao a secao so renderiza se aparecer algo. */}
+      {tab === "awin" && offersItems.length > 0 && (
         <CollapsibleSection
           defaultOpen={false}
           className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
@@ -563,8 +565,9 @@ export async function HomeExperience({
         </CollapsibleSection>
       )}
 
-      {/* Lojas em destaque: apenas lojas com produtos ativos */}
-      {featuredStores.length > 0 && (
+      {/* Lojas em destaque: apenas lojas com produtos ativos.
+          Removida da aba Mercado Livre (catalogo puro). */}
+      {tab !== "ml" && featuredStores.length > 0 && (
         <CollapsibleSection
           defaultOpen={false}
           className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
