@@ -39,6 +39,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // deles — bloqueado ate o usuario dar o sinal.
 const BLOCKED_URL_PARTS = ["rovitex.com.br"];
 const BLOCKED_MERCHANTS = ["rovitex"];
+// CDNs de imagem mortos (conta VTEX inativa): produto com imagem quebrada
+// nem entra no catalogo. Remover quando a VTEX reativar as contas.
+const BLOCKED_IMAGE_HOSTS = [
+  "vestis.vteximg.com.br",
+  "shopinfo.vteximg.com.br",
+];
 
 async function upsertByExternalId(
   p: NormalizedProduct,
@@ -50,7 +56,8 @@ async function upsertByExternalId(
     BLOCKED_URL_PARTS.some(
       (b) => p.url.includes(b) || (p.affiliateUrl ?? "").includes(b),
     ) ||
-    (merchant ?? "").toLowerCase().includes(BLOCKED_MERCHANTS[0])
+    (merchant ?? "").toLowerCase().includes(BLOCKED_MERCHANTS[0]) ||
+    BLOCKED_IMAGE_HOSTS.some((h) => (p.imageUrl ?? "").includes(h))
   ) {
     return;
   }
