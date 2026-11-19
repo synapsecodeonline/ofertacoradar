@@ -469,11 +469,23 @@ export async function maybeSyncML(force = false) {
   });
   if (locked.count === 0) return;
 
+  // Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
+  // Sem isso, fases longas sem checkpoint (lote de links, paginas de
+  // catalogo) deixam busyAt velho -> alerta "travado" falso e trava
+  // expira permitindo sync duplicado.
+  const heartbeat = setInterval(() => {
+    prisma.syncState
+      .update({ where: { key: ML_STATE_KEY }, data: { busyAt: new Date() } })
+      .catch(() => {});
+  }, 30_000);
+  heartbeat.unref?.();
+
   try {
     await runMLCycle();
   } catch (e) {
     console.error("[syncer:ml] ciclo falhou:", e);
   } finally {
+    clearInterval(heartbeat);
     await prisma.syncState
       .update({ where: { key: ML_STATE_KEY }, data: { busyAt: null } })
       .catch(() => {});
@@ -516,11 +528,20 @@ export async function maybeSyncLomadee(force = false) {
   });
   if (locked.count === 0) return;
 
+  // Heartbeat (ver maybeSyncML)
+  const heartbeat = setInterval(() => {
+    prisma.syncState
+      .update({ where: { key: STATE_KEY }, data: { busyAt: new Date() } })
+      .catch(() => {});
+  }, 30_000);
+  heartbeat.unref?.();
+
   try {
     await runCycle(apiKey, baseUrl);
   } catch (e) {
     console.error("[syncer] ciclo falhou:", e);
   } finally {
+    clearInterval(heartbeat);
     await prisma.syncState
       .update({ where: { key: STATE_KEY }, data: { busyAt: null } })
       .catch(() => {});
