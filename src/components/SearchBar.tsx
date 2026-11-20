@@ -17,14 +17,6 @@ type Suggest = {
   merchants: string[];
 };
 
-const ORDENS: [string, string][] = [
-  ["", "Ordenar: ofertas"],
-  ["desconto", "Maior desconto"],
-  ["menor-preco", "Menor preço"],
-  ["maior-preco", "Maior preço"],
-  ["recentes", "Mais recentes"],
-];
-
 export default function SearchBar({
   merchants,
   currentMerchant,
@@ -249,24 +241,6 @@ export default function SearchBar({
           ))}
         </select>
       )}
-      <select
-        name="ordem"
-        defaultValue={params.get("ordem") ?? ""}
-        onChange={(e) => {
-          const p = new URLSearchParams(params.toString());
-          if (e.target.value) p.set("ordem", e.target.value);
-          else p.delete("ordem");
-          go(p);
-        }}
-        className="h-11 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm font-medium text-zinc-900 outline-none transition-colors focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-        aria-label="Ordenar resultados"
-      >
-        {ORDENS.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
       <button
         type="submit"
         className="h-11 rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md active:scale-[0.98]"
