@@ -415,22 +415,20 @@ async function lookupViaSerpApi(asin: string): Promise<AmzLookup | null> {
   if (!key) return null;
   try {
     const res = await fetch(
-      `https://serpapi.com/search.json?engine=amazon_product&asin=${asin}&api_key=${key}`,
+      `https://serpapi.com/search.json?engine=amazon_product&asin=${asin}&amazon_domain=amazon.com.br&api_key=${key}`,
       { signal: AbortSignal.timeout(15_000) },
     );
     const json = (await res.json()) as Record<string, unknown>;
     const p = json.product_results as Record<string, unknown> | undefined;
     if (!p || json.error) return { asin, error: String(json.error ?? "produto não encontrado") };
-    const priceOf = (o: unknown) => {
-      const r = o as Record<string, unknown> | undefined;
-      return parsePriceVal(r?.extracted_price ?? r?.raw);
-    };
-    const price = priceOf(p.price);
-    const wasPrice = priceOf(p.was_price);
-    const images = p.images as Record<string, unknown>[] | undefined;
+    // SerpApi devolve price/old_price como string formatada e
+    // extracted_* como numero — aceita os dois
+    const price = parsePriceVal(p.extracted_price ?? p.price);
+    const wasPrice = parsePriceVal(p.extracted_old_price ?? p.old_price);
+    const thumbnails = p.thumbnails as Record<string, unknown>[] | undefined;
     const imageUrl =
-      (images?.[0]?.link as string | undefined) ??
-      (p.image as string | undefined);
+      (thumbnails?.[0]?.link as string | undefined) ??
+      (p.thumbnail as string | undefined);
     return {
       asin,
       title: (p.title as string | undefined)?.slice(0, 300),
