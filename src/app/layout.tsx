@@ -112,6 +112,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 Lojas Mercado Livre
               </HashLink>
+              <HashLink
+                href="/?aba=amazon"
+                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-orange-500 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Amazon
+              </HashLink>
               <Link
                 href="/cupons"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -137,6 +143,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               >
                 Lojas Mercado Livre
               </HashLink>
+              <HashLink
+                href="/?aba=amazon"
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-orange-50 hover:text-orange-500 dark:text-zinc-300 dark:hover:bg-orange-950/40"
+              >
+                Amazon
+              </HashLink>
               <Link
                 href="/cupons"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
@@ -160,8 +172,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 {SITE_NAME} é um site de ofertas com links de parceiro
                 (afiliado). Podemos receber comissão pelas compras realizadas
                 através dos nossos links, sem custo extra para você. Os preços e
-                cupons são exibidos conforme as informações das lojas parceiras (Lomadee, Mercado Livre, Awin)
-                e podem sofrer alterações.
+                cupons são exibidos conforme as informações das lojas parceiras
+                (Lomadee, Mercado Livre, Awin e Amazon) e podem sofrer alterações.
               </p>
             </div>
             <div className="flex flex-col gap-2 text-sm">
@@ -173,6 +185,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </Link>
               <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Lojas Mercado Livre
+              </Link>
+              <Link href="/?aba=amazon" className="text-zinc-500 transition-colors hover:text-orange-500 dark:text-zinc-400">
+                Amazon
               </Link>
               <Link href="/cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Cupons do dia
