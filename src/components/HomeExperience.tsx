@@ -37,14 +37,14 @@ const notExpired = {
 const TABS = {
   produtos: {
     label: "Produtos",
-    eyebrow: "Todas as fontes",
-    title: "Ofertas e produtos",
+    eyebrow: "Lomadee · Mercado Livre · Amazon · Awin",
+    title: "As melhores ofertas do Brasil",
     noun: "ofertas",
   },
   cupons: {
     label: "Cupons",
     eyebrow: "Cupons de desconto",
-    title: "Cupons do dia",
+    title: "Cupom certo, preço menor",
     noun: "cupons",
   },
 } as const;
