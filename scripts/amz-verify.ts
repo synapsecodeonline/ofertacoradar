@@ -126,6 +126,11 @@ async function main() {
 
   let ok = 0, removed = 0, unknown = 0, consecutiveUnknown = 0;
   const newlyVerified: string[] = [];
+  const saveProgress = () => {
+    const merged = [...new Set([...verified, ...newlyVerified])];
+    mkdirSync(dirname(VERIFIED_FILE), { recursive: true });
+    writeFileSync(VERIFIED_FILE, JSON.stringify(merged));
+  };
 
   for (const p of pending) {
     const asin = p.externalId!.slice(4);
@@ -148,8 +153,11 @@ async function main() {
       consecutiveUnknown++;
       console.log(`  ? sem sinal: ${asin} ${p.title.slice(0, 50)}`);
     }
-    if (verdict !== "unknown") {
+    if (verdict === "eligible") {
       console.log(`  ✓ elegivel: ${asin}`);
+    }
+    if (verdict !== "unknown") {
+      saveProgress(); // grava a cada verificado — nao perde progresso se cair
     }
     // 3 desconhecidos seguidos = sessao provavelmente morta — aborta
     if (consecutiveUnknown >= 3) {
@@ -164,11 +172,7 @@ async function main() {
 
   await browser.close();
 
-  if (newlyVerified.length) {
-    const merged = [...new Set([...verified, ...newlyVerified])];
-    mkdirSync(dirname(VERIFIED_FILE), { recursive: true });
-    writeFileSync(VERIFIED_FILE, JSON.stringify(merged));
-  }
+  saveProgress();
 
   console.log(
     `\nPronto: ${ok} elegiveis | ${removed} desativados | ${unknown} sem sinal.`,
