@@ -61,6 +61,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   // verificacao do canal na Lomadee
   other: { lomadee: "2324685" },
+  // verificacao do dominio no Google Search Console
+  verification: { google: "tpoZjN1_dAX3P0NXtxz00WH0Qyd6GesrCf9fR3RHjh0" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
