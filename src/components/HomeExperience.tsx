@@ -1,4 +1,6 @@
 import { after } from "next/server";
+import { Prisma } from "@prisma/client";
+import type { Product } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
 import { maybeSyncAwin } from "@/lib/awin";
@@ -99,9 +101,9 @@ export async function HomeExperience({
   const searchFilter = query
     ? {
         OR: [
-          { title: { contains: query } },
-          { description: { contains: query } },
-          { merchant: { contains: query } },
+          { title: { contains: query, mode: "insensitive" as const } },
+          { description: { contains: query, mode: "insensitive" as const } },
+          { merchant: { contains: query, mode: "insensitive" as const } },
         ],
       }
     : {};
@@ -120,6 +122,36 @@ export async function HomeExperience({
       searchFilter,
     ],
   };
+
+  // Aba Produtos: intercala as fontes — ROW_NUMBER por fonte (ordem por
+  // desconto) e merge por rodada (rn). Fontes pequenas (Amazon/Awin)
+  // aparecem em toda pagina em vez de afundar no ranking global.
+  // Cupons mantem a ordenacao por expiracao via Prisma.
+  const interleaveConds: Prisma.Sql[] = [
+    Prisma.sql`active = true`,
+    Prisma.sql`("price" IS NULL OR "price" <> 0)`,
+    Prisma.sql`("endsAt" IS NULL OR "endsAt" >= now())`,
+    Prisma.sql`"imageUrl" IS NOT NULL`,
+    Prisma.sql`(
+      "externalId" LIKE 'prod-lomadee:%' OR "externalId" LIKE 'camp-lomadee:%'
+      OR "externalId" LIKE 'ml:%' OR "externalId" LIKE 'aw:%' OR "externalId" LIKE 'amz:%'
+    )`,
+    ...(category
+      ? [Prisma.sql`"category" IN (${Prisma.join(rawSlugsFor(category))})`]
+      : []),
+    ...(category && subtype ? [Prisma.sql`"subtype" = ${subtype}`] : []),
+    ...(merchant
+      ? [Prisma.sql`LOWER("merchant") = LOWER(${merchant})`]
+      : []),
+    ...(query
+      ? [
+          Prisma.sql`(
+            "title" ILIKE ${`%${query}%`} OR "description" ILIKE ${`%${query}%`}
+            OR "merchant" ILIKE ${`%${query}%`}
+          )`,
+        ]
+      : []),
+  ];
 
   // Sync incremental em background: nao bloqueia a resposta.
   // Retornar a promise e obrigatorio: sem isso o after() resolve na
@@ -145,21 +177,45 @@ export async function HomeExperience({
     subtypeFacets,
     couponTotal,
     srcRows,
-    amzRail,
   ] = await Promise.all([
-    prisma.product.findMany({
-      where: listWhere,
-      // Produtos: ranking por maior desconto. Cupons: os que terminam
-      // antes primeiro (mesma logica da antiga pagina /cupons).
-      orderBy: isCouponTab
-        ? [
+    isCouponTab
+      ? prisma.product.findMany({
+          where: listWhere,
+          // Cupons: os que terminam antes primeiro
+          // (mesma logica da antiga pagina /cupons).
+          orderBy: [
             { endsAt: { sort: "asc", nulls: "last" } },
             { id: "desc" as const },
-          ]
-        : { discountPct: { sort: "desc", nulls: "last" } },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
+          ],
+          skip: (page - 1) * PAGE_SIZE,
+          take: PAGE_SIZE,
+        })
+      : // Produtos: intercalado por fonte — ver interleaveConds acima.
+        prisma.$queryRaw<Product[]>`
+          WITH filtered AS (
+            SELECT p.*,
+              CASE
+                WHEN p."externalId" LIKE 'prod-lomadee:%' THEN 0
+                WHEN p."externalId" LIKE 'camp-lomadee:%' THEN 1
+                WHEN p."externalId" LIKE 'ml:%' THEN 2
+                WHEN p."externalId" LIKE 'aw:%' THEN 3
+                WHEN p."externalId" LIKE 'amz:%' THEN 4
+                ELSE 5
+              END AS src
+            FROM "ofertacoradar"."Product" p
+            WHERE ${Prisma.join(interleaveConds, " AND ")}
+          ),
+          ranked AS (
+            SELECT *, ROW_NUMBER() OVER (
+              PARTITION BY src
+              ORDER BY "discountPct" DESC NULLS LAST, id DESC
+            ) - 1 AS rn
+            FROM filtered
+          )
+          SELECT * FROM ranked
+          ORDER BY rn, "discountPct" DESC NULLS LAST, id DESC
+          LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}
+        `,
     prisma.product.count({ where: listWhere }),
     prisma.product.findMany({
       where: {
@@ -271,24 +327,6 @@ export async function HomeExperience({
         AND ("endsAt" IS NULL OR "endsAt" >= now())
       GROUP BY "merchant"
     `,
-    // Trilha "Amazon em destaque": fonte pequena (~74 itens) some no
-    // ranking global por desconto — o rail garante visibilidade na home.
-    // So na visao padrao da aba Produtos (sem busca/filtro/paginacao).
-    tab === "produtos" && !query && !merchant && page === 1
-      ? prisma.product.findMany({
-          where: {
-            active: true,
-            imageUrl: { not: null },
-            AND: [
-              { externalId: { startsWith: "amz:" } },
-              notZeroPrice,
-              notExpired,
-            ],
-          },
-          orderBy: { discountPct: { sort: "desc", nulls: "last" } },
-          take: 12,
-        })
-      : Promise.resolve([]),
   ]);
 
   // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
@@ -386,14 +424,12 @@ export async function HomeExperience({
   const items = pageItems.filter((p) => !flashIds.has(p.id));
 
   // Cliques por produto (30d) para prova social nos cards
-  // (grid + trilha Amazon)
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
-  const clickIds = [...items.map((p) => p.id), ...amzRail.map((p) => p.id)];
-  const clickGroups = clickIds.length
+  const clickGroups = items.length
     ? await prisma.click.groupBy({
         by: ["productId"],
         where: {
-          productId: { in: clickIds },
+          productId: { in: items.map((p) => p.id) },
           createdAt: { gte: monthAgo },
         },
         _count: { _all: true },
@@ -501,36 +537,6 @@ export async function HomeExperience({
         </CollapsibleSection>
       )}
 
-      {/* Amazon em destaque: os ~74 itens amz: nao aparecem no top do
-          ranking global — trilha horizontal garante >=10 visiveis. */}
-      {amzRail.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                Ofertas selecionadas
-              </p>
-              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                Amazon
-              </h2>
-            </div>
-            <HashLink
-              href="/?loja=Amazon#catalogo"
-              className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
-            >
-              Ver todas →
-            </HashLink>
-          </div>
-          <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin]">
-            {amzRail.map((p) => (
-              <div key={p.id} className="w-36 shrink-0 snap-start sm:w-44">
-                <ProductCard product={p} clicks={clickMap.get(p.id)} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {categoryList.length > 0 && (
         <div className="mb-8 mt-4">
           <CategoryNav
@@ -605,7 +611,7 @@ export async function HomeExperience({
       <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
         {isCouponTab
           ? "Ordenados pelos cupons que terminam primeiro"
-          : "Ranking por maior desconto"}
+          : "Fontes intercaladas por rodada, maior desconto primeiro"}
       </p>
 
       {items.length === 0 ? (
