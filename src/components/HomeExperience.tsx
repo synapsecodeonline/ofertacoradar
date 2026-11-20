@@ -470,8 +470,8 @@ export async function HomeExperience({
                 {cfg.title}
               </h1>
               <p className="mt-1 hidden text-sm text-zinc-500 dark:text-zinc-400 sm:mt-2 sm:block">
-                {headerTotal.toLocaleString("pt-BR")} {cfg.noun} verificadas ·
-                preços e ofertas atualizados diariamente
+                {headerTotal.toLocaleString("pt-BR")} {cfg.noun} conferidas ·
+                preço e estoque atualizados todo dia
               </p>
             </div>
             <div className="w-full max-w-2xl">

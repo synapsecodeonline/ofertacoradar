@@ -8,4 +8,4 @@ export function siteUrl(): string {
 }
 
 export const SITE_NAME = "Ofertaço Radar";
-export const SITE_TAGLINE = "Cupons e ofertas com desconto";
+export const SITE_TAGLINE = "Ofertas de verdade, verificadas todo dia";

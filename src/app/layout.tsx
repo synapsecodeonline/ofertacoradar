@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    "Cupons, ofertas e produtos selecionados das melhores lojas. Ofertas verificadas com links diretos para aproveitar o desconto.",
+    "Ofertas de verdade verificadas todo dia: produtos, promoções e cupons de Amazon, Mercado Livre, Lomadee e mais. Preço real, desconto real.",
   keywords: [
     "ofertas",
     "ofertas do dia",
@@ -50,14 +50,14 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description:
-      "Cupons, ofertas e produtos selecionados das melhores lojas. Ofertas verificadas com links diretos.",
+      "Ofertas de verdade verificadas todo dia: produtos, promoções e cupons das maiores lojas do Brasil.",
     images: [{ url: "/api/og", width: 1200, height: 630, alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description:
-      "Cupons, ofertas e produtos selecionados das melhores lojas.",
+      "Ofertas de verdade verificadas todo dia: produtos, promoções e cupons das maiores lojas do Brasil.",
     images: ["/api/og"],
   },
   robots: { index: true, follow: true },
@@ -107,8 +107,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Barra de anuncio (rola para fora) */}
         <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-center text-xs font-semibold text-white">
           <p className="px-4 py-1.5">
-            Ofertas verificadas diariamente · Links de parceiro, sem custo
-            extra para você
+            Ofertas verificadas diariamente · Preço real, desconto real — sem pegadinha
           </p>
         </div>
 
