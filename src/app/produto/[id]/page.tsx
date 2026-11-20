@@ -262,6 +262,8 @@ export default async function ProductPage({
               src={imgSrc(product.imageUrl)}
               alt={product.title}
               className="h-full w-full object-contain p-10"
+              decoding="async"
+              fetchPriority="high"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-zinc-300 dark:text-zinc-700">

@@ -47,6 +47,8 @@ export default async function ProductCard({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-contain p-4 transition-transform duration-500 ease-out group-hover:scale-[1.06]"
             unoptimized
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-zinc-300 dark:text-zinc-700">
@@ -95,6 +97,8 @@ export default async function ProductCard({
               <img
                 src={logo}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="h-4 w-4 shrink-0 rounded-sm bg-white object-contain p-px ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700"
               />
             ) : (
