@@ -61,17 +61,21 @@ export function instagramCaption(p: CaptionProduct): string {
   lines.push(".");
   lines.push("");
 
+  // Maximo 5 hashtags — as mais especificas primeiro (loja, categoria),
+  // depois as genericas de maior alcance
   const tags = [
-    "oferta",
-    "promocao",
-    "desconto",
     p.merchant ? tag(p.merchant) : null,
     p.category ? tag(p.category) : null,
+    "oferta",
+    "desconto",
+    "promocao",
     "economia",
     "achadinhos",
   ].filter((t): t is string => !!t && t.length > 1);
 
-  lines.push([...new Set(tags)].map((t) => `#${t}`).join(" "));
+  lines.push(
+    [...new Set(tags)].slice(0, 5).map((t) => `#${t}`).join(" "),
+  );
 
   return lines.join("\n");
 }

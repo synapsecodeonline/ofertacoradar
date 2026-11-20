@@ -61,9 +61,14 @@ export async function GET(
       currency: true,
       merchant: true,
       couponCode: true,
+      externalId: true,
     },
   });
   if (!product) return new Response("Produto nao encontrado", { status: 404 });
+
+  const isAmazon =
+    product.externalId?.startsWith("amz:") ||
+    product.merchant?.toLowerCase() === "amazon";
 
   const discount =
     product.discountPct ?? discountPercent(product.price, product.oldPrice);
@@ -122,7 +127,20 @@ export async function GET(
                 padding: "12px 24px",
               }}
             >
-              {storeLogoUrl ? (
+              {isAmazon ? (
+                // seta-sorriso da logo Amazon desenhada inline
+                // (SVG externo e instavel no next/og)
+                <svg width="72" height="30" viewBox="0 0 72 30">
+                  <path
+                    d="M4 12 Q36 34 68 12"
+                    stroke="#ff9900"
+                    strokeWidth="6"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <path d="M57 5 L69 13 L58 19 Z" fill="#ff9900" />
+                </svg>
+              ) : storeLogoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={storeLogoUrl}
