@@ -213,10 +213,10 @@ npm run amz:scrape -- --delay 8000 # pausa maior entre requests
 npm run amz:scrape -- --max-new 5  # no maximo 5 produtos NOVOS (resto so atualiza)
 ```
 
-- **Fontes** (editáveis em `SOURCES` no script): `/gp/bestsellers` geral + verticais (eletrônicos, cozinha, beleza) e `/deals`.
+- **Fontes** (editáveis em `SOURCES` no script): `/deals` e best-sellers de nichos (bebê) primeiro na fila, depois buscas direcionadas (`mamadeira`, `toldos` — páginas 1-3/2), best-sellers geral + verticais (eletrônicos, cozinha, beleza). A ordem importa: com `--max-new` a cota enche antes das fontes genéricas.
 - **Extração**: quebra o HTML por `data-asin`, extrai título, preço atual, preço antigo (só com marcador de "de/riscar") e imagem (ampliada para 640px). Só cadastra produto com título + imagem + preço.
-- **Upsert** por `amz:{ASIN}` via `addAmazonProduct` → rodar de novo **atualiza**, nunca duplica. `affiliateUrl` sai com `?tag=$AMZ_TAG`.
-- **Rate limit**: pausa de 5s entre páginas; se a Amazon devolver página de bloqueio (~4KB), o script **aborta** pedindo para aguardar. Não rode em loop.
+- **Upsert** por `amz:{ASIN}` via `addAmazonProduct` → rodar de novo **atualiza**, nunca duplica. `affiliateUrl` sai com `?tag=$AMZ_TAG`. `oldPrice` gravado pelo verify é preservado quando a listagem não traz "De:" (senão o desconto sumiria a cada scrape).
+- **Rate limit**: pausa de 5s entre páginas; se a Amazon devolver página de bloqueio (~4KB) ou HTTP 503, o script tenta **fallback via Chromium logado** (mesma sessão do verify — fingerprint de browser real) e aborta se ambos falharem. Não rode em loop.
 - **Layout mudou?** Se uma página válida retornar "0 produtos extraídos", o parser (`extract()`) precisa de ajuste — os seletores atuais estão comentados no script.
 - Requer `.env` com `DATABASE_URL` (e `AMZ_TAG`, com default `synapsecodeon-20`).
 - **Agendamento local**: `scripts/amz-cron.sh` é o wrapper para cron (resolve o node do nvm e loga em `logs/amz-scrape.log`). Cron instalado: `0 7 * * *` → scrape com `--max-new 5` (**máx. 5 produtos novos/dia**) + verify de elegibilidade — exige a máquina ligada; se a Amazon bloquear, o script aborta e o log mostra.
@@ -234,6 +234,7 @@ npm run amz:verify -- --all   # re-verifica tudo
 
 - Para cada ASIN abre `/dp/{ASIN}` e observa a chamada `data.amazon.com.br/api/.../associate` que a SiteStripe dispara: `shareEligibility.eligible` ou botão "Obter link" → elegível; API sem `eligible` e sem botão → **inelegível (produto desativado)**.
 - Conservador: sem sinal (sessão expirada, captcha, página quebrada) → **pula sem desativar**. 3 "sem sinal" seguidos abortam pedindo novo login.
+- Desconto é detectado na página do produto: `.a-text-price` riscado **maior** que o preço atual (fora de `.a-price-range`, que é faixa de variações e não desconto) ou % de economia ("Você economizou…"). Preço e `oldPrice` são atualizados no banco a cada verificação.
 - Rejeições: **inelegível** → desativa + bloqueio **permanente**; **sem preço de tabela** (sem desconto) → desativa + bloqueio de **7 dias** (volta sozinho se entrar em oferta — o scrape reativa e o verify re-julga). Blocklist em `~/.config/ofertacoradar/amz-blocked.json` (`{asin: expiresAt}`, `0` = permanente); scrape pula ASINs bloqueados.
 - Conjunto já verificado fica em `~/.config/ofertacoradar/amz-verified.json` — reruns só checam novidades. O cron diário roda scrape → verify em sequência.
 - Sessão expira com o tempo: se o verify logar "sessão expirou", rode `npm run amz:login` de novo.

@@ -98,47 +98,90 @@ async function checkAsin(
       timeout: 45000,
     });
     // espera a barra SiteStripe renderizar (ate 20s) — sem ela nao da
-    // pra concluir nada; depois espera a chamada /associate (ate 10s)
+    // pra concluir nada; depois espera a chamada /associate OU o botao
+    // "Obter link" (ate ~20s). Paginas lentas sob carga precisam de
+    // mais paciencia — sem isso tudo vira "sem sinal".
     await page
       .waitForSelector("#nav-AssociateStripe", { timeout: 20000 })
       .catch(() => {});
-    for (let i = 0; i < 20 && !apiBody; i++) await sleep(500);
-    await sleep(1500);
+    for (let i = 0; i < 40; i++) {
+      if (apiBody) break;
+      const gl = await page
+        .evaluate(`!!document.getElementById("amzn-ss-get-link-button")`)
+        .catch(() => false);
+      if (gl) {
+        await sleep(1200); // botao visivel — da mais um tempo pra API chegar
+        break;
+      }
+      await sleep(500);
+    }
+    await sleep(1000);
     // evaluate com STRING: funcoes TS viram __name() do esbuild e quebram
     // no browser. String nao passa pelo transform.
     const dom = (await page.evaluate(`(() => {
       const txt = (sel) => document.querySelector(sel)?.textContent?.trim() ?? "";
+      // escopo do bloco de preco — celwidget#corePrice_desktop e
+      // #corePrice*_feature_div sao os containers reais; .a-price-range
+      // e faixa de variacao ("R$559 - R$699"), NAO desconto
+      const scope = document.querySelector(
+        "#corePrice_desktop, #corePriceDisplay_desktop_feature_div, #corePriceDisplay_feature_div, #corePrice_feature_div, #apex_desktop, #centerCol",
+      ) || document.body;
+      const pick = (sel) => {
+        const el = scope.querySelector(sel);
+        return el ? el.textContent.trim() : "";
+      };
+      const lists = [...scope.querySelectorAll(".a-text-price .a-offscreen")]
+        .filter((e) => !e.closest(".a-price-range"))
+        .map((e) => e.textContent.trim());
+      const saveTxt =
+        pick("#priceSaving") ||
+        pick("#priceblock_saveprice") ||
+        pick(".a-color-price.a-size-small");
       return {
         getLink: !!document.getElementById("amzn-ss-get-link-button"),
         stripe: !!document.getElementById("nav-AssociateStripe"),
         captcha: /digitar os caracteres|enter the characters|não somos robôs|unusual traffic/i.test(
           document.body?.innerText?.slice(0, 3000) ?? "",
         ),
-        // precos da pagina do produto — listagem nao mostra "De: R$ X",
-        // mas a pagina sim (a-text-price/basisPrice = preco de tabela)
         price:
+          pick(".a-price .a-offscreen") ||
           txt("#corePriceDisplay .a-offscreen") ||
-          txt("#corePrice_feature_div .a-offscreen") ||
           txt(".a-price .a-offscreen"),
-        listPrice:
-          txt(".a-text-price .a-offscreen") ||
-          txt("#priceblock_ourprice") ||
-          txt(".basisPrice .a-offscreen") ||
-          txt("#listPrice"),
+        lists,
+        saveTxt,
       };
     })()`)) as {
       getLink: boolean;
       stripe: boolean;
       captcha: boolean;
       price: string;
-      listPrice: string;
+      lists: string[];
+      saveTxt: string;
     };
     const prices: PagePrices = {
       price: brlNum(dom.price),
       oldPrice: null,
     };
-    const list = brlNum(dom.listPrice);
-    if (list && prices.price && list > prices.price) prices.oldPrice = list;
+    // preco de tabela = .a-text-price riscado MAIOR que o atual,
+    // fora de .a-price-range; fallback: % de economia ("Voce
+    // economizou R$ X (Y%)") -> oldPrice = price/(1-pct)
+    if (prices.price) {
+      for (const l of dom.lists) {
+        const v = brlNum(l);
+        if (v && v > prices.price) {
+          prices.oldPrice = v;
+          break;
+        }
+      }
+      if (prices.oldPrice == null) {
+        const pct = dom.saveTxt.match(/(\d{1,2})\s*%/);
+        if (pct) {
+          const p = Number(pct[1]);
+          if (p > 0 && p < 90)
+            prices.oldPrice = Math.round((prices.price / (1 - p / 100)) * 100) / 100;
+        }
+      }
+    }
     if (dom.captcha) return { verdict: "unknown", prices };
     const apiEligible = /"eligible"\s*:/.test(apiBody);
     if (apiEligible || dom.getLink)

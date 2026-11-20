@@ -19,6 +19,12 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
+const AMZ_STATE = join(homedir(), ".config/ofertacoradar/amz-state.json");
+const AMZ_LIBS = join(
+  homedir(),
+  ".local/share/ofertacoradar-chromelibs/x86_64-linux-gnu",
+);
+
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
@@ -31,6 +37,8 @@ const SOURCES = [
   "https://www.amazon.com.br/s?k=mamadeira",
   "https://www.amazon.com.br/s?k=mamadeira&page=2",
   "https://www.amazon.com.br/s?k=mamadeira&page=3",
+  "https://www.amazon.com.br/s?k=toldos",
+  "https://www.amazon.com.br/s?k=toldos&page=2",
   "https://www.amazon.com.br/gp/bestsellers",
   "https://www.amazon.com.br/gp/bestsellers/electronics",
   "https://www.amazon.com.br/gp/bestsellers/kitchen",
@@ -171,6 +179,40 @@ async function fetchPage(
   return { html };
 }
 
+// Fallback via Chromium logado (sessao SiteStripe): quando o fetch puro
+// toma 503/bloqueio, o browser real passa — fingerprint TLS diferente.
+let pwPage: import("playwright").Page | null = null;
+let pwBrowser: import("playwright").Browser | null = null;
+
+async function fetchViaBrowser(url: string): Promise<string | null> {
+  try {
+    if (!pwBrowser) {
+      process.env.LD_LIBRARY_PATH = `${AMZ_LIBS}:${process.env.LD_LIBRARY_PATH ?? ""}`;
+      const { chromium } = await import("playwright");
+      pwBrowser = await chromium.launch({ headless: true });
+      const ctx = await pwBrowser.newContext({
+        storageState: existsSync(AMZ_STATE) ? AMZ_STATE : undefined,
+        locale: "pt-BR",
+      });
+      pwPage = await ctx.newPage();
+    }
+    const res = await pwPage!.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    if (!res || res.status() >= 400) {
+      console.log(`  browser HTTP ${res?.status()} em ${url}`);
+      return null;
+    }
+    await pwPage!.waitForTimeout(3000);
+    const html = await pwPage!.content();
+    return html.length > 50_000 ? html : null;
+  } catch (e) {
+    console.log(`  browser falhou: ${e instanceof Error ? e.message.slice(0, 80) : e}`);
+    return null;
+  }
+}
+
 async function main() {
   const urls = SOURCES.filter((u) => !ONLY || u.includes(ONLY)).slice(0, MAX_PAGES);
   console.log(`${urls.length} pagina(s) para raspar.\n`);
@@ -205,12 +247,17 @@ async function main() {
   for (const url of urls) {
     if (quotaHit) break;
     console.log(`→ ${url}`);
-    const { html, blocked } = await fetchPage(url);
+    let { html, blocked } = await fetchPage(url);
     if (!html) {
-      errors++;
-      if (blocked) break; // IP bloqueado — proximas paginas vao falhar igual
-      await sleep(DELAY);
-      continue;
+      // fetch bloqueado/503 -> tenta via Chromium logado
+      console.log("  tentando via browser logado...");
+      html = await fetchViaBrowser(url);
+      if (!html) {
+        errors++;
+        if (blocked) break; // IP bloqueado — proximas paginas vao falhar igual
+        await sleep(DELAY);
+        continue;
+      }
     }
     const items = extract(html);
     // Detector de mudanca de layout: pagina valida sem nenhum ASIN
@@ -272,6 +319,8 @@ async function main() {
     }
     await sleep(DELAY);
   }
+
+  await pwBrowser?.close().catch(() => {});
 
   const ativos = await prisma.product.count({
     where: { active: true, externalId: { startsWith: "amz:" } },
