@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
@@ -16,10 +15,8 @@ import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
 import CollapsibleSection from "@/components/CollapsibleSection";
-import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
-import { Suspense, type ReactNode } from "react";
-import type { Product } from "@prisma/client";
+import { Suspense } from "react";
 
 const PAGE_SIZE = 48;
 
@@ -31,127 +28,24 @@ const notExpired = {
   OR: [{ endsAt: null }, { endsAt: { gte: new Date() } }],
 };
 
-const SORTS = {
-  desconto: { label: "Maior desconto" },
-  recentes: { label: "Mais recentes" },
-  terminando: { label: "Terminando em breve" },
-  populares: { label: "Mais populares" },
-} as const;
-
-type SortKey = keyof typeof SORTS;
-
-// Cada aba e uma fonte de afiliado: o catalogo nunca mistura fontes.
-// prefix = externalId prefix; noun = rotulo de contagem; sort default.
+// Duas abas: "Produtos" = catalogo unificado de produtos e ofertas de
+// TODAS as fontes (ranking por desconto); "Cupons" = itens com codigo
+// de cupom, de qualquer fonte (ordenados pelo que termina antes).
 const TABS = {
-  lomadee: {
-    label: "Lomadee (Multi Marcas)",
-    eyebrow: "Lomadee",
-    title: "Ofertas Lomadee",
+  produtos: {
+    label: "Produtos",
+    eyebrow: "Todas as fontes",
+    title: "Ofertas e produtos",
     noun: "ofertas",
-    prefix: "prod-lomadee:",
-    defaultSort: "desconto",
   },
-  ml: {
-    label: "Mercado Livre",
-    eyebrow: "Mercado Livre",
-    title: "Ofertas Mercado Livre",
-    noun: "ofertas",
-    prefix: "ml:",
-    defaultSort: "desconto",
-  },
-  awin: {
-    label: "Awin",
-    eyebrow: "Awin",
-    title: "Produtos Awin",
-    noun: "produtos",
-    prefix: "aw:",
-    defaultSort: "recentes",
-  },
-  amazon: {
-    label: "Amazon",
-    eyebrow: "Amazon",
-    title: "Ofertas Amazon",
-    noun: "ofertas",
-    prefix: "amz:",
-    defaultSort: "desconto",
+  cupons: {
+    label: "Cupons",
+    eyebrow: "Cupons de desconto",
+    title: "Cupons do dia",
+    noun: "cupons",
   },
 } as const;
 type Tab = keyof typeof TABS;
-const TAB_ORDER = Object.keys(TABS) as Tab[];
-// Abas de oferta: sempre ranking por desconto — ?ordem= nao se aplica
-const RANKED_TABS: Tab[] = ["lomadee", "ml", "amazon"];
-
-function orderByFor(sort: SortKey) {
-  switch (sort) {
-    case "desconto":
-      return { discountPct: { sort: "desc" as const, nulls: "last" as const } };
-    case "terminando":
-      return { endsAt: { sort: "asc" as const, nulls: "last" as const } };
-    case "populares":
-      return { clicks: { _count: "desc" as const } };
-    default:
-      return { updatedAt: "desc" as const };
-  }
-}
-
-function RailCard({
-  p,
-  className = "w-48",
-  corner,
-  footer,
-}: {
-  p: Product;
-  className?: string;
-  corner?: ReactNode;
-  footer?: ReactNode;
-}) {
-  const d = p.discountPct ?? discountPercent(p.price, p.oldPrice);
-  const saving =
-    p.price != null && p.oldPrice != null && p.oldPrice > p.price
-      ? p.oldPrice - p.price
-      : null;
-  return (
-    <Link
-      href={`/produto/${p.id}`}
-      className={`group flex ${className} shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900`}
-    >
-      <div className="relative aspect-[4/3] bg-zinc-50 dark:bg-zinc-950">
-        {p.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imgSrc(p.imageUrl)}
-            alt={p.title}
-            className="h-full w-full object-contain p-2"
-          />
-        )}
-        {d !== null && (
-          <span className="absolute left-1.5 top-1.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
-            -{d}%
-          </span>
-        )}
-        {corner}
-      </div>
-      <div className="flex flex-1 flex-col gap-1 p-2.5">
-        <h3 className="line-clamp-2 text-xs font-semibold leading-snug">
-          {p.title}
-        </h3>
-        <div className="mt-auto flex items-baseline gap-1.5">
-          {p.price != null && (
-            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-              {formatPrice(p.price, p.currency)}
-            </span>
-          )}
-          {saving !== null && saving >= 10 && (
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-              -{formatPrice(saving, p.currency)}
-            </span>
-          )}
-        </div>
-        {footer}
-      </div>
-    </Link>
-  );
-}
 
 type SearchParams = Promise<{
   [key: string]: string | string[] | undefined;
@@ -165,8 +59,7 @@ export async function HomeExperience({
   // dayOnly: renderiza so Instagram + transparencia (tela "Ofertas do dia")
   dayOnly?: boolean;
 }) {
-  const { q, categoria, aba, pagina, ordem, loja, tipo, fonte: fonteRaw } =
-    await searchParams;
+  const { q, categoria, aba, pagina, loja, tipo } = await searchParams;
   const query = typeof q === "string" ? q : "";
   const rawCat = typeof categoria === "string" ? categoria : "";
   const category = rawCat ? canonicalCategory(rawCat) : "";
@@ -174,34 +67,29 @@ export async function HomeExperience({
   const subDefs = subtypesFor(category);
   const subtype = subDefs.some((d) => d.slug === rawSub) ? rawSub : "";
   const rawTab = typeof aba === "string" ? aba : "";
-  const fonteParam = typeof fonteRaw === "string" ? fonteRaw : "";
-  // Legado: aba=produtos (catalogo unificado) e ?fonte= migram p/ a aba da fonte
-  // "lojas"/"produtos"/"ofertas" sao legados -> aba canonica e lomadee
-  let tab: Tab = "lomadee";
-  if (TAB_ORDER.includes(rawTab as Tab)) tab = rawTab as Tab;
-  else if (rawTab === "produtos" || rawTab === "ofertas" || rawTab === "lojas")
-    tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lomadee";
-  else if (fonteParam === "ml" || fonteParam === "awin" || fonteParam === "amazon" || fonteParam === "lomadee") tab = fonteParam === "lomadee" ? "lomadee" : fonteParam;
+  // Legado: ?aba=lomadee|ml|awin|amazon|produtos|ofertas|lojas e ?fonte=
+  // convergem para a aba Produtos — as URLs antigas caem na visao
+  // unificada em vez de 404. So "cupons" e aba propria.
+  const tab: Tab = rawTab === "cupons" ? "cupons" : "produtos";
+  const isCouponTab = tab === "cupons";
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
   const cfg = TABS[tab];
-  const sort: SortKey =
-    ordem === "recentes" || ordem === "terminando" || ordem === "populares"
-      ? ordem
-      : cfg.defaultSort;
 
-  // Cada aba filtra um unico prefixo de fonte — nada de misturar.
-  // Lomadee inclui cupons camp-lomadee: alem dos produtos prod-lomadee:
-  // ("todas as ofertas validas" da aba).
-  const sourceCond =
-    tab === "lomadee"
-      ? {
-          OR: [
-            { externalId: { startsWith: "prod-lomadee:" } },
-            { externalId: { startsWith: "camp-lomadee:" } },
-          ],
-        }
-      : { externalId: { startsWith: cfg.prefix } };
+  // Produtos: tudo que e item de afiliado vendavel, de todas as fontes,
+  // num ranking so. Cupons: so itens com codigo de cupom (couponCode
+  // nao nulo/vazio — NULL e "" caem fora pelo <> '' do SQL).
+  const sourceCond = isCouponTab
+    ? { couponCode: { not: "" } }
+    : {
+        OR: [
+          { externalId: { startsWith: "prod-lomadee:" } },
+          { externalId: { startsWith: "camp-lomadee:" } },
+          { externalId: { startsWith: "ml:" } },
+          { externalId: { startsWith: "aw:" } },
+          { externalId: { startsWith: "amz:" } },
+        ],
+      };
   const searchFilter = query
     ? {
         OR: [
@@ -227,35 +115,6 @@ export async function HomeExperience({
     ],
   };
 
-  // Secao "Ofertas {Fonte}": Lomadee usa camp: (ofertas/cupons);
-  // ML/Awin usam os itens com desconto da propria fonte.
-  const OFFERS_PREFIX: Record<Tab, string> = {
-    lomadee: "camp-lomadee:",
-    ml: "ml:",
-    awin: "aw:",
-    amazon: "amz:",
-  };
-  const OFFERS_TITLE: Record<Tab, string> = {
-    lomadee: "Ofertas Lomadee",
-    ml: "Ofertas Mercado Livre",
-    awin: "Ofertas Awin",
-    amazon: "Ofertas Amazon",
-  };
-  const STORE_EYEBROW: Record<Tab, string> = {
-    lomadee: "Lomadee (Multi Marcas)",
-    ml: "Mercado Livre",
-    awin: "Lojas Awin",
-    amazon: "Lojas Amazon",
-  };
-  const offersWhere = {
-    ...listWhere,
-    AND: [
-      { externalId: { startsWith: OFFERS_PREFIX[tab] } },
-      ...listWhere.AND.filter((c) => c !== sourceCond),
-      ...(tab === "lomadee" ? [] : [{ discountPct: { gt: 0 } }]),
-    ],
-  };
-
   // Sync incremental em background: nao bloqueia a resposta.
   // Retornar a promise e obrigatorio: sem isso o after() resolve na
   // hora e a function congela apos a resposta, matando o sync.
@@ -277,12 +136,19 @@ export async function HomeExperience({
     flashDeals,
     brandRows,
     subtypeFacets,
-    offersItems,
+    couponTotal,
     srcRows,
   ] = await Promise.all([
     prisma.product.findMany({
       where: listWhere,
-      orderBy: orderByFor(RANKED_TABS.includes(tab) ? "desconto" : sort),
+      // Produtos: ranking por maior desconto. Cupons: os que terminam
+      // antes primeiro (mesma logica da antiga pagina /cupons).
+      orderBy: isCouponTab
+        ? [
+            { endsAt: { sort: "asc", nulls: "last" } },
+            { id: "desc" as const },
+          ]
+        : { discountPct: { sort: "desc", nulls: "last" } },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -365,18 +231,18 @@ export async function HomeExperience({
           _count: { _all: true },
         })
       : Promise.resolve([]),
-    // Secao de ofertas da fonte (camp-lomadee: na Lomadee; desconto em ML/Awin)
-    prisma.product.findMany({
-      where: offersWhere,
-      orderBy:
-        tab === "lomadee"
-          ? { endsAt: { sort: "asc", nulls: "last" } }
-          : { discountPct: { sort: "desc", nulls: "last" } },
-      take: 12,
+    // Total de cupons do catalogo inteiro (sem filtros) p/ o cabecalho
+    prisma.product.count({
+      where: {
+        active: true,
+        imageUrl: { not: null },
+        couponCode: { not: "" },
+        AND: [notExpired],
+      },
     }),
     // Merchants visiveis por fonte em UMA query (FILTER por prefixo) ->
-    // aba das "Lojas em destaque" + contagem das abas. Uma query so porque
-    // o pool do banco e pequeno (connection_limit baixo).
+    // secao "Lojas em destaque" + total do catalogo de produtos.
+    // Uma query so porque o pool do banco e pequeno (connection_limit baixo).
     prisma.$queryRaw<
       { merchant: string; camp: bigint; prod: bigint; ml: bigint; aw: bigint; amz: bigint }[]
     >`
@@ -401,69 +267,44 @@ export async function HomeExperience({
     brandRows.map((b) => [b.name ?? "", b.logo] as const),
   );
 
-  // Contagem de itens visiveis por fonte (abas) e por loja.
-  // srcRows: uma linha por merchant com contagem por prefixo de fonte.
-  const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw" | "amz"> = {
-    lomadee: "prod",
-    ml: "ml",
-    awin: "aw",
-    amazon: "amz",
-  };
-  const tabCounts = new Map<Tab, number>();
-  const countByMerchant = new Map<string, number>();
+  // srcRows: uma linha por merchant com contagem por prefixo de fonte —
+  // alimenta "Lojas em destaque" e o total do catalogo de produtos.
   const merchantSrc = new Map<
     string,
     { camp: number; prod: number; ml: number; aw: number; amz: number }
   >();
+  let catalogTotal = 0;
   for (const r of srcRows) {
-    const camp = Number(r.camp);
-    const prod = Number(r.prod);
-    const ml = Number(r.ml);
-    const aw = Number(r.aw);
-    const amz = Number(r.amz);
-    const total = camp + prod + ml + aw + amz;
-    countByMerchant.set(r.merchant, total);
-    merchantSrc.set(r.merchant, { camp, prod, ml, aw, amz });
-    for (const t of TAB_ORDER) {
-      // Lomadee conta produtos + cupons (mesma regra do sourceCond)
-      const n = t === "lomadee" ? camp + prod : { camp, prod, ml, aw, amz }[SRC_KEY[t]];
-      if (n <= 0) continue;
-      tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
-    }
+    const counts = {
+      camp: Number(r.camp),
+      prod: Number(r.prod),
+      ml: Number(r.ml),
+      aw: Number(r.aw),
+      amz: Number(r.amz),
+    };
+    merchantSrc.set(r.merchant, counts);
+    catalogTotal += counts.camp + counts.prod + counts.ml + counts.aw + counts.amz;
   }
-  // Awin/Amazon so aparecem como aba quando houver itens
-  const catalogTotal =
-    (tabCounts.get("lomadee") ?? 0) +
-    (tabCounts.get("ml") ?? 0) +
-    (tabCounts.get("awin") ?? 0) +
-    (tabCounts.get("amazon") ?? 0);
+  const headerTotal = isCouponTab ? couponTotal : catalogTotal;
 
-  // "Lojas em destaque" por aba. Lomadee = rede inteira (camp+prod),
-  // ML = ml:, Awin = aw:, Amazon = amz: — cada tela so mostra lojas da sua fonte.
-  const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw" | "amz"> = {
-    lomadee: "prod",
-    ml: "ml",
-    awin: "aw",
-    amazon: "amz",
-  };
-  const featuredForTab = (t: Tab) =>
-    FEATURED_STORES.map((s) => {
-      const src = merchantSrc.get(s.merchant);
-      const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0, amz: 0 };
-      // Lomadee (Multi Marcas) inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
-      const visible =
-        t === "lomadee"
-          ? counts.camp + counts.prod > 0
-          : (src ? src[SRC_COUNT[t]] : 0) > 0;
-      return {
-        ...s,
-        offers: counts.camp,
-        products: counts.prod + counts.ml + counts.aw + counts.amz,
-        linkTab: t,
-        visible,
-      };
-    }).filter((s) => s.visible);
-  const featuredStores = featuredForTab(tab);
+  // "Lojas em destaque": qualquer loja com itens ativos no catalogo
+  // unificado (todas as fontes). Links levam a aba Produtos + ?loja=.
+  const featuredStores = FEATURED_STORES.map((s) => {
+    const counts = merchantSrc.get(s.merchant) ?? {
+      camp: 0,
+      prod: 0,
+      ml: 0,
+      aw: 0,
+      amz: 0,
+    };
+    const products = counts.prod + counts.ml + counts.aw + counts.amz;
+    return {
+      ...s,
+      offers: counts.camp,
+      products,
+      visible: counts.camp + products > 0,
+    };
+  }).filter((s) => s.visible);
 
 
   const categoryList = [
@@ -499,9 +340,8 @@ export async function HomeExperience({
     if (category) p.set("categoria", category);
     if (category && subtype) p.set("tipo", subtype);
     if (merchant) p.set("loja", merchant);
-    p.set("aba", tab);
-    const defaultSort = cfg.defaultSort;
-    if (sort !== defaultSort) p.set("ordem", sort);
+    // Produtos e a aba padrao — so grava ?aba= na aba Cupons
+    if (isCouponTab) p.set("aba", "cupons");
     for (const [k, v] of Object.entries(extra)) {
       if (v === "") p.delete(k);
       else p.set(k, v);
@@ -545,7 +385,7 @@ export async function HomeExperience({
                 {cfg.title}
               </h1>
               <p className="mt-1 hidden text-sm text-zinc-500 dark:text-zinc-400 sm:mt-2 sm:block">
-                {catalogTotal.toLocaleString("pt-BR")} {cfg.noun} verificadas ·
+                {headerTotal.toLocaleString("pt-BR")} {cfg.noun} verificadas ·
                 preços e ofertas atualizados diariamente
               </p>
             </div>
@@ -563,47 +403,16 @@ export async function HomeExperience({
       )}
 
       {!dayOnly && (<>
-      {/* Ofertas da fonte: removidas das abas Lomadee/ML — ofertas ficam
-          centralizadas em / e /cupons. Awin ainda nao tem
-          itens, entao a secao so renderiza se aparecer algo. */}
-      {tab === "awin" && offersItems.length > 0 && (
+      {/* Lojas em destaque: apenas lojas com itens ativos no catalogo
+          unificado. So na aba Produtos — Cupons e uma lista curta. */}
+      {tab === "produtos" && featuredStores.length > 0 && (
         <CollapsibleSection
           defaultOpen={false}
           className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
           title={
             <span className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Ofertas verificadas
-              </span>
-              <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
-                {OFFERS_TITLE[tab]}
-              </span>
-            </span>
-          }
-          meta={
-            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              {offersItems.length} ofertas
-            </span>
-          }
-        >
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {offersItems.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
-
-      {/* Lojas em destaque: apenas lojas com produtos ativos.
-          So na aba Awin — Lomadee/ML sao catalogo ranqueado puro. */}
-      {tab === "awin" && featuredStores.length > 0 && (
-        <CollapsibleSection
-          defaultOpen={false}
-          className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-          title={
-            <span className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                {STORE_EYEBROW[tab]}
+                Lojas parceiras
               </span>
               <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
                 Lojas em destaque
@@ -622,7 +431,7 @@ export async function HomeExperience({
               return (
                 <HashLink
                   key={s.merchant}
-                  href={`/?aba=${s.linkTab}&loja=${encodeURIComponent(s.merchant)}#catalogo`}
+                  href={`/?loja=${encodeURIComponent(s.merchant)}#catalogo`}
                   className="group flex aspect-square flex-col items-center justify-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
@@ -730,34 +539,13 @@ export async function HomeExperience({
         </nav>
       )}
 
-      {/* Ordenacao: entre categorias e catalogo.
-          Lomadee/ML sao sempre ranking — seletor so faz sentido na Awin. */}
-      {RANKED_TABS.includes(tab) ? (
-        <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
-          Ranking por maior desconto
-        </p>
-      ) : (
-      <div className="mb-5 flex flex-wrap items-center justify-center gap-1.5 text-xs">
-        <span className="mr-1 font-semibold text-zinc-500 dark:text-zinc-400">
-          Ordenar por
-        </span>
-        <div className="flex flex-wrap justify-center gap-1 rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
-          {(Object.keys(SORTS) as SortKey[]).map((s) => (
-            <HashLink
-              key={s}
-              href={qs({ ordem: s })}
-              className={`rounded-full px-3 py-1 font-medium transition-all ${
-                sort === s
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-              }`}
-            >
-              {SORTS[s].label}
-            </HashLink>
-          ))}
-        </div>
-      </div>
-      )}
+      {/* Ordenacao fixa por aba: Produtos ranqueia por desconto,
+          Cupons pelos que terminam antes. */}
+      <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
+        {isCouponTab
+          ? "Ordenados pelos cupons que terminam primeiro"
+          : "Ranking por maior desconto"}
+      </p>
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
@@ -765,9 +553,9 @@ export async function HomeExperience({
             Nada por aqui ainda
           </p>
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-            {tab === "awin"
-              ? "Awin ainda não tem ofertas ativas. Assim que uma loja parceira for aprovada, os produtos aparecem aqui automaticamente."
-              : `Nenhum item encontrado em ${cfg.label} com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
+            {isCouponTab
+              ? "Nenhum cupom ativo no momento. Volte em breve — novos códigos aparecem todo dia."
+              : `Nenhum item encontrado com esses filtros. Tente outra busca ou volte mais tarde — o catálogo é atualizado diariamente.`}
           </p>
         </div>
       ) : (

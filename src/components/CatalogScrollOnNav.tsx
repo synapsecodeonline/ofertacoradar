@@ -38,7 +38,7 @@ export function markScrollTo(hash: string) {
 /**
  * Montado uma vez na home. Rola ate o hash em dois momentos:
  * 1) no mount — cobre cliques vindos de OUTRA pagina (ex.: header em
- *    /produto/x -> /?aba=ml#catalogo), quando os params nao "mudam"
+ *    /produto/x -> /?aba=cupons#catalogo), quando os params nao "mudam"
  *    dentro desta pagina;
  * 2) quando searchParams mudam — cobre navegacao client-side dentro da
  *    home, que comita DEPOIS do clique (o reset de scroll do Next nao

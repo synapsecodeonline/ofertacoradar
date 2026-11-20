@@ -101,29 +101,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="flex items-center gap-2">
               <nav className="hidden items-center gap-1 rounded-full border border-zinc-200/70 bg-zinc-100/70 p-1 text-sm font-semibold dark:border-zinc-800 dark:bg-zinc-900/70 sm:flex">
               <HashLink
-                href="/?aba=lomadee"
+                href="/"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Lomadee (Multi Marcas)
+                Produtos
               </HashLink>
               <HashLink
-                href="/?aba=ml"
-                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Mercado Livre
-              </HashLink>
-              <HashLink
-                href="/?aba=amazon"
-                className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-orange-500 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Amazon
-              </HashLink>
-              <Link
-                href="/cupons"
+                href="/?aba=cupons"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Cupons
-              </Link>
+              </HashLink>
               </nav>
               <AuthButton />
               <ThemeToggle />
@@ -132,29 +120,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* Menu mobile: fileira de pills com scroll horizontal */}
           <nav className="flex items-center gap-1 overflow-x-auto border-t border-zinc-200/60 px-4 py-2 [scrollbar-width:none] dark:border-zinc-800/60 sm:hidden [&::-webkit-scrollbar]:hidden">
               <HashLink
-                href="/?aba=lomadee"
+                href="/"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
-                Lomadee (Multi Marcas)
+                Produtos
               </HashLink>
               <HashLink
-                href="/?aba=ml"
-                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
-              >
-                Mercado Livre
-              </HashLink>
-              <HashLink
-                href="/?aba=amazon"
-                className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-orange-50 hover:text-orange-500 dark:text-zinc-300 dark:hover:bg-orange-950/40"
-              >
-                Amazon
-              </HashLink>
-              <Link
-                href="/cupons"
+                href="/?aba=cupons"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
                 Cupons
-              </Link>
+              </HashLink>
           </nav>
         </header>
         <DbStatusBanner />
@@ -180,17 +156,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
                 Navegação
               </p>
-              <Link href="/?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Lomadee (Multi Marcas)
+              <Link href="/" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Produtos
               </Link>
-              <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Mercado Livre
-              </Link>
-              <Link href="/?aba=amazon" className="text-zinc-500 transition-colors hover:text-orange-500 dark:text-zinc-400">
-                Amazon
-              </Link>
-              <Link href="/cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Cupons do dia
+              <Link href="/?aba=cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Cupons
               </Link>
               <a
                 href={

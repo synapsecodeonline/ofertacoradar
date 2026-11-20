@@ -247,7 +247,9 @@ async function main() {
   for (const url of urls) {
     if (quotaHit) break;
     console.log(`→ ${url}`);
-    let { html, blocked } = await fetchPage(url);
+    const fetched = await fetchPage(url);
+    let { html } = fetched;
+    const { blocked } = fetched;
     if (!html) {
       // fetch bloqueado/503 -> tenta via Chromium logado
       console.log("  tentando via browser logado...");

@@ -42,8 +42,8 @@ npm run dev          # http://localhost:3000
 
 | Rota | Tipo | Descrição |
 |---|---|---|
-| `/` | página | **O catálogo** — abas por fonte (`?aba=lomadee\|ml\|awin\|amazon`), busca, categorias, subtipos, ordenação e grid paginado. Lomadee/ML/Amazon são sempre **ranking por maior desconto**; Awin tem seletor de ordenação. Nunca mistura fontes. |
-| `/cupons` | página | **Cupons do dia** — só `camp-lomadee:` (cupons/ofertas promocionais), ordenados por expiração, paginação `?cpage=`. |
+| `/` | página | **O catálogo** — duas abas: `Produtos` (padrão, catálogo unificado de produtos e ofertas de **todas** as fontes, ranking por maior desconto) e `?aba=cupons` (itens com `couponCode` de qualquer fonte, ordenados por expiração). Busca, categorias, subtipos e grid paginado. URLs antigas `?aba=lomadee\|ml\|awin\|amazon\|produtos\|ofertas\|lojas` e `?fonte=` convergem para a aba Produtos. |
+| `/cupons` | route handler | Redirect 302 → `/?aba=cupons` (a página de cupons virou aba da home; redirect preserva links/SEO antigos). |
 | `/produto/[id]` | página | Detalhe: preço, cupom copiável, countdown, prova social, relacionados, share, JSON-LD `Product`+`BreadcrumbList`. Dispara sync em `after()`. |
 | `/ir/[id]` | route handler | Redirect 302 para a loja **registrando clique** (pulando admin logado e bots). `?src=` → `utm_source`. Por fonte: `ml:` → `matt_tool`/`matt_word`; `amz:` → força `?tag=`; `prod-lomadee:` sem affiliateUrl → shortener `lmdee.link`. |
 | `/admin` | página | Painel restrito a logados (Supabase): KPIs, gráficos, status de sync por fonte com erros, produtos sem imagem, botão "Sincronizar agora" (todas as fontes), **formulário de cadastro manual Amazon**, export CSV. Auto-refresh (15s durante sync, 60s ocioso). |
@@ -58,7 +58,7 @@ npm run dev          # http://localhost:3000
 | `/api/ml-auth/start\|callback` | route handlers | OAuth do Mercado Livre (bootstrap manual). |
 | `/api/health` | route handler | Health check `{ok:true}`. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo Instagram (login): top produtos + `cardUrl` + caption. |
-| `/sitemap.xml` | metadata route | Home + `/cupons` + **todos** os produtos ativos (até 45.000). |
+| `/sitemap.xml` | metadata route | Home + `/?aba=cupons` + **todos** os produtos ativos (até 45.000). |
 | `/robots.txt` | metadata route | Libera tudo exceto `/ir/`; aponta para o sitemap. |
 
 ### `/ir/[id]` em detalhe
@@ -107,9 +107,9 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ### UX / Conversão
 
-- Abas por fonte no menu: **Lojas Lomadee · Lojas Mercado Livre · Amazon · Cupons** (Awin só aparece com itens).
-- Ranking por maior desconto forçado em Lomadee/ML/Amazon (busca e filtros respeitam).
-- "Lojas em destaque" apenas na aba Awin.
+- Duas abas no menu: **Produtos** (catálogo unificado de todas as fontes) e **Cupons** (itens com código de cupom).
+- Aba Produtos: ranking por maior desconto forçado (busca e filtros respeitam). Aba Cupons: ordenada pelos que terminam primeiro.
+- "Lojas em destaque" na aba Produtos — qualquer loja com itens ativos.
 - Busca (`?q=`), filtro de loja (`?loja=`), categoria (`?categoria=`) e subtipo (`?tipo=`).
 - Paginação `?pagina=` (24–48 itens/página conforme a visão).
 - Cards com logo da loja, badge de fonte, desconto, cupom, urgência e prova social (cliques 30d ≥ 3).
@@ -132,12 +132,12 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ## SEO
 
-- `sitemap.xml` dinâmico: home + `/cupons` + **todos** os produtos ativos (até 45.000, limite do sitemap é 50k).
+- `sitemap.xml` dinâmico: home + `/?aba=cupons` + **todos** os produtos ativos (até 45.000, limite do sitemap é 50k).
 - `robots.txt`: `allow: /`, `disallow: /ir/`.
 - Metadata global: template `%s | Ofertaço Radar`, keywords pt-BR, OG `pt_BR`, Twitter `summary_large_image`, `og:image` = `/api/og`.
 - Home: JSON-LD `WebSite` + `Organization`.
 - Produto: canonical, OG com imagem, JSON-LD `Product`/`Offer`/`BreadcrumbList`.
-- `/cupons`: canonical + OG próprio.
+- `/?aba=cupons`: canonical + OG herdados da home.
 - Performance da home: queries independentes em `Promise.all`, contagens por fonte numa `$queryRaw` com `FILTER`.
 
 ---
@@ -183,7 +183,7 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ### Arquitetura
 
-- **Gatilhos**: `after()` no cron (`/api/cron/sync`, a cada 1min via cron-job.org), `/cupons`, `/produto/[id]` e botão do `/admin` (`/api/admin/sync` → `startAllSyncs`). **Retornar a promise é obrigatório** — sem isso o `after()` resolve na hora e a function congela, matando o sync.
+- **Gatilhos**: `after()` no cron (`/api/cron/sync`, a cada 1min via cron-job.org), home (`/`), `/produto/[id]` e botão do `/admin` (`/api/admin/sync` → `startAllSyncs`). **Retornar a promise é obrigatório** — sem isso o `after()` resolve na hora e a function congela, matando o sync.
 - **Travas/heartbeat** (`src/lib/sync-lock.ts`, compartilhado): `busyAt` na `SyncState` + heartbeat a cada 30s + linhas `:beat`/`:err`. Lock expira em 3min se o worker morrer.
 - **Budget** ~45s por invocação; ciclos completam em múltiplas invocações via `phase`/`page` persistidos.
 - **Dois pools Prisma**: `prisma` (páginas, `connection_limit=5`) e `syncPrisma` (`src/lib/db.ts`, `connection_limit=2`) para o sync não competir com queries do site.
