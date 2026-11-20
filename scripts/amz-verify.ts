@@ -28,6 +28,12 @@ const VERIFIED_FILE = join(
   "ofertacoradar",
   "amz-verified.json",
 );
+const BLOCKED_FILE = join(
+  homedir(),
+  ".config",
+  "ofertacoradar",
+  "amz-blocked.json",
+);
 const LIBS = join(
   homedir(),
   ".local/share/ofertacoradar-chromelibs/x86_64-linux-gnu",
@@ -137,6 +143,24 @@ async function main() {
     ? JSON.parse(readFileSync(VERIFIED_FILE, "utf8"))
     : [];
   const verifiedSet = new Set(ALL ? [] : verified);
+  // blocklist: ASINs rejeitados (inelegiveis ou sem desconto) — o scrape
+  // nao recadastra e o verify nao reprocessa
+  const blocked: string[] = existsSync(BLOCKED_FILE)
+    ? JSON.parse(readFileSync(BLOCKED_FILE, "utf8"))
+    : [];
+  const blockedSet = new Set(blocked);
+  let blockChanged = false;
+  const reject = async (asin: string, productId: number, why: string) => {
+    await prisma.product.update({
+      where: { id: productId },
+      data: { active: false },
+    });
+    if (!blockedSet.has(asin)) {
+      blockedSet.add(asin);
+      blockChanged = true;
+    }
+    console.log(`  ✗ ${why} (desativado + bloqueado): ${asin}`);
+  };
 
   const products = await prisma.product.findMany({
     where: { active: true, externalId: { startsWith: "amz:" } },
@@ -165,7 +189,7 @@ async function main() {
   });
   await sleep(3000);
 
-  let ok = 0, removed = 0, unknown = 0, consecutiveUnknown = 0;
+  let ok = 0, removed = 0, nodesc = 0, unknown = 0, consecutiveUnknown = 0;
   const newlyVerified: string[] = [];
   const saveProgress = () => {
     const merged = [...new Set([...verified, ...newlyVerified])];
@@ -191,25 +215,28 @@ async function main() {
       }
     }
     if (verdict === "eligible") {
-      ok++;
-      consecutiveUnknown = 0;
-      newlyVerified.push(p.externalId!);
+      // elegivel mas SEM preco de tabela na pagina = sem desconto —
+      // a aba Amazon e de ofertas, entao rejeita e bloqueia
+      if (prices.price != null && prices.oldPrice == null) {
+        nodesc++;
+        consecutiveUnknown = 0;
+        newlyVerified.push(p.externalId!);
+        await reject(asin, p.id, "SEM DESCONTO");
+      } else {
+        ok++;
+        consecutiveUnknown = 0;
+        newlyVerified.push(p.externalId!);
+        console.log(`  ✓ elegivel: ${asin}`);
+      }
     } else if (verdict === "ineligible") {
       removed++;
       consecutiveUnknown = 0;
       newlyVerified.push(p.externalId!);
-      await prisma.product.update({
-        where: { id: p.id },
-        data: { active: false },
-      });
-      console.log(`  ✗ INELEGIVEL (desativado): ${asin} ${p.title.slice(0, 50)}`);
+      await reject(asin, p.id, "INELEGIVEL");
     } else {
       unknown++;
       consecutiveUnknown++;
       console.log(`  ? sem sinal: ${asin} ${p.title.slice(0, 50)}`);
-    }
-    if (verdict === "eligible") {
-      console.log(`  ✓ elegivel: ${asin}`);
     }
     if (verdict !== "unknown") {
       saveProgress(); // grava a cada verificado — nao perde progresso se cair
@@ -228,9 +255,13 @@ async function main() {
   await browser.close();
 
   saveProgress();
+  if (blockChanged) {
+    mkdirSync(dirname(BLOCKED_FILE), { recursive: true });
+    writeFileSync(BLOCKED_FILE, JSON.stringify([...blockedSet]));
+  }
 
   console.log(
-    `\nPronto: ${ok} elegiveis | ${removed} desativados | ${unknown} sem sinal.`,
+    `\nPronto: ${ok} elegiveis c/ desconto | ${removed} inelegiveis | ${nodesc} sem desconto | ${unknown} sem sinal.`,
   );
 }
 

@@ -15,6 +15,9 @@
 // que deveria ter" — ajuste os regex de extract() abaixo.
 import { prisma } from "../src/lib/db";
 import { addAmazonProduct } from "../src/lib/amazon";
+import { existsSync, readFileSync } from "fs";
+import { homedir } from "os";
+import { join } from "path";
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -167,14 +170,24 @@ async function main() {
   console.log(`${urls.length} pagina(s) para raspar.\n`);
 
   const seen = new Set<string>();
-  // ASINs ja cadastrados: servem pra contar so produtos NOVOS na cota
-  const existing = new Set(
+  // ASINs ja cadastrados: externalId -> oldPrice. A listagem nao mostra
+  // "De: R$ X", entao o oldPrice gravado pelo verify e preservado no update
+  // (senao cada scrape apagaria o desconto).
+  const existing = new Map(
     (
       await prisma.product.findMany({
         where: { externalId: { startsWith: "amz:" } },
-        select: { externalId: true },
+        select: { externalId: true, oldPrice: true },
       })
-    ).map((p) => p.externalId!),
+    ).map((p) => [p.externalId!, p.oldPrice] as const),
+  );
+  // blocklist do verify: inelegiveis/sem desconto nunca voltam
+  const blockedFile = join(
+    homedir(),
+    ".config/ofertacoradar/amz-blocked.json",
+  );
+  const blockedAsins = new Set<string>(
+    existsSync(blockedFile) ? JSON.parse(readFileSync(blockedFile, "utf8")) : [],
   );
   let total = 0, inserted = 0, updated = 0, skipped = 0, errors = 0, newCount = 0, quotaHit = false;
 
@@ -206,7 +219,12 @@ async function main() {
       }
       seen.add(p.asin);
       total++;
+      if (blockedAsins.has(`amz:${p.asin}`)) {
+        skipped++;
+        continue; // rejeitado pelo verify (inelegivel ou sem desconto)
+      }
       const isNew = !existing.has(`amz:${p.asin}`);
+      const prevOld = existing.get(`amz:${p.asin}`);
       if (isNew && newCount >= MAX_NEW) {
         quotaHit = true;
         break; // cota de novos cheia — para de gravar E de buscar paginas
@@ -225,7 +243,8 @@ async function main() {
           asin: p.asin,
           title: p.title,
           price: p.price,
-          oldPrice: p.oldPrice,
+          // listagem nao tem "De: R$" — preserva o oldPrice que o verify gravou
+          oldPrice: p.oldPrice ?? prevOld ?? null,
           imageUrl: p.imageUrl,
         });
         if (isNew) newCount++;
