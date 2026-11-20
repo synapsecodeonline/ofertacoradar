@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getInstagramKit } from "@/lib/instagramKit";
 import { formatPrice } from "@/lib/format";
 import CopyCaption from "@/components/CopyCaption";
+import KitDownload from "@/components/KitDownload";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kit Instagram", robots: { index: false } };
@@ -106,20 +107,19 @@ export default async function AdminKitPage() {
                   </p>
                 )}
                 <div className="mt-auto flex flex-wrap gap-2 pt-2">
-                  <a
+                  <KitDownload
                     href={item.cardUrl}
-                    download={`${num}-${slug}-feed.png`}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
-                  >
-                    ↓ Feed
-                  </a>
-                  <a
+                    fileName={`${num}-${slug}-feed.png`}
+                    caption={item.caption}
+                    label="↓ Feed + legenda"
+                    primary
+                  />
+                  <KitDownload
                     href={item.cardStoryUrl}
-                    download={`${num}-${slug}-story.png`}
-                    className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-bold text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-300"
-                  >
-                    ↓ Story
-                  </a>
+                    fileName={`${num}-${slug}-story.png`}
+                    caption={item.caption}
+                    label="↓ Story + legenda"
+                  />
                   <CopyCaption text={item.caption} />
                   <a
                     href={item.pageUrl}
