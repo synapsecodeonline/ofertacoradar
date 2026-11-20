@@ -173,7 +173,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 (afiliado). Podemos receber comissão pelas compras realizadas
                 através dos nossos links, sem custo extra para você. Os preços e
                 cupons são exibidos conforme as informações das lojas parceiras
-                (Lomadee, Mercado Livre, Awin e Amazon) e podem sofrer alterações.
+                (Lomadee, Mercado Livre e Amazon) e podem sofrer alterações.
               </p>
             </div>
             <div className="flex flex-col gap-2 text-sm">

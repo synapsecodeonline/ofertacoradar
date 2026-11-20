@@ -19,7 +19,7 @@ const PAGE_SIZE = 48;
 function introFor(slug: string, count: number): string {
   const label = categoryLabel(slug);
   const n = count.toLocaleString("pt-BR");
-  return `Ofertas e produtos de ${label.toLowerCase()} verificadas diariamente em todas as nossas lojas parceiras — Lomadee, Mercado Livre, Awin e Amazon. ${n} itens ativos com preços atualizados, cupons quando disponíveis e links diretos para comprar com desconto.`;
+  return `Ofertas e produtos de ${label.toLowerCase()} verificadas diariamente nas nossas lojas parceiras — Lomadee, Mercado Livre e Amazon. ${n} itens ativos com preços atualizados, cupons quando disponíveis e links diretos para comprar com desconto.`;
 }
 
 export async function generateMetadata({

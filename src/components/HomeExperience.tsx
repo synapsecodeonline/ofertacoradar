@@ -17,8 +17,6 @@ import {
 import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
-import CollapsibleSection from "@/components/CollapsibleSection";
-import { FEATURED_STORES, storeLogo } from "@/lib/featured-stores";
 import { Suspense } from "react";
 
 const PAGE_SIZE = 48;
@@ -37,7 +35,7 @@ const notExpired = {
 const TABS = {
   produtos: {
     label: "Produtos",
-    eyebrow: "Lomadee · Mercado Livre · Amazon · Awin",
+    eyebrow: "Lomadee · Mercado Livre · Amazon",
     title: "As melhores ofertas do Brasil",
     noun: "ofertas",
   },
@@ -186,7 +184,6 @@ export async function HomeExperience({
     categories,
     merchants,
     flashDeals,
-    brandRows,
     subtypeFacets,
     couponTotal,
     srcRows,
@@ -288,8 +285,6 @@ export async function HomeExperience({
       take: 12,
     }),
 
-    // Logos das lojas em destaque (Brand.name -> logo Lomadee)
-    prisma.brand.findMany({ select: { id: true, name: true, logo: true } }),
     // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)
     subDefs.length
       ? prisma.product.groupBy({
@@ -346,49 +341,18 @@ export async function HomeExperience({
     `,
   ]);
 
-  // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
-  const brandLogoByName = new Map(
-    brandRows.map((b) => [b.name ?? "", b.logo] as const),
-  );
-
   // srcRows: uma linha por merchant com contagem por prefixo de fonte —
-  // alimenta "Lojas em destaque" e o total do catalogo de produtos.
-  const merchantSrc = new Map<
-    string,
-    { camp: number; prod: number; ml: number; aw: number; amz: number }
-  >();
+  // alimenta o total do catalogo de produtos.
   let catalogTotal = 0;
   for (const r of srcRows) {
-    const counts = {
-      camp: Number(r.camp),
-      prod: Number(r.prod),
-      ml: Number(r.ml),
-      aw: Number(r.aw),
-      amz: Number(r.amz),
-    };
-    merchantSrc.set(r.merchant, counts);
-    catalogTotal += counts.camp + counts.prod + counts.ml + counts.aw + counts.amz;
+    catalogTotal +=
+      Number(r.camp) +
+      Number(r.prod) +
+      Number(r.ml) +
+      Number(r.aw) +
+      Number(r.amz);
   }
   const headerTotal = isCouponTab ? couponTotal : catalogTotal;
-
-  // "Lojas em destaque": qualquer loja com itens ativos no catalogo
-  // unificado (todas as fontes). Links levam a aba Produtos + ?loja=.
-  const featuredStores = FEATURED_STORES.map((s) => {
-    const counts = merchantSrc.get(s.merchant) ?? {
-      camp: 0,
-      prod: 0,
-      ml: 0,
-      aw: 0,
-      amz: 0,
-    };
-    const products = counts.prod + counts.ml + counts.aw + counts.amz;
-    return {
-      ...s,
-      offers: counts.camp,
-      products,
-      visible: counts.camp + products > 0,
-    };
-  }).filter((s) => s.visible);
 
 
   const categoryList = [
@@ -488,73 +452,6 @@ export async function HomeExperience({
       )}
 
       {!dayOnly && (<>
-      {/* Lojas em destaque: apenas lojas com itens ativos no catalogo
-          unificado. So na aba Produtos — Cupons e uma lista curta. */}
-      {tab === "produtos" && featuredStores.length > 0 && (
-        <CollapsibleSection
-          defaultOpen={false}
-          className="mb-8 border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-          title={
-            <span className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Lojas parceiras
-              </span>
-              <span className="text-xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
-                Lojas em destaque
-              </span>
-            </span>
-          }
-          meta={
-            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              {featuredStores.length} lojas
-            </span>
-          }
-        >
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {featuredStores.map((s) => {
-              const logo = storeLogo(s, brandLogoByName);
-              return (
-                <HashLink
-                  key={s.merchant}
-                  href={`/?loja=${encodeURIComponent(s.merchant)}#catalogo`}
-                  className="group flex aspect-square flex-col items-center justify-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
-                >
-                  <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-zinc-50 dark:bg-zinc-950">
-                    {logo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={logo}
-                        alt={s.merchant}
-                        className="h-full w-full object-contain p-1.5"
-                      />
-                    ) : (
-                      <span className="text-lg font-extrabold text-zinc-300 dark:text-zinc-600">
-                        {s.merchant.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </span>
-                  <span className="line-clamp-2 text-center text-xs font-bold leading-tight text-zinc-700 transition-colors group-hover:text-emerald-700 dark:text-zinc-300 dark:group-hover:text-emerald-400">
-                    {s.merchant}
-                  </span>
-                  <span className="text-center text-[10px] font-semibold leading-tight text-zinc-400">
-                    {[
-                      s.offers > 0
-                        ? `${s.offers} ${s.offers === 1 ? "oferta" : "ofertas"}`
-                        : "",
-                      s.products > 0
-                        ? `${s.products} ${s.products === 1 ? "produto" : "produtos"}`
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </HashLink>
-              );
-            })}
-          </div>
-        </CollapsibleSection>
-      )}
-
       {categoryList.length > 0 && (
         <div className="mb-8 mt-4">
           <CategoryNav
