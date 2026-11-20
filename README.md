@@ -86,7 +86,7 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 - **Lomadee** (`src/lib/syncer.ts` + `src/lib/feed.ts`): campanhas (`status=onTime`) + catálogo de produtos de orgs afiliadas; rate limit 60 req/min; validação contínua de **link + imagem**.
 - **Mercado Livre** (`src/lib/mercadolivre.ts` + `src/lib/syncer.ts`): OAuth2+PKCE com refresh automático; catálogo via `/products/search` + buy-box winner (a busca `/sites/search` foi descontinuada pelo ML).
-- **Amazon** (`src/lib/amazon.ts`): PA-API 5.0 com assinatura **AWS SigV4** (`SearchItems` por keywords) quando `AMZ_API_KEY`/`AMZ_API_SECRET` existem; sem credenciais, cadastro **manual** via `/admin` (lookup por SerpApi ou scrape, com fallback manual).
+- **Amazon** (`src/lib/amazon.ts`): PA-API 5.0 com assinatura **AWS SigV4** (`SearchItems` por keywords) quando `AMZ_API_KEY`/`AMZ_API_SECRET` existem; sem credenciais, três caminhos de cadastro: **manual** via `/admin` (lookup por SerpApi ou scrape), **scraper local** (`scripts/amz-scrape.ts`, ver abaixo) e PA-API quando liberada.
 - **Awin**: credenciais já configuradas na Vercel; sincronizador pendente.
 
 ### Bloqueios ativos
@@ -200,6 +200,25 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 - Lomadee API (campanhas sempre; catálogo só com `LOMADEE_PRODUCTS=1`) ou `FEED_URL` genérico; ML com credenciais.
 - Upsert por `externalId`; desativação por prefixo de fonte.
 
+### Scraper Amazon local (`scripts/amz-scrape.ts` → `npm run amz:scrape`)
+
+A Amazon bloqueia IP de datacenter (Vercel retorna 503/captcha), então o catálogo `amz:` pode ser alimentado por **scraping rodado na sua máquina** (IP residencial):
+
+```bash
+npm run amz:scrape -- --dry        # testa: lista produtos sem gravar
+npm run amz:scrape                 # raspa todas as fontes e grava
+npm run amz:scrape -- --pages 2    # limita a N paginas
+npm run amz:scrape -- --only deals # so URLs que contenham "deals"
+npm run amz:scrape -- --delay 8000 # pausa maior entre requests
+```
+
+- **Fontes** (editáveis em `SOURCES` no script): `/gp/bestsellers` geral + verticais (eletrônicos, cozinha, beleza) e `/deals`.
+- **Extração**: quebra o HTML por `data-asin`, extrai título, preço atual, preço antigo (só com marcador de "de/riscar") e imagem (ampliada para 640px). Só cadastra produto com título + imagem + preço.
+- **Upsert** por `amz:{ASIN}` via `addAmazonProduct` → rodar de novo **atualiza**, nunca duplica. `affiliateUrl` sai com `?tag=$AMZ_TAG`.
+- **Rate limit**: pausa de 5s entre páginas; se a Amazon devolver página de bloqueio (~4KB), o script **aborta** pedindo para aguardar. Não rode em loop.
+- **Layout mudou?** Se uma página válida retornar "0 produtos extraídos", o parser (`extract()`) precisa de ajuste — os seletores atuais estão comentados no script.
+- Requer `.env` com `DATABASE_URL` (e `AMZ_TAG`, com default `synapsecodeon-20`).
+
 ---
 
 ## Comandos
@@ -210,6 +229,7 @@ npm run build      # build de produção
 npm run start      # serve o build
 npm run lint       # ESLint
 npm run sync       # sync manual (tsx --env-file=.env)
+npm run amz:scrape # scrape local do catalogo Amazon (ver secao abaixo)
 npm run db:push    # prisma db push
 npx tsc --noEmit   # typecheck
 npx vercel --prod --yes   # deploy manual
