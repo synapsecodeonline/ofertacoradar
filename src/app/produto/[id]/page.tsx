@@ -17,6 +17,7 @@ import { IconArrowRight, IconCheck, IconFlame, IconShield, IconTag } from "@/com
 import ShareButtons from "@/components/ShareButtons";
 import InstagramCaption from "@/components/InstagramCaption";
 import BackButton from "@/components/BackButton";
+import NotifyForm from "@/components/NotifyForm";
 import { instagramCaption } from "@/lib/instagram";
 import { createClient } from "@/lib/supabase/server";
 
@@ -92,16 +93,25 @@ export default async function ProductPage({
     product.endsAt && product.endsAt.getTime() - Date.now() < 7 * 86_400_000;
 
   // Prova social real: cliques registrados em /ir/[id]
-  const [totalClicks, lowState] = await Promise.all([
+  const [totalClicks, lowAgg, lowState] = await Promise.all([
     prisma.click.count({ where: { productId: product.id } }),
-    // Menor preco historico (SyncState KV — ver upsert.ts)
+    // Menor preco do historico (tabela PriceHistory apos migracao)
+    prisma.priceHistory
+      .aggregate({
+        where: { productId: product.id },
+        _min: { price: true },
+      })
+      .catch(() => null),
+    // Fallback: SyncState KV (lp:externalId) ate a migracao rodar
     product.externalId
       ? prisma.syncState
           .findUnique({ where: { key: `lp:${product.externalId}` } })
           .catch(() => null)
       : Promise.resolve(null),
   ]);
-  const lowestEver = lowState?.phase ? Number(lowState.phase) : null;
+  const lowestEver =
+    lowAgg?._min?.price ??
+    (lowState?.phase ? Number(lowState.phase) : null);
 
   // Razoes objetivas para comprar por aqui (todas derivadas de dados reais)
   const reasons: string[] = [];
@@ -476,6 +486,9 @@ export default async function ProductPage({
               </>
             )}
           </div>
+
+          {/* Captura de email: alerta de queda de preco */}
+          <NotifyForm productId={product.id} />
 
           {/* Como usar o cupom */}
           {product.couponCode && (

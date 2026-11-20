@@ -94,11 +94,16 @@ export async function upsertByExternalId(
     }
   }
 
-  // Menor preco historico por produto, guardado em SyncState como KV
-  // (banco nao permite DDL — sem coluna/tabela nova). phase = menor
-  // preco visto; LEAST garante que so desce. Leitura na pagina de
-  // produto mostra "menor preco registrado" (prova de oferta real).
+  // Historico de preco por produto (tabela PriceHistory apos migracao;
+  // fallback: SyncState KV ate la). Leitura na pagina de produto.
   if (p.price != null && p.externalId) {
+    await prisma
+      .$executeRaw`
+        INSERT INTO "ofertacoradar"."PriceHistory" ("productId", "price")
+        SELECT id, ${p.price} FROM "ofertacoradar"."Product"
+        WHERE "externalId" = ${p.externalId}
+      `
+      .catch(() => {});
     await prisma
       .$executeRaw`
         INSERT INTO "ofertacoradar"."SyncState" (key, phase)

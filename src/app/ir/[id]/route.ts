@@ -59,12 +59,43 @@ export async function GET(
     } catch {
       // referer invalido — ignora UTMs
     }
+    const refererMeta = parts.join("|").slice(0, 480) || null;
     await prisma.click
       .create({
         data: {
           productId: product.id,
-          referer: parts.join("|").slice(0, 480) || null,
+          referer: refererMeta,
           userAgent: userAgent?.slice(0, 500),
+        },
+      })
+      .catch(() => {});
+
+    // Evento estruturado (tabela Event) — fallback silencioso se ainda
+    // nao migrada. Permite funil click -> sessao -> UTM por produto.
+    let utmSource: string | null = null;
+    let utmMedium: string | null = null;
+    let utmCampaign: string | null = null;
+    try {
+      const refUrl = httpRef ? new URL(httpRef) : null;
+      utmSource = refUrl?.searchParams.get("utm_source")?.slice(0, 120) ?? null;
+      utmMedium = refUrl?.searchParams.get("utm_medium")?.slice(0, 120) ?? null;
+      utmCampaign =
+        refUrl?.searchParams.get("utm_campaign")?.slice(0, 120) ?? null;
+    } catch {
+      // referer invalido
+    }
+    await prisma.event
+      .create({
+        data: {
+          type: "click",
+          productId: product.id,
+          sessionId: sid?.slice(0, 60) ?? null,
+          path: `/produto/${product.id}`,
+          referer: httpRef?.slice(0, 480) ?? null,
+          userAgent: userAgent?.slice(0, 500) ?? null,
+          utmSource: utmSource ?? srcParam?.slice(0, 120) ?? null,
+          utmMedium,
+          utmCampaign,
         },
       })
       .catch(() => {});

@@ -65,17 +65,37 @@ export async function POST(req: Request) {
       // falha na auth nao deve impedir a contagem do pageview
     }
 
+    const utm = body?.utm && typeof body.utm === "object" ? body.utm : {};
+    const pick = (k: string) =>
+      typeof utm[k] === "string" ? (utm[k] as string).slice(0, 120) : null;
+
+    // Tabela Event real (apos migration-events.sql). Fallback: hack do
+    // produto sentinela enquanto a tabela nao existir.
+    try {
+      await prisma.event.create({
+        data: {
+          type: "pageview",
+          path: path.slice(0, 300),
+          sessionId: typeof body?.sid === "string" ? body.sid.slice(0, 60) : null,
+          referer: req.headers.get("referer")?.slice(0, 480) ?? null,
+          userAgent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
+          utmSource: pick("utm_source") ?? pick("utmSource"),
+          utmMedium: pick("utm_medium") ?? pick("utmMedium"),
+          utmCampaign: pick("utm_campaign") ?? pick("utmCampaign"),
+        },
+      });
+      return Response.json({ ok: true });
+    } catch {
+      /* tabela ainda nao existe — cai no fallback abaixo */
+    }
+
     const productId = await pvProductId();
-    // Metadados de atribuicao embutidos no campo referer (sem coluna nova):
-    // "path|sid=..|utm_source=..|utm_medium=.."
     const meta: string[] = [];
     if (typeof body?.sid === "string" && body.sid)
       meta.push(`sid=${body.sid.slice(0, 60)}`);
-    if (body?.utm && typeof body.utm === "object") {
-      for (const [k, v] of Object.entries(body.utm).slice(0, 6)) {
-        if (typeof v === "string" && v)
-          meta.push(`${k.slice(0, 20)}=${v.slice(0, 80)}`);
-      }
+    for (const [k, v] of Object.entries(utm).slice(0, 6)) {
+      if (typeof v === "string" && v)
+        meta.push(`${k.slice(0, 20)}=${v.slice(0, 80)}`);
     }
     await prisma.click.create({
       data: {

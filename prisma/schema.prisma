@@ -92,3 +92,47 @@ model Click {
   @@index([productId])
   @@schema("ofertacoradar")
 }
+
+// Evento de analytics real (pageview|click) — substitui o hack do
+// produto sentinela. Criada via SQL manual (banco nao aceita db push
+// do pooler); ver scripts/migration-events.sql.
+model Event {
+  id           Int      @id @default(autoincrement())
+  type         String // "pageview" | "click"
+  productId    Int?
+  sessionId    String?
+  path         String?
+  referer      String?
+  userAgent    String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  createdAt    DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([sessionId])
+  @@index([productId])
+  @@schema("ofertacoradar")
+}
+
+// Captura de email "avise-me quando baixar" / newsletter.
+model Subscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  productId Int?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@schema("ofertacoradar")
+}
+
+// Historico de preco por produto (sync grava; pagina mostra menor preco).
+model PriceHistory {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  price      Float
+  recordedAt DateTime @default(now())
+
+  @@index([productId, recordedAt])
+  @@schema("ofertacoradar")
+}
