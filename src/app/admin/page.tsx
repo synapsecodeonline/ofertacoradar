@@ -466,6 +466,12 @@ export default async function AdminPage() {
           >
             Exportar CSV
           </a>
+          <a
+            href="/api/admin/subscribers"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            Subscribers
+          </a>
           <Link
             href="/admin/kit"
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
