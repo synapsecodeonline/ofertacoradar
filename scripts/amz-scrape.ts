@@ -29,6 +29,8 @@ const SOURCES = [
   "https://www.amazon.com.br/deals",
   "https://www.amazon.com.br/gp/bestsellers/baby",
   "https://www.amazon.com.br/s?k=mamadeira",
+  "https://www.amazon.com.br/s?k=mamadeira&page=2",
+  "https://www.amazon.com.br/s?k=mamadeira&page=3",
   "https://www.amazon.com.br/gp/bestsellers",
   "https://www.amazon.com.br/gp/bestsellers/electronics",
   "https://www.amazon.com.br/gp/bestsellers/kitchen",
