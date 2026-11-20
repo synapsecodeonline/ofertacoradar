@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncAwin } from "@/lib/awin";
 import ProductCard from "@/components/ProductCard";
 import SearchBar from "@/components/SearchBar";
 import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypesFor } from "@/lib/categories";
@@ -122,6 +123,7 @@ export async function HomeExperience({
     Promise.all([
       maybeSyncLomadee().catch(() => {}),
       maybeSyncML().catch(() => {}),
+      maybeSyncAwin().catch(() => {}),
     ]),
   );
 

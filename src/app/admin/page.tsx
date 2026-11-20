@@ -381,6 +381,7 @@ export default async function AdminPage() {
   const SYNC_SOURCES: Record<string, { name: string }> = {
     main: { name: "Lomadee" },
     ml: { name: "Mercado Livre" },
+    awin: { name: "Awin" },
     amazon: { name: "Amazon" },
   };
   // Linhas auxiliares do sync: `${key}:beat` = ultimo sinal de vida,

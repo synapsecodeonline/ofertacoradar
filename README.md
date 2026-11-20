@@ -81,17 +81,17 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 | `camp-lomadee:` | Cupons/ofertas Lomadee | `lmdee.link` já rastreado |
 | `prod-lomadee:` | Catálogo de produtos Lomadee | shortener `lmdee.link` no clique |
 | `ml:` | Mercado Livre (catálogo oficial) | `matt_tool`/`matt_word` no redirect |
-| `aw:` | Awin | (sincronizador ainda não implementado) |
+| `aw:` | Awin | deep link `awin1.com` do feed ou montado com `AWIN_AFFID` |
 | `amz:` | Amazon Associates | `?tag=$AMZ_TAG` no redirect |
 
 - **Lomadee** (`src/lib/syncer.ts` + `src/lib/feed.ts`): campanhas (`status=onTime`) + catálogo de produtos de orgs afiliadas; rate limit 60 req/min; validação contínua de **link + imagem**.
 - **Mercado Livre** (`src/lib/mercadolivre.ts` + `src/lib/syncer.ts`): OAuth2+PKCE com refresh automático; catálogo via `/products/search` + buy-box winner (a busca `/sites/search` foi descontinuada pelo ML).
 - **Amazon** (`src/lib/amazon.ts`): PA-API 5.0 com assinatura **AWS SigV4** (`SearchItems` por keywords) quando `AMZ_API_KEY`/`AMZ_API_SECRET` existem; sem credenciais, três caminhos de cadastro: **manual** via `/admin` (lookup por SerpApi ou scrape), **scraper local** (`scripts/amz-scrape.ts`, ver abaixo) e PA-API quando liberada.
-- **Awin**: credenciais já configuradas na Vercel; sincronizador pendente.
+- **Awin** (`src/lib/awin.ts`): sincronizador de **product datafeeds** — a Awin não tem API pública de catálogo; cada anunciante aprovado disponibiliza um feed (CSV/XML/JSON). Configure `AWIN_FEEDS` + `AWIN_AFFID` (ver tabela de env) e os produtos entram como `aw:` automaticamente — rastreados por deep link quando o feed traz `aw_deep_link` ou quando `awinmid`+`AWIN_AFFID` permitem montar o `cread.php`.
 
 ### Bloqueios ativos
 
-- `BLOCKED_URL_PARTS`/`BLOCKED_MERCHANTS` em `syncer.ts`: **Rovitex** bloqueada (catálogo Lomadee desatualizado, links quebrados) até o usuário liberar.
+- `BLOCKED_URL_PARTS`/`BLOCKED_MERCHANTS` em `upsert.ts`: **Rovitex** bloqueada (catálogo Lomadee desatualizado, links quebrados) até o usuário liberar.
 - `BLOCKED_IMAGE_HOSTS`: `vestis.vteximg.com.br` e `shopinfo.vteximg.com.br` (contas VTEX inativas) — produto com imagem desses hosts nem entra no banco.
 
 ---
@@ -170,7 +170,8 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 | `AMZ_MARKETPLACE` / `AMZ_HOST` / `AMZ_REGION` | não | defaults `www.amazon.com.br` / `webservices.amazon.com.br` / `us-east-1` |
 | `AMZ_KEYWORDS` | não | lista de termos de busca do sync Amazon (vírgula) |
 | `SERPAPI_KEY` | não | lookup de produtos Amazon no cadastro manual (`/admin`) — 100 buscas/mês grátis |
-| `AWIN_API_TOKEN` / `AWIN_PUBLISHER_ID` | não | credenciais Awin (sincronizador pendente) |
+| `AWIN_FEEDS` | não | feeds de produtos Awin — JSON array (`[{"url","advertiser","awinmid"}]`) ou URLs separadas por `;`. Habilita sync `aw:` |
+| `AWIN_AFFID` | não | publisher ID da Awin — monta deep link `cread.php` quando o feed não traz link rastreado |
 | `NEXT_PUBLIC_SITE_URL` | recomendado | URL canônica — sitemap/canonical/OG/JSON-LD |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | auth do `/admin` |
 | `NEXT_PUBLIC_INSTAGRAM_URL` | não | link do Instagram |
@@ -307,7 +308,7 @@ prisma/schema.prisma
 
 ## Roadmap sugerido
 
-- [ ] Sincronizador Awin (`aw:`) — credenciais já configuradas
+- [x] Sincronizador Awin (`aw:`) — pronto; falta só configurar `AWIN_FEEDS`/`AWIN_AFFID` quando os anunciantes forem aprovados
 - [ ] Amazon PA-API quando a conta Creators atingir 10 vendas/30 dias (credenciais `AMZ_API_KEY`/`AMZ_API_SECRET`)
 - [ ] Reconciliar conversões via API `/orders` Lomadee (cliques → vendas → receita real)
 - [ ] Páginas `/categoria/[slug]` e `/lojas` indexáveis (SEO)
