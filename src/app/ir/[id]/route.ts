@@ -76,6 +76,10 @@ export async function GET(
   if (product.externalId?.startsWith("amz:")) {
     const target = new URL(product.affiliateUrl ?? product.url);
     target.searchParams.set("tag", process.env.AMZ_TAG ?? "synapsecodeon-20");
+    // Mesmos params do link gerado pelo SiteStripe (GetLink)
+    target.searchParams.set("linkCode", "ogi");
+    target.searchParams.set("th", "1");
+    target.searchParams.set("psc", "1");
     const source = request.nextUrl.searchParams.get("src");
     if (source) target.searchParams.set("utm_source", source);
     return NextResponse.redirect(target, 302);

@@ -226,6 +226,17 @@ function parseSearchItems(json: Record<string, unknown>): AmzItem[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Mesmo formato de link que o SiteStripe gera (GetLink):
+// tag + linkCode=ogi&th=1&psc=1
+function amzAffiliateUrl(url: string) {
+  const u = new URL(url);
+  u.searchParams.set("tag", PARTNER_TAG());
+  u.searchParams.set("linkCode", "ogi");
+  u.searchParams.set("th", "1");
+  u.searchParams.set("psc", "1");
+  return u.toString();
+}
+
 function amzUrl(asin: string) {
   return `https://www.amazon.com.br/dp/${asin}`;
 }
@@ -233,7 +244,7 @@ function amzUrl(asin: string) {
 async function upsertAmz(p: AmzItem) {
   const externalId = `amz:${p.asin}`;
   const url = amzUrl(p.asin);
-  const affiliateUrl = `${url}?tag=${encodeURIComponent(PARTNER_TAG())}`;
+  const affiliateUrl = amzAffiliateUrl(url);
   const category = resolveCategory(undefined, p.title, p.merchant ?? "Amazon");
   await prisma.product.upsert({
     where: { externalId },
@@ -536,7 +547,7 @@ export async function addAmazonProduct(input: {
 }) {
   const externalId = `amz:${input.asin.toUpperCase()}`;
   const url = amzUrl(input.asin.toUpperCase());
-  const affiliateUrl = `${url}?tag=${encodeURIComponent(PARTNER_TAG())}`;
+  const affiliateUrl = amzAffiliateUrl(url);
   const p = {
     title: input.title,
     price: input.price ?? undefined,
