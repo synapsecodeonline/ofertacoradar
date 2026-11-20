@@ -234,6 +234,7 @@ npm run amz:verify -- --all   # re-verifica tudo
 
 - Para cada ASIN abre `/dp/{ASIN}` e observa a chamada `data.amazon.com.br/api/.../associate` que a SiteStripe dispara: `shareEligibility.eligible` ou botão "Obter link" → elegível; API sem `eligible` e sem botão → **inelegível (produto desativado)**.
 - Conservador: sem sinal (sessão expirada, captcha, página quebrada) → **pula sem desativar**. 3 "sem sinal" seguidos abortam pedindo novo login.
+- Rejeições: **inelegível** → desativa + bloqueio **permanente**; **sem preço de tabela** (sem desconto) → desativa + bloqueio de **7 dias** (volta sozinho se entrar em oferta — o scrape reativa e o verify re-julga). Blocklist em `~/.config/ofertacoradar/amz-blocked.json` (`{asin: expiresAt}`, `0` = permanente); scrape pula ASINs bloqueados.
 - Conjunto já verificado fica em `~/.config/ofertacoradar/amz-verified.json` — reruns só checam novidades. O cron diário roda scrape → verify em sequência.
 - Sessão expira com o tempo: se o verify logar "sessão expirou", rode `npm run amz:login` de novo.
 - Requer Chromium do Playwright + libs locais em `~/.local/share/ofertacoradar-chromelibs` (instaladas sem sudo via `apt-get download` + `dpkg -x`).

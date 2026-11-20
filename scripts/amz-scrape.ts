@@ -185,14 +185,19 @@ async function main() {
       })
     ).map((p) => [p.externalId!, p.oldPrice] as const),
   );
-  // blocklist do verify: inelegiveis/sem desconto nunca voltam
+  // blocklist do verify: {asin: expiresAt} — 0 = permanente (inelegivel),
+  // futuro = temporario (sem desconto; expira e pode voltar com oferta)
   const blockedFile = join(
     homedir(),
     ".config/ofertacoradar/amz-blocked.json",
   );
-  const blockedAsins = new Set<string>(
-    existsSync(blockedFile) ? JSON.parse(readFileSync(blockedFile, "utf8")) : [],
-  );
+  const blockedMap: Record<string, number> = existsSync(blockedFile)
+    ? JSON.parse(readFileSync(blockedFile, "utf8"))
+    : {};
+  const isBlocked = (ext: string) => {
+    const t = blockedMap[ext];
+    return t === 0 || (t != null && t > Date.now());
+  };
   let total = 0, inserted = 0, updated = 0, skipped = 0, errors = 0, newCount = 0, quotaHit = false;
 
   for (const url of urls) {
@@ -223,7 +228,7 @@ async function main() {
       }
       seen.add(p.asin);
       total++;
-      if (blockedAsins.has(`amz:${p.asin}`)) {
+      if (isBlocked(`amz:${p.asin}`)) {
         skipped++;
         continue; // rejeitado pelo verify (inelegivel ou sem desconto)
       }

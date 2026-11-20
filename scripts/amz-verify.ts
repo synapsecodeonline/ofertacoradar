@@ -40,6 +40,27 @@ const LIBS = join(
 );
 process.env.LD_LIBRARY_PATH = `${LIBS}:${process.env.LD_LIBRARY_PATH ?? ""}`;
 
+const WEEK = 7 * 24 * 3600 * 1000;
+// blocklist: {externalId: expiresAt} — 0 = permanente (inelegivel),
+// timestamp = temporario (sem desconto; re-checa apos expirar)
+function loadBlocked(): Record<string, number> {
+  if (!existsSync(BLOCKED_FILE)) return {};
+  try {
+    const raw = JSON.parse(readFileSync(BLOCKED_FILE, "utf8"));
+    if (Array.isArray(raw)) {
+      // formato legado (lista de ASINs) -> temporario de 7 dias
+      return Object.fromEntries(raw.map((a: string) => [a, Date.now() + WEEK]));
+    }
+    return raw;
+  } catch {
+    return {};
+  }
+}
+function saveBlocked(map: Record<string, number>) {
+  mkdirSync(dirname(BLOCKED_FILE), { recursive: true });
+  writeFileSync(BLOCKED_FILE, JSON.stringify(map));
+}
+
 const arg = (n: string) => {
   const i = process.argv.indexOf(`--${n}`);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -143,23 +164,26 @@ async function main() {
     ? JSON.parse(readFileSync(VERIFIED_FILE, "utf8"))
     : [];
   const verifiedSet = new Set(ALL ? [] : verified);
-  // blocklist: ASINs rejeitados (inelegiveis ou sem desconto) — o scrape
-  // nao recadastra e o verify nao reprocessa
-  const blocked: string[] = existsSync(BLOCKED_FILE)
-    ? JSON.parse(readFileSync(BLOCKED_FILE, "utf8"))
-    : [];
-  const blockedSet = new Set(blocked);
+  // blocklist: inelegivel = permanente (0); sem desconto = 7 dias.
+  // Entrada expirada torna o produto pendente de novo (volta se entrar
+  // em oferta — o scrape o reativa e o verify re-julga).
+  const blockedMap = loadBlocked();
   let blockChanged = false;
-  const reject = async (asin: string, productId: number, why: string) => {
+  const reject = async (
+    asin: string,
+    productId: number,
+    why: string,
+    permanent: boolean,
+  ) => {
     await prisma.product.update({
       where: { id: productId },
       data: { active: false },
     });
-    if (!blockedSet.has(asin)) {
-      blockedSet.add(asin);
-      blockChanged = true;
-    }
-    console.log(`  ✗ ${why} (desativado + bloqueado): ${asin}`);
+    blockedMap[`amz:${asin}`] = permanent ? 0 : Date.now() + WEEK;
+    blockChanged = true;
+    console.log(
+      `  ✗ ${why} (desativado${permanent ? " + bloqueado definitivo" : " + re-check em 7d"}): ${asin}`,
+    );
   };
 
   const products = await prisma.product.findMany({
@@ -168,7 +192,12 @@ async function main() {
     orderBy: { createdAt: "asc" },
   });
   const pending = products
-    .filter((p) => !verifiedSet.has(p.externalId!))
+    .filter((p) => {
+      const ext = p.externalId!;
+      if (!verifiedSet.has(ext)) return true;
+      const t = blockedMap[ext];
+      return t != null && t > 0 && t <= Date.now(); // bloqueio temporario expirou
+    })
     .slice(0, LIMIT);
 
   console.log(
@@ -221,18 +250,23 @@ async function main() {
         nodesc++;
         consecutiveUnknown = 0;
         newlyVerified.push(p.externalId!);
-        await reject(asin, p.id, "SEM DESCONTO");
+        await reject(asin, p.id, "SEM DESCONTO", false);
       } else {
         ok++;
         consecutiveUnknown = 0;
         newlyVerified.push(p.externalId!);
+        // tinha bloqueio temporario? aprovou -> desbloqueia de vez
+        if (blockedMap[p.externalId!] > 0) {
+          delete blockedMap[p.externalId!];
+          blockChanged = true;
+        }
         console.log(`  ✓ elegivel: ${asin}`);
       }
     } else if (verdict === "ineligible") {
       removed++;
       consecutiveUnknown = 0;
       newlyVerified.push(p.externalId!);
-      await reject(asin, p.id, "INELEGIVEL");
+      await reject(asin, p.id, "INELEGIVEL", true);
     } else {
       unknown++;
       consecutiveUnknown++;
@@ -255,10 +289,7 @@ async function main() {
   await browser.close();
 
   saveProgress();
-  if (blockChanged) {
-    mkdirSync(dirname(BLOCKED_FILE), { recursive: true });
-    writeFileSync(BLOCKED_FILE, JSON.stringify([...blockedSet]));
-  }
+  if (blockChanged) saveBlocked(blockedMap);
 
   console.log(
     `\nPronto: ${ok} elegiveis c/ desconto | ${removed} inelegiveis | ${nodesc} sem desconto | ${unknown} sem sinal.`,
