@@ -353,6 +353,179 @@ export async function maybeSyncAmazon(force = false) {
   await runAmazonLocked();
 }
 
+// ---- Cadastro manual (conta sem API liberada) ----
+// O usuario cola um link/ASIN da Amazon no /admin; o servidor tenta
+// ler os dados da pagina do produto. Se o scrape falhar (captcha,
+// mudanca de layout), o formulario aceita preenchimento manual.
+
+// Aceita ASIN puro (B0XXXXXXXXX) ou URL amazon.com.br/dp/...|gp/product/...
+export function parseAsin(input: string): string | null {
+  const s = input.trim();
+  const m =
+    s.match(/\/dp\/([A-Z0-9]{10})/i) ??
+    s.match(/\/gp\/product\/([A-Z0-9]{10})/i) ??
+    s.match(/\/gp\/aw\/d\/([A-Z0-9]{10})/i);
+  if (m) return m[1].toUpperCase();
+  return /^[A-Z0-9]{10}$/i.test(s) ? s.toUpperCase() : null;
+}
+
+export interface AmzLookup {
+  asin: string;
+  title?: string;
+  price?: number;
+  oldPrice?: number;
+  imageUrl?: string;
+  error?: string;
+}
+
+function parseBrl(s: string): number | undefined {
+  const m = s.match(/R\$(?:\s|&nbsp;)*([\d]{1,3}(?:\.\d{3})*,\d{2}|[\d]+,\d{2})/);
+  if (!m) return undefined;
+  return Number(m[1].replace(/\./g, "").replace(",", "."));
+}
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Melhor esforco: baixa a pagina do produto e extrai og:title,
+// preco atual/lista e imagem principal. Amazon costuma devolver
+// captcha para datacenter — nesse caso devolve error explicativo.
+export async function lookupAmazonProduct(asin: string): Promise<AmzLookup> {
+  const out: AmzLookup = { asin };
+  try {
+    const res = await fetch(amzUrl(asin), {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "accept-language": "pt-BR,pt;q=0.9",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const html = await res.text();
+    if (/captcha|robot check|digite os caracteres/i.test(html)) {
+      out.error =
+        "Amazon bloqueou a leitura automática (captcha). Preencha os dados manualmente.";
+      return out;
+    }
+    if (!res.ok || html.length < 10_000) {
+      out.error = `Página do produto indisponível (HTTP ${res.status}).`;
+      return out;
+    }
+
+    // titulo: og:title ("Amazon.com.br: X: ...") ou #productTitle
+    const ogTitle =
+      html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)?.[1] ??
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i)?.[1];
+    const pt = html.match(/<span[^>]+id="productTitle"[^>]*>([\s\S]*?)<\/span>/i)?.[1];
+    const title = stripTags(pt ?? ogTitle ?? "")
+      .replace(/^Amazon\.com\.br:\s*/i, "")
+      .replace(/:\s*Amazon\.com\.br\s*$/i, "")
+      .replace(/\s*:\s*Amazon\.com\.br.*$/i, "")
+      .slice(0, 300);
+    if (title) out.title = title;
+
+    // preco atual: label de acessibilidade do preco-to-pay
+    // ("R$ 38,09 com 45 por cento de desconto") — o primeiro "R$" da
+    // regiao corePrice pode ser o preco antigo (basis price)
+    const coreIdx = html.indexOf("corePrice_feature_div");
+    const coreRegion = coreIdx >= 0 ? html.slice(coreIdx, coreIdx + 12000) : html;
+    const payIdx = coreRegion.indexOf("apex-pricetopay-accessibility-label");
+    const payRegion = payIdx >= 0 ? coreRegion.slice(payIdx, payIdx + 800) : coreRegion;
+    const price = parseBrl(payRegion) ?? parseBrl(coreRegion);
+    if (price != null) out.price = price;
+    // preco antigo: "De: R$ X" (basis price da Amazon) ou offscreen
+    // maior que o atual dentro da mesma regiao
+    const deMatch = coreRegion.match(/De:\s*R\$\s?([\d]{1,3}(?:\.\d{3})*,\d{2}|[\d]+,\d{2})/);
+    const oldFromDe = deMatch ? parseBrl(`R$ ${deMatch[1]}`) : undefined;
+    const offscreens = [...coreRegion.matchAll(/a-offscreen[^>]*>([\s\S]*?)</g)].map(
+      (m) => stripTags(m[1]),
+    );
+    const oldFromOff = offscreens
+      .map(parseBrl)
+      .filter((n): n is number => n != null && n > (price ?? 0))
+      .sort((a, b) => a - b)[0];
+    const old = oldFromDe ?? oldFromOff;
+    if (old != null && old > (price ?? 0)) out.oldPrice = old;
+
+    // imagem: #landingImage src, data-a-dynamic-image (JSON com &quot;)
+    // ou og:image — a Amazon muda o formato com frequencia
+    const dynImg =
+      html.match(/id="landingImage"[^>]*data-a-dynamic-image="([^"]+)"/i)?.[1] ??
+      html.match(/data-a-dynamic-image="([^"]+)"/i)?.[1];
+    const dynUrl = dynImg?.match(/https:\/\/m\.media-amazon\.com\/images\/I\/[^&"]+/)?.[0];
+    const img =
+      html.match(/id="landingImage"[^>]+src="([^"]+)"/i)?.[1] ??
+      dynUrl ??
+      html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)?.[1] ??
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i)?.[1];
+    if (img) out.imageUrl = img.replace(/&amp;/g, "&");
+  } catch (e) {
+    out.error = `Falha ao ler a página: ${e instanceof Error ? e.message : e}`;
+  }
+  return out;
+}
+
+// Cadastro manual: upsert do produto amz:{ASIN} com dados informados
+// (vindos do lookup ou digitados no formulario).
+export async function addAmazonProduct(input: {
+  asin: string;
+  title: string;
+  price?: number | null;
+  oldPrice?: number | null;
+  imageUrl?: string | null;
+  description?: string | null;
+}) {
+  const externalId = `amz:${input.asin.toUpperCase()}`;
+  const url = amzUrl(input.asin.toUpperCase());
+  const affiliateUrl = `${url}?tag=${encodeURIComponent(PARTNER_TAG())}`;
+  const p = {
+    title: input.title,
+    price: input.price ?? undefined,
+    oldPrice: input.oldPrice ?? undefined,
+  };
+  const category = resolveCategory(undefined, input.title, "Amazon");
+  return prisma.product.upsert({
+    where: { externalId },
+    create: {
+      externalId,
+      title: input.title,
+      description: input.description ?? null,
+      imageUrl: input.imageUrl ?? null,
+      price: input.price ?? null,
+      oldPrice: input.oldPrice ?? null,
+      discountPct: discountPctOf(p),
+      category,
+      subtype: resolveSubtype(category, input.title),
+      merchant: "Amazon",
+      url,
+      affiliateUrl,
+      active: true,
+    },
+    update: {
+      title: input.title,
+      description: input.description ?? null,
+      imageUrl: input.imageUrl ?? null,
+      price: input.price ?? null,
+      oldPrice: input.oldPrice ?? null,
+      discountPct: discountPctOf(p),
+      category,
+      subtype: resolveSubtype(category, input.title),
+      merchant: "Amazon",
+      url,
+      affiliateUrl,
+      active: true,
+    },
+  });
+}
+
 // Versao para o botao "Sincronizar agora" do /admin.
 export async function startAmazonSync(): Promise<{
   status: SyncSourceStatus;

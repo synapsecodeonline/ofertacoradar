@@ -8,6 +8,7 @@ import { SOURCE_LABEL, SOURCE_BADGE, type SourceKey } from "@/lib/sources";
 import { getRevenueReport, type SourceRevenue } from "@/lib/reports";
 import AdminSyncButton from "@/components/AdminSyncButton";
 import AdminAutoRefresh from "@/components/AdminAutoRefresh";
+import AdminAmzForm from "@/components/AdminAmzForm";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -587,6 +588,13 @@ export default async function AdminPage() {
               );
             })}
           </div>
+        </Card>
+      </div>
+
+      {/* Cadastro manual de produtos Amazon (API ainda nao liberada) */}
+      <div className="mb-8">
+        <Card title="Adicionar produto Amazon">
+          <AdminAmzForm />
         </Card>
       </div>
 
