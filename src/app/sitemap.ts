@@ -19,11 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  // Limite do sitemap e 50 mil URLs — pegamos todos os produtos ativos.
   const products = await prisma.product.findMany({
     where: { active: true },
     select: { id: true, updatedAt: true },
     orderBy: { updatedAt: "desc" },
-    take: 5000,
+    take: 45000,
   });
 
   return [

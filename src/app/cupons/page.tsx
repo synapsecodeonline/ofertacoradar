@@ -15,7 +15,21 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Cupons do dia",
     description:
       "Cupons e ofertas exclusivas do dia nas lojas parceiras. Copie o cupom e aproveite o desconto no checkout.",
+    keywords: [
+      "cupons de desconto",
+      "cupom",
+      "cupons do dia",
+      "codigo promocional",
+      "promocoes",
+    ],
     alternates: { canonical: `${siteUrl()}/cupons` },
+    openGraph: {
+      title: "Cupons do dia | Ofertaço Radar",
+      description:
+        "Cupons e ofertas exclusivas do dia nas lojas parceiras. Copie o cupom e aproveite o desconto.",
+      url: `${siteUrl()}/cupons`,
+      images: [{ url: "/api/og", width: 1200, height: 630 }],
+    },
   };
 }
 

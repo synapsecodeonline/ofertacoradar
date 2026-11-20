@@ -152,24 +152,58 @@ export default async function ProductPage({
   ]);
   const related = [...sameMerchant, ...sameCategory].slice(0, 4);
 
+  const productUrl = `${siteUrl()}/produto/${product.id}`;
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.title,
-    description: product.description ?? undefined,
-    image: product.imageUrl ?? undefined,
-    brand: product.merchant ? { "@type": "Brand", name: product.merchant } : undefined,
-    offers: {
-      "@type": "Offer",
-      url: `${siteUrl()}/produto/${product.id}`,
-      priceCurrency: product.currency || "BRL",
-      ...(product.price != null ? { price: product.price } : {}),
-      availability: "https://schema.org/InStock",
-      ...(product.endsAt ? { validThrough: product.endsAt.toISOString() } : {}),
-      seller: product.merchant
-        ? { "@type": "Organization", name: product.merchant }
-        : { "@type": "Organization", name: SITE_NAME },
-    },
+    "@graph": [
+      {
+        "@type": "Product",
+        name: product.title,
+        description: product.description ?? undefined,
+        image: product.imageUrl ?? undefined,
+        brand: product.merchant
+          ? { "@type": "Brand", name: product.merchant }
+          : undefined,
+        offers: {
+          "@type": "Offer",
+          url: productUrl,
+          priceCurrency: product.currency || "BRL",
+          ...(product.price != null ? { price: product.price } : {}),
+          availability: "https://schema.org/InStock",
+          ...(product.endsAt ? { validThrough: product.endsAt.toISOString() } : {}),
+          seller: product.merchant
+            ? { "@type": "Organization", name: product.merchant }
+            : { "@type": "Organization", name: SITE_NAME },
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Início",
+            item: siteUrl(),
+          },
+          ...(product.category
+            ? [
+                {
+                  "@type": "ListItem",
+                  position: 2,
+                  name: categoryLabel(product.category),
+                  item: `${siteUrl()}/?categoria=${encodeURIComponent(canonicalCategory(product.category))}`,
+                },
+              ]
+            : []),
+          {
+            "@type": "ListItem",
+            position: product.category ? 3 : 2,
+            name: product.title,
+            item: productUrl,
+          },
+        ],
+      },
+    ],
   };
 
   return (

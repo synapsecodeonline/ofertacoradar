@@ -29,13 +29,18 @@ export const metadata: Metadata = {
   description:
     "Cupons, ofertas e produtos selecionados das melhores lojas. Ofertas verificadas com links diretos para aproveitar o desconto.",
   keywords: [
-    "cupons de desconto",
     "ofertas",
+    "ofertas do dia",
+    "cupons de desconto",
+    "cupom de desconto",
+    "promocoes",
     "promocao",
-    "cupom",
     "desconto",
     "black friday",
-    "ofertas do dia",
+    "ofertas mercadolivre",
+    "ofertas online",
+    "comprar com desconto",
+    "melhores ofertas",
   ],
   openGraph: {
     type: "website",
@@ -44,12 +49,14 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description:
       "Cupons, ofertas e produtos selecionados das melhores lojas. Ofertas verificadas com links diretos.",
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description:
       "Cupons, ofertas e produtos selecionados das melhores lojas.",
+    images: ["/api/og"],
   },
   robots: { index: true, follow: true },
   // verificacao do canal na Lomadee
