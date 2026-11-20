@@ -18,6 +18,7 @@ import ShareButtons from "@/components/ShareButtons";
 import InstagramCaption from "@/components/InstagramCaption";
 import BackButton from "@/components/BackButton";
 import NotifyForm from "@/components/NotifyForm";
+import ScrollToTop from "@/components/ScrollToTop";
 import { instagramCaption } from "@/lib/instagram";
 import { createClient } from "@/lib/supabase/server";
 
@@ -227,6 +228,7 @@ export default async function ProductPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-4 py-8">
+      <ScrollToTop />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
