@@ -70,6 +70,17 @@ export async function GET(
     }
   }
 
+  // Amazon: garante o Partner Tag no redirect — a comissao so conta
+  // com ?tag= valido. affiliateUrl ja vem com tag do sync; aqui e
+  // reforco caso o produto tenha sido criado sem ela.
+  if (product.externalId?.startsWith("amz:")) {
+    const target = new URL(product.affiliateUrl ?? product.url);
+    target.searchParams.set("tag", process.env.AMZ_TAG ?? "synapsecodeon-20");
+    const source = request.nextUrl.searchParams.get("src");
+    if (source) target.searchParams.set("utm_source", source);
+    return NextResponse.redirect(target, 302);
+  }
+
   // Produtos do catalogo nao tem link de afiliado pronto:
   // gera um lmdee.link rastreado na hora (cacheado) ou cai na URL direta.
   // Todo produto ativo foi validado com lmdeeTracking — se a loja quebra

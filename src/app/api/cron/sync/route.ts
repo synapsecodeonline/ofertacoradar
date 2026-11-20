@@ -1,5 +1,6 @@
 import { after, type NextRequest } from "next/server";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncAmazon } from "@/lib/amazon";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
     Promise.all([
       maybeSyncLomadee().catch(() => {}),
       maybeSyncML().catch(() => {}),
+      maybeSyncAmazon().catch(() => {}),
     ]),
   );
   return Response.json({ ok: true });

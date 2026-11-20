@@ -31,6 +31,7 @@ function sourceSql(col: string) {
     WHEN ${col} LIKE 'camp-lomadee:%' OR ${col} LIKE 'prod-lomadee:%' THEN 'lomadee'
     WHEN ${col} LIKE 'ml:%' THEN 'ml'
     WHEN ${col} LIKE 'aw:%' THEN 'awin'
+    WHEN ${col} LIKE 'amz:%' THEN 'amazon'
     ELSE 'outros' END`;
 }
 
@@ -366,9 +367,8 @@ export default async function AdminPage() {
   const srcLabel = (s: string) =>
     s === "outros" ? "Outros" : SOURCE_LABEL[s as SourceKey] ?? s;
   const srcBadge = (s: string) =>
-    s === "lomadee" || s === "ml" || s === "awin"
-      ? SOURCE_BADGE[s as SourceKey]
-      : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300";
+    SOURCE_BADGE[s as SourceKey] ??
+    "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300";
 
   // sync ativo agora? -> auto-refresh mais rapido + badge pulsante
   const syncBusy = syncStates.some(
@@ -380,6 +380,7 @@ export default async function AdminPage() {
   const SYNC_SOURCES: Record<string, { name: string }> = {
     main: { name: "Lomadee" },
     ml: { name: "Mercado Livre" },
+    amazon: { name: "Amazon" },
   };
   // Linhas auxiliares do sync: `${key}:beat` = ultimo sinal de vida,
   // `${key}:err` = ultimo erro registrado pela fonte.

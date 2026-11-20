@@ -67,11 +67,19 @@ const TABS = {
     prefix: "aw:",
     defaultSort: "recentes",
   },
+  amazon: {
+    label: "Amazon",
+    eyebrow: "Amazon",
+    title: "Ofertas Amazon",
+    noun: "ofertas",
+    prefix: "amz:",
+    defaultSort: "desconto",
+  },
 } as const;
 type Tab = keyof typeof TABS;
 const TAB_ORDER = Object.keys(TABS) as Tab[];
 // Abas de oferta: sempre ranking por desconto — ?ordem= nao se aplica
-const RANKED_TABS: Tab[] = ["lomadee", "ml"];
+const RANKED_TABS: Tab[] = ["lomadee", "ml", "amazon"];
 
 function orderByFor(sort: SortKey) {
   switch (sort) {
@@ -173,7 +181,7 @@ export async function HomeExperience({
   if (TAB_ORDER.includes(rawTab as Tab)) tab = rawTab as Tab;
   else if (rawTab === "produtos" || rawTab === "ofertas" || rawTab === "lojas")
     tab = fonteParam === "awin" ? "awin" : fonteParam === "ml" ? "ml" : "lomadee";
-  else if (fonteParam === "ml" || fonteParam === "awin" || fonteParam === "lomadee") tab = fonteParam === "lomadee" ? "lomadee" : fonteParam;
+  else if (fonteParam === "ml" || fonteParam === "awin" || fonteParam === "amazon" || fonteParam === "lomadee") tab = fonteParam === "lomadee" ? "lomadee" : fonteParam;
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
   const cfg = TABS[tab];
@@ -225,16 +233,19 @@ export async function HomeExperience({
     lomadee: "camp-lomadee:",
     ml: "ml:",
     awin: "aw:",
+    amazon: "amz:",
   };
   const OFFERS_TITLE: Record<Tab, string> = {
     lomadee: "Ofertas Lomadee",
     ml: "Ofertas Mercado Livre",
     awin: "Ofertas Awin",
+    amazon: "Ofertas Amazon",
   };
   const STORE_EYEBROW: Record<Tab, string> = {
     lomadee: "Lojas Lomadee",
     ml: "Lojas Mercado Livre",
     awin: "Lojas Awin",
+    amazon: "Lojas Amazon",
   };
   const offersWhere = {
     ...listWhere,
@@ -367,13 +378,14 @@ export async function HomeExperience({
     // aba das "Lojas em destaque" + contagem das abas. Uma query so porque
     // o pool do banco e pequeno (connection_limit baixo).
     prisma.$queryRaw<
-      { merchant: string; camp: bigint; prod: bigint; ml: bigint; aw: bigint }[]
+      { merchant: string; camp: bigint; prod: bigint; ml: bigint; aw: bigint; amz: bigint }[]
     >`
       SELECT "merchant",
         COUNT(*) FILTER (WHERE "externalId" LIKE 'camp-lomadee:%') AS camp,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'prod-lomadee:%') AS prod,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'ml:%')   AS ml,
-        COUNT(*) FILTER (WHERE "externalId" LIKE 'aw:%')   AS aw
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'aw:%')   AS aw,
+        COUNT(*) FILTER (WHERE "externalId" LIKE 'amz:%')  AS amz
       FROM "Product"
       WHERE active
         AND "merchant" IS NOT NULL
@@ -391,49 +403,53 @@ export async function HomeExperience({
 
   // Contagem de itens visiveis por fonte (abas) e por loja.
   // srcRows: uma linha por merchant com contagem por prefixo de fonte.
-  const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
+  const SRC_KEY: Record<Tab, "camp" | "prod" | "ml" | "aw" | "amz"> = {
     lomadee: "prod",
     ml: "ml",
     awin: "aw",
+    amazon: "amz",
   };
   const tabCounts = new Map<Tab, number>();
   const countByMerchant = new Map<string, number>();
   const merchantSrc = new Map<
     string,
-    { camp: number; prod: number; ml: number; aw: number }
+    { camp: number; prod: number; ml: number; aw: number; amz: number }
   >();
   for (const r of srcRows) {
     const camp = Number(r.camp);
     const prod = Number(r.prod);
     const ml = Number(r.ml);
     const aw = Number(r.aw);
-    const total = camp + prod + ml + aw;
+    const amz = Number(r.amz);
+    const total = camp + prod + ml + aw + amz;
     countByMerchant.set(r.merchant, total);
-    merchantSrc.set(r.merchant, { camp, prod, ml, aw });
+    merchantSrc.set(r.merchant, { camp, prod, ml, aw, amz });
     for (const t of TAB_ORDER) {
       // Lomadee conta produtos + cupons (mesma regra do sourceCond)
-      const n = t === "lomadee" ? camp + prod : { camp, prod, ml, aw }[SRC_KEY[t]];
+      const n = t === "lomadee" ? camp + prod : { camp, prod, ml, aw, amz }[SRC_KEY[t]];
       if (n <= 0) continue;
       tabCounts.set(t, (tabCounts.get(t) ?? 0) + n);
     }
   }
-  // Awin so aparece como aba quando houver itens
+  // Awin/Amazon so aparecem como aba quando houver itens
   const catalogTotal =
     (tabCounts.get("lomadee") ?? 0) +
     (tabCounts.get("ml") ?? 0) +
-    (tabCounts.get("awin") ?? 0);
+    (tabCounts.get("awin") ?? 0) +
+    (tabCounts.get("amazon") ?? 0);
 
   // "Lojas em destaque" por aba. Lomadee = rede inteira (camp+prod),
-  // ML = ml:, Awin = aw: — cada tela so mostra lojas da sua fonte.
-  const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw"> = {
+  // ML = ml:, Awin = aw:, Amazon = amz: — cada tela so mostra lojas da sua fonte.
+  const SRC_COUNT: Record<Tab, "camp" | "prod" | "ml" | "aw" | "amz"> = {
     lomadee: "prod",
     ml: "ml",
     awin: "aw",
+    amazon: "amz",
   };
   const featuredForTab = (t: Tab) =>
     FEATURED_STORES.map((s) => {
       const src = merchantSrc.get(s.merchant);
-      const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0 };
+      const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0, amz: 0 };
       // Lojas Lomadee inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
       const visible =
         t === "lomadee"
@@ -442,7 +458,7 @@ export async function HomeExperience({
       return {
         ...s,
         offers: counts.camp,
-        products: counts.prod + counts.ml + counts.aw,
+        products: counts.prod + counts.ml + counts.aw + counts.amz,
         linkTab: t,
         visible,
       };

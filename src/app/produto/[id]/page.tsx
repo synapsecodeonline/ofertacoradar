@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncAmazon } from "@/lib/amazon";
 import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { categoryLabel, canonicalCategory } from "@/lib/categories";
@@ -74,6 +75,7 @@ export default async function ProductPage({
     Promise.all([
       maybeSyncLomadee().catch(() => {}),
       maybeSyncML().catch(() => {}),
+      maybeSyncAmazon().catch(() => {}),
     ]),
   );
 

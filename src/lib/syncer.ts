@@ -19,6 +19,17 @@ import {
   mapLimit,
   validateProductLink,
 } from "./linkcheck";
+import {
+  LOCK_STALE_MS,
+  acquireLock,
+  beat,
+  busyFresh,
+  clearError,
+  noteError,
+  releaseLock,
+  startHeartbeat,
+} from "./sync-lock";
+import { startAmazonSync } from "./amazon";
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
@@ -30,7 +41,6 @@ import {
 const STATE_KEY = "main";
 const BUDGET_MS = 45_000; // tempo maximo de trabalho por invocacao
 const CYCLE_TTL_MS = 60_000; // novo ciclo completo a cada 1 minuto
-const LOCK_STALE_MS = 3 * 60_000; // trava expira se o worker morrer
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -460,81 +470,6 @@ async function runMLCycle() {
 
 // ---- Trava + heartbeat compartilhados ----
 
-async function acquireLock(key: string): Promise<boolean> {
-  const locked = await prisma.syncState.updateMany({
-    where: {
-      key,
-      OR: [
-        { busyAt: null },
-        { busyAt: { lt: new Date(Date.now() - LOCK_STALE_MS) } },
-      ],
-    },
-    data: { busyAt: new Date() },
-  });
-  return locked.count > 0;
-}
-
-function busyFresh(busyAt: Date | null): boolean {
-  return !!busyAt && Date.now() - busyAt.getTime() < LOCK_STALE_MS;
-}
-
-// Sinal de vida fora da trava: busyAt vira null entre blocos de 45s,
-// entao guardamos a ultima atividade em linhas auxiliares do SyncState
-// (sem migracao de schema): `${key}:beat` e `${key}:err`.
-const beatKey = (k: string) => `${k}:beat`;
-const errKey = (k: string) => `${k}:err`;
-
-async function beat(key: string) {
-  const bk = beatKey(key);
-  await prisma.syncState
-    .upsert({
-      where: { key: bk },
-      create: { key: bk, busyAt: new Date() },
-      update: { busyAt: new Date() },
-    })
-    .catch(() => {});
-}
-
-async function noteError(key: string, msg: string) {
-  const ek = errKey(key);
-  await prisma.syncState
-    .upsert({
-      where: { key: ek },
-      create: { key: ek, phase: msg.slice(0, 200), busyAt: new Date() },
-      update: { phase: msg.slice(0, 200), busyAt: new Date() },
-    })
-    .catch(() => {});
-}
-
-async function clearError(key: string) {
-  await prisma.syncState
-    .delete({ where: { key: errKey(key) } })
-    .catch(() => {});
-}
-
-// Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
-// Sem isso, fases longas sem checkpoint deixam busyAt velho -> alerta
-// "travado" falso e trava expira permitindo sync duplicado.
-function startHeartbeat(key: string) {
-  const hb = setInterval(() => {
-    prisma.syncState
-      .update({ where: { key }, data: { busyAt: new Date() } })
-      .catch(() => {});
-    beat(key);
-  }, 30_000);
-  hb.unref?.();
-  return hb;
-}
-
-async function releaseLock(key: string, hb: ReturnType<typeof setInterval>) {
-  clearInterval(hb);
-  await prisma.syncState
-    .update({ where: { key }, data: { busyAt: null } })
-    .catch(() => {});
-  // registra o fim do bloco como atividade — o proximo cron retoma
-  await beat(key);
-}
-
 async function runMLLocked() {
   const hb = startHeartbeat(ML_STATE_KEY);
   try {
@@ -566,7 +501,10 @@ async function runLomadeeLocked(apiKey: string, baseUrl: string) {
 export type SyncSourceStatus = "started" | "busy" | "skipped";
 
 export interface ForcedSyncResult {
-  results: { source: "lomadee" | "ml" | "awin"; status: SyncSourceStatus }[];
+  results: {
+    source: "lomadee" | "ml" | "awin" | "amazon";
+    status: SyncSourceStatus;
+  }[];
   // roda as fontes adquiridas — chamar dentro de after()
   run: () => Promise<void>;
 }
@@ -615,6 +553,11 @@ export async function startAllSyncs(): Promise<ForcedSyncResult> {
 
   // Awin ainda nao tem sincronizador implementado
   results.push({ source: "awin", status: "skipped" });
+
+  // Amazon: PA-API — so inicia se AMZ_API_KEY/SECRET estiverem configurados
+  const amz = await startAmazonSync();
+  if (amz.status === "started" && amz.run) tasks.push(amz.run);
+  results.push({ source: "amazon", status: amz.status });
 
   return {
     results,

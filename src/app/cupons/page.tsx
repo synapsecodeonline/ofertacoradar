@@ -3,6 +3,7 @@ import { after } from "next/server";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
+import { maybeSyncAmazon } from "@/lib/amazon";
 import { siteUrl } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
 import { IconTag } from "@/components/Icons";
@@ -56,6 +57,7 @@ export default async function CuponsPage({
     Promise.all([
       maybeSyncLomadee().catch(() => {}),
       maybeSyncML().catch(() => {}),
+      maybeSyncAmazon().catch(() => {}),
     ]),
   );
 
