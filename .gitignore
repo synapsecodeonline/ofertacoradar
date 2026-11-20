@@ -45,3 +45,6 @@ next-env.d.ts
 prisma/dev.db
 .vercel
 img.png
+
+# logs do cron local
+logs/

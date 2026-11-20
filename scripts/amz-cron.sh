@@ -13,4 +13,8 @@ LOG=logs/amz-scrape.log
 
 echo "===== $(date -Is) =====" >> "$LOG"
 npx tsx --env-file=.env scripts/amz-scrape.ts "$@" >> "$LOG" 2>&1
-echo "exit=$? $(date -Is)" >> "$LOG"
+echo "scrape exit=$? $(date -Is)" >> "$LOG"
+# verifica elegibilidade de afiliado so dos ASINs novos (sessao em
+# ~/.config/ofertacoradar/amz-state.json; se expirada, so loga e segue)
+npx tsx --env-file=.env scripts/amz-verify.ts >> "$LOG" 2>&1
+echo "verify exit=$? $(date -Is)" >> "$LOG"
