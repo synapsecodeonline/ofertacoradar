@@ -44,7 +44,7 @@ type SortKey = keyof typeof SORTS;
 // prefix = externalId prefix; noun = rotulo de contagem; sort default.
 const TABS = {
   lomadee: {
-    label: "Lojas Lomadee",
+    label: "Lomadee (Multi Marcas)",
     eyebrow: "Lomadee",
     title: "Ofertas Lomadee",
     noun: "ofertas",
@@ -52,7 +52,7 @@ const TABS = {
     defaultSort: "desconto",
   },
   ml: {
-    label: "Lojas Mercado Livre",
+    label: "Mercado Livre",
     eyebrow: "Mercado Livre",
     title: "Ofertas Mercado Livre",
     noun: "ofertas",
@@ -242,8 +242,8 @@ export async function HomeExperience({
     amazon: "Ofertas Amazon",
   };
   const STORE_EYEBROW: Record<Tab, string> = {
-    lomadee: "Lojas Lomadee",
-    ml: "Lojas Mercado Livre",
+    lomadee: "Lomadee (Multi Marcas)",
+    ml: "Mercado Livre",
     awin: "Lojas Awin",
     amazon: "Lojas Amazon",
   };
@@ -450,7 +450,7 @@ export async function HomeExperience({
     FEATURED_STORES.map((s) => {
       const src = merchantSrc.get(s.merchant);
       const counts = src ?? { camp: 0, prod: 0, ml: 0, aw: 0, amz: 0 };
-      // Lojas Lomadee inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
+      // Lomadee (Multi Marcas) inclui ofertas camp: + produtos prod-lomadee: da rede Lomadee
       const visible =
         t === "lomadee"
           ? counts.camp + counts.prod > 0
@@ -535,16 +535,16 @@ export async function HomeExperience({
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4">
       {/* Cabecalho da visao de catalogo: titulo da fonte + busca */}
       {!dayOnly && (
-        <section className="-mx-4 mb-8 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white px-5 py-8 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/10 dark:to-zinc-900">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 text-center">
+        <section className="-mx-4 mb-5 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white px-4 py-4 sm:mb-8 sm:px-5 sm:py-8 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/10 dark:to-zinc-900">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 text-center sm:gap-6">
             <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
                 {cfg.eyebrow}
               </p>
-              <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-4xl">
+              <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:mt-1.5 sm:text-3xl lg:text-4xl">
                 {cfg.title}
               </h1>
-              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 hidden text-sm text-zinc-500 dark:text-zinc-400 sm:mt-2 sm:block">
                 {catalogTotal.toLocaleString("pt-BR")} {cfg.noun} verificadas ·
                 preços e ofertas atualizados diariamente
               </p>

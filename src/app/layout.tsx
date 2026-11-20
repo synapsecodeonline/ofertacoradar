@@ -104,13 +104,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 href="/?aba=lomadee"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Lojas Lomadee
+                Lomadee (Multi Marcas)
               </HashLink>
               <HashLink
                 href="/?aba=ml"
                 className="rounded-full px-4 py-1.5 text-zinc-600 transition-all hover:bg-white hover:text-emerald-600 hover:shadow-sm dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                Lojas Mercado Livre
+                Mercado Livre
               </HashLink>
               <HashLink
                 href="/?aba=amazon"
@@ -135,13 +135,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 href="/?aba=lomadee"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
-                Lojas Lomadee
+                Lomadee (Multi Marcas)
               </HashLink>
               <HashLink
                 href="/?aba=ml"
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-300 dark:hover:bg-emerald-950/40"
               >
-                Lojas Mercado Livre
+                Mercado Livre
               </HashLink>
               <HashLink
                 href="/?aba=amazon"
@@ -181,10 +181,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Navegação
               </p>
               <Link href="/?aba=lomadee" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Lojas Lomadee
+                Lomadee (Multi Marcas)
               </Link>
               <Link href="/?aba=ml" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
-                Lojas Mercado Livre
+                Mercado Livre
               </Link>
               <Link href="/?aba=amazon" className="text-zinc-500 transition-colors hover:text-orange-500 dark:text-zinc-400">
                 Amazon
