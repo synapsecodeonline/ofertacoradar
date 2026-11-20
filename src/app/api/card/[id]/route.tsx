@@ -130,15 +130,15 @@ export async function GET(
               {isAmazon ? (
                 // seta-sorriso da logo Amazon desenhada inline
                 // (SVG externo e instavel no next/og)
-                <svg width="72" height="30" viewBox="0 0 72 30">
+                <svg width="88" height="34" viewBox="0 0 88 34">
                   <path
-                    d="M4 12 Q36 34 68 12"
+                    d="M4 26 Q42 42 74 10"
                     stroke="#ff9900"
-                    strokeWidth="6"
+                    strokeWidth="5"
                     fill="none"
                     strokeLinecap="round"
                   />
-                  <path d="M57 5 L69 13 L58 19 Z" fill="#ff9900" />
+                  <path d="M66 3 L78 11 L64 19 Z" fill="#ff9900" />
                 </svg>
               ) : storeLogoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -175,13 +175,13 @@ export async function GET(
               <div
                 style={{
                   fontSize: 34,
-                  fontWeight: 800,
-                  color: "#99f6e4",
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
+                  fontWeight: isAmazon ? 900 : 800,
+                  color: isAmazon ? "#ff9900" : "#99f6e4",
+                  letterSpacing: isAmazon ? -1 : 1,
+                  textTransform: isAmazon ? "none" : "uppercase",
                 }}
               >
-                {product.merchant}
+                {isAmazon ? "amazon" : product.merchant}
               </div>
             </div>
           )}
