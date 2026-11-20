@@ -10,6 +10,7 @@ export interface FeaturedStore {
 export const FEATURED_STORES: FeaturedStore[] = [
   // selecionadas a pedido + maior volume/prova social do catalogo
   { merchant: "Mercado Livre", domain: "mercadolivre.com.br" },
+  { merchant: "Amazon", domain: "amazon.com.br" },
   { merchant: "Malwee", brand: "Malwee", domain: "malwee.com.br" },
   { merchant: "Iodice", brand: "Iodice", domain: "iodice.com.br" },
   { merchant: "Coza", brand: "Coza", domain: "coza.com.br" },
