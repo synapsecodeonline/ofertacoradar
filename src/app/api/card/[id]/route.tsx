@@ -176,9 +176,9 @@ export async function GET(
               <div
                 style={{
                   fontSize: 34,
-                  fontWeight: isAmazon ? 900 : 800,
-                  color: isAmazon ? "#ffffff" : "#99f6e4",
-                  letterSpacing: isAmazon ? 2 : 1,
+                  fontWeight: 800,
+                  color: "#99f6e4",
+                  letterSpacing: 1,
                   textTransform: "uppercase",
                 }}
               >
