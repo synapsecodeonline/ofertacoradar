@@ -4,14 +4,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
 import { CATEGORY_ORDER, categoryLabel, canonicalCategory } from "@/lib/categories";
-import { SITE_NAME } from "@/lib/site";
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: `Ofertas verificadas | ${SITE_NAME}`,
-  description:
-    "As melhores ofertas do Brasil verificadas todo dia: produtos, promoções e cupons de Amazon, Mercado Livre, Lomadee e mais.",
+  description: SITE_TAGLINE,
   alternates: { canonical: "/ofertas" },
 };
 
@@ -33,6 +32,39 @@ const WHERE: Prisma.ProductWhereInput = {
   ],
 };
 
+const LINKS = [
+  {
+    href: "/#catalogo",
+    icon: "🔥",
+    title: "Ofertas em destaque",
+    sub: "As melhores de agora",
+  },
+  {
+    href: "/?ordem=desconto#catalogo",
+    icon: "🏷️",
+    title: "Maiores descontos",
+    sub: "Até 90% off todo dia",
+  },
+  {
+    href: "/?aba=cupons",
+    icon: "🎟️",
+    title: "Cupons de desconto",
+    sub: "Cupom certo, preço menor",
+  },
+  {
+    href: "/?ordem=recentes#catalogo",
+    icon: "🆕",
+    title: "Chegaram agora",
+    sub: "Lançamentos fresquinhos",
+  },
+  {
+    href: "/ofertas#categorias",
+    icon: "📂",
+    title: "Ver por categoria",
+    sub: "Mercado, tech, casa e mais",
+  },
+];
+
 export default async function OfertasPage() {
   const [products, total] = await Promise.all([
     prisma.product.findMany({
@@ -43,61 +75,94 @@ export default async function OfertasPage() {
     prisma.product.count({ where: WHERE }),
   ]);
 
-  const categories = CATEGORY_ORDER.slice(0, 12);
-
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10 pt-6">
-      {/* Hero compacto */}
-      <section className="mb-6 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white px-5 py-6 text-center dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-teal-950/10 dark:to-zinc-900 sm:py-8">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
-          Lomadee · Mercado Livre · Amazon
-        </p>
-        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-3xl">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10">
+      {/* ===== Perfil + links (estilo Linktree) ===== */}
+      <section className="mx-auto flex w-full max-w-md flex-col items-center pt-8 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-4xl shadow-lg shadow-emerald-600/25">
+          🛸
+        </div>
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
           {SITE_NAME}
         </h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-          {total.toLocaleString("pt-BR")} ofertas conferidas · preço e estoque
-          atualizados todo dia
+        <p className="mt-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+          @ofertacoradar
         </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          <Link
-            href="/#catalogo"
-            className="inline-flex h-11 items-center rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
-          >
-            Ver ofertas
-          </Link>
-          <Link
-            href="/?aba=cupons"
-            className="inline-flex h-11 items-center rounded-xl border border-zinc-200 bg-white px-6 text-sm font-bold text-zinc-700 transition-colors hover:border-emerald-400 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-          >
-            Cupons de desconto
-          </Link>
-        </div>
+        <p className="mt-2 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+          {SITE_TAGLINE} —{" "}
+          <b className="text-zinc-700 dark:text-zinc-200">
+            {total.toLocaleString("pt-BR")} ofertas
+          </b>{" "}
+          conferidas todo dia.
+        </p>
+
+        {/* Links */}
+        <nav aria-label="Links rápidos" className="mt-6 flex w-full flex-col gap-2.5">
+          {LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="group flex items-center gap-4 rounded-2xl border border-zinc-200/80 bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-600/10 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-xl transition-colors group-hover:bg-emerald-50 dark:bg-zinc-800 dark:group-hover:bg-emerald-950/50">
+                {l.icon}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-extrabold text-zinc-900 dark:text-white">
+                  {l.title}
+                </span>
+                <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  {l.sub}
+                </span>
+              </span>
+              <span className="text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-500 dark:text-zinc-600">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Social */}
+        <a
+          href="https://instagram.com/ofertacoradar"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex items-center gap-2 rounded-full border border-pink-200 bg-pink-50 px-4 py-2 text-xs font-bold text-pink-600 transition-colors hover:bg-pink-100 dark:border-pink-900 dark:bg-pink-950/40 dark:text-pink-400"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+            <rect x="2" y="2" width="20" height="20" rx="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          Seguir @ofertacoradar
+        </a>
       </section>
 
-      {/* Categorias */}
-      <nav aria-label="Categorias" className="mb-6">
-        <p className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-zinc-400">
-          Categorias
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((c) => (
+      {/* ===== Categorias ===== */}
+      <section id="categorias" className="mx-auto mt-10 w-full max-w-3xl scroll-mt-6">
+        <h2 className="mb-3 text-center text-sm font-extrabold uppercase tracking-widest text-zinc-500">
+          Ou explore por categoria
+        </h2>
+        <div className="flex flex-wrap justify-center gap-2">
+          {CATEGORY_ORDER.map((c) => (
             <Link
               key={c}
               href={`/?categoria=${encodeURIComponent(canonicalCategory(c))}`}
-              className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-400 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-emerald-400"
+              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-400 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-emerald-400"
             >
               {categoryLabel(c)}
             </Link>
           ))}
         </div>
-      </nav>
+      </section>
 
-      {/* Ofertas em destaque */}
-      <section>
+      {/* ===== Ofertas em destaque ===== */}
+      <section className="mt-10">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-extrabold uppercase tracking-widest text-zinc-500">
-            Ofertas em destaque
+            🏆 Ofertas em destaque
           </h2>
           <Link
             href="/"
@@ -115,8 +180,8 @@ export default async function OfertasPage() {
 
       <footer className="mt-10 text-center text-[11px] text-zinc-400">
         <p>
-          {SITE_NAME} — ofertas de verdade, verificadas todo dia. Links de
-          parceiro, sem custo extra pra você.
+          {SITE_NAME} — {SITE_TAGLINE.toLowerCase()}. Links de parceiro, sem
+          custo extra pra você.
         </p>
       </footer>
     </div>
