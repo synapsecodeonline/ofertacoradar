@@ -472,6 +472,12 @@ export default async function AdminPage() {
           >
             Kit Instagram
           </Link>
+          <Link
+            href="/admin/analytics"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            Analytics
+          </Link>
           <AdminSyncButton />
           <Link
             href="/"

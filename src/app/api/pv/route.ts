@@ -71,11 +71,16 @@ export async function POST(req: Request) {
 
     // Tabela Event real (apos migration-events.sql). Fallback: hack do
     // produto sentinela enquanto a tabela nao existir.
+    // Funil por produto: pageview em /produto/[id] carrega o productId
+    const pvProductMatch = path.match(/^\/produto\/(\d+)/);
+    const eventProductId = pvProductMatch ? Number(pvProductMatch[1]) : null;
+
     try {
       await prisma.event.create({
         data: {
           type: "pageview",
           path: path.slice(0, 300),
+          productId: eventProductId,
           sessionId: typeof body?.sid === "string" ? body.sid.slice(0, 60) : null,
           referer: req.headers.get("referer")?.slice(0, 480) ?? null,
           userAgent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
