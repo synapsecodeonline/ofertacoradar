@@ -92,9 +92,16 @@ export default async function ProductPage({
     product.endsAt && product.endsAt.getTime() - Date.now() < 7 * 86_400_000;
 
   // Prova social real: cliques registrados em /ir/[id]
-  const totalClicks = await prisma.click.count({
-    where: { productId: product.id },
-  });
+  const [totalClicks, lowState] = await Promise.all([
+    prisma.click.count({ where: { productId: product.id } }),
+    // Menor preco historico (SyncState KV — ver upsert.ts)
+    product.externalId
+      ? prisma.syncState
+          .findUnique({ where: { key: `lp:${product.externalId}` } })
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const lowestEver = lowState?.phase ? Number(lowState.phase) : null;
 
   // Razoes objetivas para comprar por aqui (todas derivadas de dados reais)
   const reasons: string[] = [];
@@ -314,6 +321,17 @@ export default async function ProductPage({
             </p>
           )}
 
+          {lowestEver != null &&
+            product.price != null &&
+            lowestEver < product.price * 0.98 && (
+              <p className="w-fit rounded-lg bg-sky-50 px-3 py-1.5 text-sm font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                📉 Menor preço já visto: {formatPrice(lowestEver, product.currency)}
+                {product.price > lowestEver
+                  ? ` — hoje está ${formatPrice(product.price - lowestEver, product.currency)} acima`
+                  : ""}
+              </p>
+            )}
+
           {totalClicks >= 3 && (
             <p className="flex w-fit items-center gap-1.5 text-sm font-bold text-orange-600 dark:text-orange-400">
               <IconFlame className="h-4 w-4" />
@@ -376,7 +394,7 @@ export default async function ProductPage({
           {/* CTA */}
           <div className="flex flex-col gap-3">
             <a
-              href={`/ir/${product.id}`}
+              href={`/ir/${product.id}?src=produto`}
               className="group/cta inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-lg font-bold text-white shadow-lg shadow-emerald-600/30 transition-all hover:shadow-xl hover:shadow-emerald-600/40 active:scale-[0.99]"
             >
               {product.couponCode

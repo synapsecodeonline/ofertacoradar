@@ -40,11 +40,30 @@ export async function GET(
     } catch {
       // falha na auth nao impede o registro do clique
     }
+    // Atribuicao embutida no campo referer (sem coluna nova):
+    // "referer_http|sid=..|src=..|utm_source=.." — permite saber de onde
+    // veio o clique (pagina, campanha, sessao) sem mudar o schema.
+    const parts: string[] = [];
+    const httpRef = request.headers.get("referer");
+    if (httpRef) parts.push(httpRef.slice(0, 200));
+    const sid = request.cookies.get("ocr_sid")?.value;
+    if (sid) parts.push(`sid=${sid.slice(0, 60)}`);
+    const srcParam = request.nextUrl.searchParams.get("src");
+    if (srcParam) parts.push(`src=${srcParam.slice(0, 60)}`);
+    try {
+      const refUrl = httpRef ? new URL(httpRef) : null;
+      for (const k of ["utm_source", "utm_medium", "utm_campaign"]) {
+        const v = refUrl?.searchParams.get(k);
+        if (v) parts.push(`${k}=${v.slice(0, 80)}`);
+      }
+    } catch {
+      // referer invalido — ignora UTMs
+    }
     await prisma.click
       .create({
         data: {
           productId: product.id,
-          referer: request.headers.get("referer"),
+          referer: parts.join("|").slice(0, 480) || null,
           userAgent: userAgent?.slice(0, 500),
         },
       })

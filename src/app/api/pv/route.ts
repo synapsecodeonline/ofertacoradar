@@ -33,6 +33,8 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => null)) as {
       path?: string;
+      sid?: string;
+      utm?: Record<string, string>;
     } | null;
     const path = typeof body?.path === "string" ? body.path : "";
     if (!path.startsWith("/") || path.length > 300) {
@@ -64,10 +66,24 @@ export async function POST(req: Request) {
     }
 
     const productId = await pvProductId();
+    // Metadados de atribuicao embutidos no campo referer (sem coluna nova):
+    // "path|sid=..|utm_source=..|utm_medium=.."
+    const meta: string[] = [];
+    if (typeof body?.sid === "string" && body.sid)
+      meta.push(`sid=${body.sid.slice(0, 60)}`);
+    if (body?.utm && typeof body.utm === "object") {
+      for (const [k, v] of Object.entries(body.utm).slice(0, 6)) {
+        if (typeof v === "string" && v)
+          meta.push(`${k.slice(0, 20)}=${v.slice(0, 80)}`);
+      }
+    }
     await prisma.click.create({
       data: {
         productId,
-        referer: path,
+        referer: (path + (meta.length ? "|" + meta.join("|") : "")).slice(
+          0,
+          480,
+        ),
         userAgent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
       },
     });

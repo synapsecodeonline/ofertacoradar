@@ -10,6 +10,7 @@ import AuthButton from "@/components/AuthButton";
 import PageViewTracker from "@/components/PageViewTracker";
 import DbStatusBanner from "@/components/DbStatusBanner";
 import NavProgress from "@/components/NavProgress";
+import SkipLink from "@/components/SkipLink";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,6 +81,29 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,
           }}
         />
+        {/* Pixels de remarketing — so carrega se o ID estiver configurado.
+            NEXT_PUBLIC_META_PIXEL_ID / NEXT_PUBLIC_GA_ID na Vercel. */}
+        {process.env.NEXT_PUBLIC_META_PIXEL_ID && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${process.env.NEXT_PUBLIC_META_PIXEL_ID}');fbq('track','PageView');`,
+            }}
+          />
+        )}
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}');`,
+              }}
+            />
+          </>
+        )}
+        <SkipLink />
         {/* Barra de anuncio (rola para fora) */}
         <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-center text-xs font-semibold text-white">
           <p className="px-4 py-1.5">

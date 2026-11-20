@@ -32,6 +32,7 @@ export default function CopyCoupon({ code }: { code: string }) {
     >
       {code}
       <span
+        aria-live="polite"
         className={`rounded-md px-2 py-0.5 font-sans text-xs font-bold transition-colors ${
           copied
             ? "bg-emerald-600 text-white"

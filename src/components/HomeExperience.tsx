@@ -50,6 +50,16 @@ const TABS = {
 } as const;
 type Tab = keyof typeof TABS;
 
+// Ordenacoes da aba Produtos: "ofertas" (default) = intercalado por fonte;
+// as demais usam Prisma com orderBy direto (sem interleave).
+const ORDENS = {
+  desconto: { discountPct: { sort: "desc", nulls: "last" } },
+  recentes: { createdAt: "desc" },
+  "menor-preco": { price: { sort: "asc", nulls: "last" } },
+  "maior-preco": { price: { sort: "desc", nulls: "last" } },
+} as const;
+type Ordem = keyof typeof ORDENS;
+
 type SearchParams = Promise<{
   [key: string]: string | string[] | undefined;
 }>;
@@ -62,7 +72,8 @@ export async function HomeExperience({
   // dayOnly: renderiza so Instagram + transparencia (tela "Ofertas do dia")
   dayOnly?: boolean;
 }) {
-  const { q, categoria, aba, pagina, loja, tipo } = await searchParams;
+  const { q, categoria, aba, pagina, loja, tipo, ordem: ordemParam } =
+    await searchParams;
   const query = typeof q === "string" ? q : "";
   const rawCat = typeof categoria === "string" ? categoria : "";
   const category = rawCat ? canonicalCategory(rawCat) : "";
@@ -77,6 +88,8 @@ export async function HomeExperience({
   const isCouponTab = tab === "cupons";
   const page = Math.max(1, Number(pagina) || 1);
   const merchant = typeof loja === "string" ? loja : "";
+  const ordemRaw = typeof ordemParam === "string" ? ordemParam : "";
+  const ordem: Ordem | "" = ordemRaw in ORDENS ? (ordemRaw as Ordem) : "";
   const cfg = TABS[tab];
 
   // Produtos: tudo que e item de afiliado vendavel, de todas as fontes,
@@ -178,15 +191,19 @@ export async function HomeExperience({
     couponTotal,
     srcRows,
   ] = await Promise.all([
-    isCouponTab
+    isCouponTab || ordem
       ? prisma.product.findMany({
           where: listWhere,
-          // Cupons: os que terminam antes primeiro
-          // (mesma logica da antiga pagina /cupons).
-          orderBy: [
-            { endsAt: { sort: "asc", nulls: "last" } },
-            { id: "desc" as const },
-          ],
+          // Cupons: os que terminam antes primeiro. Ordem escolhida:
+          // desconto / recentes / menor / maior preco.
+          orderBy: isCouponTab
+            ? [
+                { endsAt: { sort: "asc", nulls: "last" } },
+                { id: "desc" as const },
+              ]
+            : ordem
+              ? ORDENS[ordem]
+              : { discountPct: { sort: "desc", nulls: "last" } },
           skip: (page - 1) * PAGE_SIZE,
           take: PAGE_SIZE,
         })
@@ -407,6 +424,7 @@ export async function HomeExperience({
     if (category) p.set("categoria", category);
     if (category && subtype) p.set("tipo", subtype);
     if (merchant) p.set("loja", merchant);
+    if (ordem) p.set("ordem", ordem);
     // Produtos e a aba padrao — so grava ?aba= na aba Cupons
     if (isCouponTab) p.set("aba", "cupons");
     for (const [k, v] of Object.entries(extra)) {
@@ -636,7 +654,7 @@ export async function HomeExperience({
                 {cfg.title}
               </h2>
             </div>
-            <span className="text-sm font-medium text-zinc-400">
+            <span aria-live="polite" className="text-sm font-medium text-zinc-500">
               {items.length}
               {total > items.length ? ` de ${total.toLocaleString("pt-BR")}` : ""}{" "}
               {cfg.noun}

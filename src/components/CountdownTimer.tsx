@@ -39,7 +39,11 @@ export default function CountdownTimer({ endsAt }: { endsAt: string }) {
       : [`${pad(hours)}h`, `${pad(minutes)}m`, `${pad(seconds)}s`];
 
   return (
-    <div className="flex items-center gap-1.5" aria-label="Tempo restante da oferta">
+    <div
+      className="flex items-center gap-1.5"
+      role="timer"
+      aria-label="Tempo restante da oferta"
+    >
       {parts.map((p, i) => (
         <span key={i} className="flex items-center gap-1.5">
           {i > 0 && <span className="text-amber-500">:</span>}

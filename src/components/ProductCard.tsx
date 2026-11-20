@@ -87,7 +87,7 @@ export default async function ProductCard({
           </span>
         )}
         {product.merchant && (
-          <span className="flex items-center gap-1.5 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          <span className="flex items-center gap-1.5 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
             {isAmazon ? (
               <AmazonMark />
             ) : logo ? (
@@ -122,7 +122,7 @@ export default async function ProductCard({
             )}
             {product.oldPrice != null &&
               product.oldPrice > (product.price ?? 0) && (
-                <span className="mt-1 text-xs text-zinc-400 line-through">
+                <span className="mt-1 text-xs text-zinc-500 line-through">
                   {formatPrice(product.oldPrice, product.currency)}
                 </span>
               )}
@@ -132,7 +132,7 @@ export default async function ProductCard({
               </span>
             )}
           </div>
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950 dark:text-emerald-400 dark:group-hover:bg-emerald-500 dark:group-hover:text-white">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 transition-all duration-300 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-950 dark:text-emerald-400 dark:group-hover:bg-emerald-500 dark:group-hover:text-white" aria-hidden="true">
             <IconArrowRight className="h-4 w-4" />
           </span>
         </div>
