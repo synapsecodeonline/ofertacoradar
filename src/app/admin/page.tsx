@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
-import { SOURCE_LABEL, SOURCE_BADGE, type SourceKey } from "@/lib/sources";
 import { getRevenueReport, type SourceRevenue } from "@/lib/reports";
 import AdminSyncButton from "@/components/AdminSyncButton";
 import AdminAutoRefresh from "@/components/AdminAutoRefresh";
@@ -14,7 +13,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
 const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 
 function timeAgo(d: Date | null | undefined, now: Date): string {
   if (!d) return "nunca";
@@ -27,16 +25,6 @@ function timeAgo(d: Date | null | undefined, now: Date): string {
   return `há ${Math.floor(h / 24)}d`;
 }
 
-function sourceSql(col: string) {
-  return `CASE
-    WHEN ${col} LIKE 'camp-lomadee:%' OR ${col} LIKE 'prod-lomadee:%' THEN 'lomadee'
-    WHEN ${col} LIKE 'ml:%' THEN 'ml'
-    WHEN ${col} LIKE 'aw:%' THEN 'awin'
-    WHEN ${col} LIKE 'amz:%' THEN 'amazon'
-    ELSE 'outros' END`;
-}
-
-const SRC_CASE = sourceSql('p."externalId"');
 // Cliques de afiliado = todos menos os pageviews (produto sentinela)
 const NOT_PV = (pvId: number) => `c."productId" <> ${pvId}`;
 
@@ -89,32 +77,21 @@ function HBar({
   label,
   value,
   max,
-  badge,
-  sub,
 }: {
   label: string;
   value: number;
   max: number;
-  badge?: string;
-  sub?: string;
 }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      {badge ? (
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${badge}`}>
-          {label}
-        </span>
-      ) : (
-        <span className="w-32 shrink-0 truncate text-xs font-semibold text-zinc-600 dark:text-zinc-300" title={label}>
-          {label}
-        </span>
-      )}
+      <span className="w-32 shrink-0 truncate text-xs font-semibold text-zinc-600 dark:text-zinc-300" title={label}>
+        {label}
+      </span>
       <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
         <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(2, (value / max) * 100)}%` }} />
       </div>
       <span className="shrink-0 text-right text-xs font-bold tabular-nums text-zinc-500">
         {value.toLocaleString("pt-BR")}
-        {sub && <span className="ml-1 font-medium text-zinc-400">{sub}</span>}
       </span>
     </div>
   );
@@ -188,7 +165,6 @@ export default async function AdminPage() {
   const d1 = new Date(now.getTime() - DAY_MS);
   const d7 = new Date(now.getTime() - 7 * DAY_MS);
   const d30 = new Date(now.getTime() - 30 * DAY_MS);
-  const in72h = new Date(now.getTime() + 72 * HOUR_MS);
 
   const pv = await prisma.product.findUnique({
     where: { externalId: PV_EXTERNAL_ID },
@@ -199,95 +175,59 @@ export default async function AdminPage() {
   const [
     pvDay,
     clicksDay,
-    clicksTotal,
     clicks24h,
     clicks7d,
-    pvTotal,
-    pv24h,
-    pv7d,
-    clicksBySrc,
-    clicksByDow,
-    clicksByHour,
-    topReferers,
-    devices,
-    clicksByCategory,
+    // Analytics real (tabela Event)
+    evPv24h,
+    evClk24h,
+    evPv7d,
+    evClk7d,
+    subsTotal,
+    recentSubs,
+    utmRows,
     topProducts,
     topMerchants,
-    endingCount,
-    endingTop,
-    noImage,
     lastUpdate,
     syncStates,
   ] = await Promise.all([
-    // pageviews por dia (30d)
+    // series diarias 30d (tabela Click — historico completo)
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS n
        FROM "Click" WHERE "productId" = ${pvId} AND "createdAt" >= $1
        GROUP BY 1 ORDER BY 1`,
       d30,
     ),
-    // cliques afiliado por dia (30d)
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', c."createdAt") AS day, COUNT(*) AS n
        FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
        GROUP BY 1 ORDER BY 1`,
       d30,
     ),
-    prisma.click.count({ where: { NOT: { productId: pvId } } }),
     prisma.click.count({ where: { createdAt: { gte: d1 }, NOT: { productId: pvId } } }),
     prisma.click.count({ where: { createdAt: { gte: d7 }, NOT: { productId: pvId } } }),
-    prisma.click.count({ where: { productId: pvId } }),
-    prisma.click.count({ where: { productId: pvId, createdAt: { gte: d1 } } }),
-    prisma.click.count({ where: { productId: pvId, createdAt: { gte: d7 } } }),
-    // cliques por fonte (30d)
-    prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
-      `SELECT ${SRC_CASE} AS src, COUNT(*) AS n
-       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
-       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1 GROUP BY 1 ORDER BY 2 DESC`,
-      d30,
-    ),
-    // cliques por dia da semana (30d)
-    prisma.$queryRawUnsafe<{ dow: number; n: bigint }[]>(
-      `SELECT EXTRACT(ISODOW FROM c."createdAt")::int AS dow, COUNT(*) AS n
-       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
-       GROUP BY 1 ORDER BY 1`,
-      d30,
-    ),
-    // cliques por hora do dia (30d)
-    prisma.$queryRawUnsafe<{ hr: number; n: bigint }[]>(
-      `SELECT EXTRACT(HOUR FROM c."createdAt")::int AS hr, COUNT(*) AS n
-       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
-       GROUP BY 1 ORDER BY 1`,
-      d30,
-    ),
-    // paginas que mais geram clique (referer do /ir)
-    prisma.$queryRawUnsafe<{ referer: string; n: bigint }[]>(
-      `SELECT c.referer, COUNT(*) AS n
-       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
-         AND c.referer IS NOT NULL AND c.referer <> ''
-       GROUP BY c.referer ORDER BY n DESC LIMIT 10`,
-      d30,
-    ),
-    // dispositivo estimado pelo user-agent
-    prisma.$queryRawUnsafe<{ dev: string; n: bigint }[]>(
-      `SELECT CASE
-         WHEN c."userAgent" ~* 'bot|crawl|spider|slurp|facebookexternal' THEN 'bot'
-         WHEN c."userAgent" ~* 'mobile|android|iphone' THEN 'mobile'
-         ELSE 'desktop' END AS dev,
-         COUNT(*) AS n
-       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
-       GROUP BY 1 ORDER BY 2 DESC`,
-      d30,
-    ),
-    // cliques por categoria (30d)
-    prisma.$queryRawUnsafe<{ cat: string | null; n: bigint }[]>(
-      `SELECT p.category AS cat, COUNT(*) AS n
-       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
-       WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
-       GROUP BY p.category ORDER BY n DESC LIMIT 10`,
-      d30,
-    ),
-    // top produtos / lojas (30d)
+    // KPIs reais da tabela Event (fallback zero pre-migracao)
+    prisma.event.count({ where: { type: "pageview", createdAt: { gte: d1 } } }).catch(() => 0),
+    prisma.event.count({ where: { type: "click", createdAt: { gte: d1 } } }).catch(() => 0),
+    prisma.event.count({ where: { type: "pageview", createdAt: { gte: d7 } } }).catch(() => 0),
+    prisma.event.count({ where: { type: "click", createdAt: { gte: d7 } } }).catch(() => 0),
+    prisma.subscriber.count().catch(() => 0),
+    prisma.subscriber
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { email: true, createdAt: true },
+      })
+      .catch(() => [] as { email: string; createdAt: Date }[]),
+    // canais de trafego (UTM) — ultimos eventos de pageview
+    prisma.event
+      .findMany({
+        where: { type: "pageview", createdAt: { gte: d7 } },
+        select: { utmSource: true },
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      })
+      .catch(() => [] as { utmSource: string | null }[]),
+    // top produtos / lojas (30d, tabela Click)
     prisma.$queryRawUnsafe<{ id: number; title: string; merchant: string | null; n: bigint }[]>(
       `SELECT p.id, p.title, p.merchant, COUNT(*) AS n
        FROM "Click" c JOIN "Product" p ON p.id = c."productId"
@@ -302,41 +242,19 @@ export default async function AdminPage() {
        GROUP BY p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
     ),
-    // ofertas terminando em <72h
-    prisma.product.count({
-      where: {
-        active: true,
-        imageUrl: { not: null },
-        endsAt: { gte: now, lte: in72h },
-      },
-    }),
-    prisma.$queryRawUnsafe<{ id: number; title: string; n: bigint }[]>(
-      `SELECT p.id, p.title, COUNT(c.id) AS n
-       FROM "Product" p LEFT JOIN "Click" c ON c."productId" = p.id
-         AND c."createdAt" >= $2
-       WHERE p.active AND p."imageUrl" IS NOT NULL
-         AND p."endsAt" >= $1 AND p."endsAt" <= $3
-       GROUP BY p.id, p.title ORDER BY n DESC LIMIT 5`,
-      now,
-      d30,
-      in72h,
-    ),
-    // produtos ativos sem imagem, por fonte
-    prisma.$queryRawUnsafe<{ src: string; n: bigint }[]>(
-      `SELECT ${sourceSql('"externalId"')} AS src, COUNT(*) AS n
-       FROM "Product" WHERE active AND "imageUrl" IS NULL
-         AND "externalId" <> 'internal:pageview'
-       GROUP BY 1 ORDER BY 2 DESC`,
-    ),
     // ultima atualizacao por fonte (saude do catalogo)
     prisma.$queryRawUnsafe<{ src: string; last: Date | null }[]>(
-      `SELECT ${sourceSql('"externalId"')} AS src, MAX("updatedAt") AS last
+      `SELECT CASE
+         WHEN "externalId" LIKE 'camp-lomadee:%' OR "externalId" LIKE 'prod-lomadee:%' THEN 'lomadee'
+         WHEN "externalId" LIKE 'ml:%' THEN 'ml'
+         WHEN "externalId" LIKE 'aw:%' THEN 'awin'
+         WHEN "externalId" LIKE 'amz:%' THEN 'amazon'
+         ELSE 'outros' END AS src, MAX("updatedAt") AS last
        FROM "Product" GROUP BY 1`,
     ),
     prisma.syncState.findMany(),
   ]);
 
-  // Comissao real das fontes (cache de 1h dentro de reports.ts)
   const revenue = await getRevenueReport(30);
 
   // ---- series diarias ----
@@ -357,26 +275,20 @@ export default async function AdminPage() {
   const clicks30d = clicksSeries.reduce((a, d) => a + d.n, 0);
   const pv30d = pvSeries.reduce((a, d) => a + d.n, 0);
 
-  // ---- dia da semana / hora ----
-  const DOW = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-  const dowMap = new Map(clicksByDow.map((r) => [r.dow, Number(r.n)]));
-  const dowData = [1, 2, 3, 4, 5, 6, 7].map((d) => dowMap.get(d) ?? 0);
-  const hrMap = new Map(clicksByHour.map((r) => [r.hr, Number(r.n)]));
-  const hrData = Array.from({ length: 24 }, (_, h) => hrMap.get(h) ?? 0);
-  const hrLabels = Array.from({ length: 24 }, (_, h) => `${h}h`);
+  // ---- canais UTM (Event) ----
+  const utmCount = new Map<string, number>();
+  for (const r of utmRows) {
+    const k = r.utmSource ?? "(direto)";
+    utmCount.set(k, (utmCount.get(k) ?? 0) + 1);
+  }
+  const topUtm = [...utmCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const maxUtm = Math.max(1, ...topUtm.map(([, n]) => n));
 
-  const srcLabel = (s: string) =>
-    s === "outros" ? "Outros" : SOURCE_LABEL[s as SourceKey] ?? s;
-  const srcBadge = (s: string) =>
-    SOURCE_BADGE[s as SourceKey] ??
-    "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300";
-
-  // sync ativo agora? -> auto-refresh mais rapido + badge pulsante
+  // ---- sync / alertas ----
   const syncBusy = syncStates.some(
     (s) => s.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000,
   );
 
-  // ---- alertas ----
   const alerts: { tone: "red" | "amber"; text: string }[] = [];
   const SYNC_SOURCES: Record<string, { name: string }> = {
     main: { name: "Lomadee" },
@@ -384,8 +296,6 @@ export default async function AdminPage() {
     awin: { name: "Awin" },
     amazon: { name: "Amazon" },
   };
-  // Linhas auxiliares do sync: `${key}:beat` = ultimo sinal de vida,
-  // `${key}:err` = ultimo erro registrado pela fonte.
   const beatMap = new Map(
     syncStates.filter((s) => s.key.endsWith(":beat")).map((s) => [s.key.slice(0, -5), s]),
   );
@@ -412,51 +322,38 @@ export default async function AdminPage() {
     } else if (err?.busyAt && now.getTime() - err.busyAt.getTime() < 60 * 60_000) {
       alerts.push({ tone: "amber", text: `Sync de ${cfg.name} com erro recente: ${err.phase}` });
     }
-    // Ciclo completo demorado NAO e alerta: o badge "desatualizado" ja
-    // reflete a saude real do catalogo (freshness dos produtos).
   }
   const lastUpdMap = new Map(lastUpdate.map((r) => [r.src, r.last]));
+  const srcName: Record<string, string> = {
+    lomadee: "Lomadee",
+    ml: "Mercado Livre",
+    awin: "Awin",
+    amazon: "Amazon",
+  };
   for (const [src, last] of lastUpdMap) {
     if (src === "outros" || !last) continue;
     if (now.getTime() - last.getTime() > 7 * DAY_MS) {
-      alerts.push({ tone: "amber", text: `Fonte ${srcLabel(src)} sem produtos atualizados há mais de 7 dias.` });
+      alerts.push({ tone: "amber", text: `Fonte ${srcName[src] ?? src} sem produtos atualizados há mais de 7 dias.` });
     }
   }
-  // "Sem cliques 24h" nao e alerta: catalogo novo / pouco trafego e normal.
 
-  // ---- helpers de exibicao ----
-  const maxNum = (...arrs: { n: bigint | number }[][]) =>
-    Math.max(1, ...arrs.flat().map((r) => Number(r.n)));
-
-  const maxSrc = maxNum(clicksBySrc);
-  const maxDow = maxNum(clicksByDow.map((r) => ({ n: r.n })));
-  const maxHr = maxNum(clicksByHour);
-  const maxRef = maxNum(topReferers);
-  const maxCat = maxNum(clicksByCategory);
-  const maxDev = maxNum(devices);
-  const maxMerchant = maxNum(topMerchants);
-
+  // ---- KPIs: so o que importa ----
+  const conversion7d = evPv7d > 0 ? ((evClk7d / evPv7d) * 100).toFixed(2) : "0.00";
   const kpis = [
-    { label: "Cliques 24h", value: clicks24h },
-    { label: "Cliques 7d", value: clicks7d },
-    { label: "Cliques 30d", value: clicks30d },
-    { label: "Total cliques", value: clicksTotal },
-    { label: "Visitas 24h", value: pv24h },
-    { label: "Visitas 7d", value: pv7d },
-    { label: "Visitas 30d", value: pv30d },
-    { label: "Total visitas", value: pvTotal },
+    { label: "Visitas 24h", value: evPv24h },
+    { label: "Cliques 24h", value: evClk24h || clicks24h },
+    { label: "Conversão 7d", value: `${conversion7d}%` },
+    { label: "Subscribers", value: subsTotal },
   ];
 
-  const catLabel = (c: string | null) =>
-    c ? c.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "Sem categoria";
-  const devLabel: Record<string, string> = { mobile: "Mobile", desktop: "Desktop", bot: "Bots" };
+  const maxMerchant = Math.max(1, ...topMerchants.map((m) => Number(m.n)));
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Painel</p>
-          <h1 className="text-3xl font-extrabold tracking-tight">Estatísticas do site</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight">Admin</h1>
           <p className="mt-1 text-sm text-zinc-500">Logado como {data.user.email}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -477,12 +374,6 @@ export default async function AdminPage() {
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
           >
             Kit Instagram
-          </Link>
-          <Link
-            href="/admin/analytics"
-            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            Analytics
           </Link>
           <AdminSyncButton />
           <Link
@@ -523,7 +414,7 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      {/* Sync das fontes — sempre visivel no topo */}
+      {/* Sync das fontes */}
       <div className="mb-8">
         <Card
           title={
@@ -538,7 +429,7 @@ export default async function AdminPage() {
             </span>
           }
         >
-          <div className="flex flex-col gap-2.5">
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
               <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
             )}
@@ -553,14 +444,10 @@ export default async function AdminPage() {
               const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
               const err = errMap.get(s.key);
               const errRecent = !!err?.busyAt && now.getTime() - err.busyAt.getTime() < 24 * 3_600_000;
-              // saude real do catalogo = quando os PRODUTOS da fonte
-              // foram atualizados pela ultima vez (nao o ciclo interno)
               const prodSrc = s.key === "main" ? "lomadee" : s.key;
               const prodLast = lastUpdMap.get(prodSrc) ?? null;
               const prodAge = prodLast ? now.getTime() - prodLast.getTime() : null;
               const catalogFresh = prodAge !== null && prodAge < 24 * 3_600_000;
-              // status agregado: o que importa e o catalogo estar em dia
-              // e a fonte estar respondendo — nao o estado interno do ciclo
               const status = busyFresh
                 ? { label: "sincronizando", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" }
                 : !active
@@ -584,23 +471,11 @@ export default async function AdminPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
-                    fase: {s.phase} · página {s.page}
-                  </p>
-                  <p className="text-xs text-zinc-500">
                     produtos atualizados: {timeAgo(prodLast, now)}
                   </p>
-                  <p className="text-xs text-zinc-500">
-                    última atividade do sync: {timeAgo(beatAt ?? s.busyAt, now)}
-                  </p>
-                  {busyFresh && (
-                    <p className="text-xs text-zinc-500">
-                      trabalhando desde {timeAgo(s.busyAt, now)}
-                    </p>
-                  )}
                   {errRecent && (
                     <p className="mt-1 text-xs font-semibold text-orange-600 dark:text-orange-400">
                       erro: {err!.phase}
-                      {err!.busyAt && ` (${timeAgo(err!.busyAt, now)})`}
                     </p>
                   )}
                 </div>
@@ -610,14 +485,14 @@ export default async function AdminPage() {
         </Card>
       </div>
 
-      {/* Cadastro manual de produtos Amazon (API ainda nao liberada) */}
+      {/* Cadastro manual Amazon */}
       <div className="mb-8">
         <Card title="Adicionar produto Amazon">
           <AdminAmzForm />
         </Card>
       </div>
 
-      {/* Receita / comissao estimada */}
+      {/* Receita */}
       <div className="mb-8">
         <Card title="Receita / comissão estimada — 30 dias">
           <div className="flex flex-col gap-3">
@@ -625,20 +500,15 @@ export default async function AdminPage() {
               <RevenueRow key={r.source} r={r} />
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-zinc-400">
-            Comissão Lomadee vem da API de pedidos (dados reais, podem incluir
-            pedidos ainda pendentes de aprovação). ML e Awin não expõem API
-            pública de ganhos.
-          </p>
         </Card>
       </div>
 
       {/* Graficos diarios */}
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        <Card title="Cliques por dia — 30 dias">
+        <Card title={`Cliques por dia — 30d (${clicks30d.toLocaleString("pt-BR")})`}>
           <BarChart data={clicksSeries.map((d) => d.n)} labels={clicksSeries.map((d) => d.label)} />
         </Card>
-        <Card title="Visitas por dia — 30 dias">
+        <Card title={`Visitas por dia — 30d (${pv30d.toLocaleString("pt-BR")})`}>
           <BarChart
             data={pvSeries.map((d) => d.n)}
             labels={pvSeries.map((d) => d.label)}
@@ -648,57 +518,31 @@ export default async function AdminPage() {
       </div>
 
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        {/* Dia da semana */}
-        <Card title="Cliques por dia da semana — 30 dias">
+        {/* Canais de trafego */}
+        <Card title="Canais de tráfego — 7d">
           <div className="flex flex-col gap-2">
-            {DOW.slice(1).map((d, i) => (
-              <HBar key={d} label={d} value={dowData[i]} max={maxDow} />
+            {topUtm.length === 0 && <p className="text-sm text-zinc-400">Sem dados ainda.</p>}
+            {topUtm.map(([src, n]) => (
+              <HBar key={src} label={src} value={n} max={maxUtm} />
             ))}
           </div>
         </Card>
-        {/* Horario */}
-        <Card title="Cliques por horário — 30 dias">
-          <BarChart data={hrData} labels={hrLabels} color="fill-violet-500/80" />
-        </Card>
-      </div>
-
-      <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        {/* Origem */}
-        <Card title="Páginas que mais geram clique — 30 dias">
-          <div className="flex flex-col gap-2">
-            {topReferers.length === 0 && <p className="text-sm text-zinc-400">Sem dados.</p>}
-            {topReferers.map((r) => (
-              <HBar key={r.referer} label={r.referer} value={Number(r.n)} max={maxRef} />
-            ))}
-          </div>
-        </Card>
-        {/* Dispositivo */}
-        <Card title="Dispositivo — 30 dias">
-          <div className="flex flex-col gap-2">
-            {devices.map((d) => (
-              <HBar key={d.dev} label={devLabel[d.dev] ?? d.dev} value={Number(d.n)} max={maxDev} />
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        {/* Categoria */}
-        <Card title="Cliques por categoria — 30 dias">
-          <div className="flex flex-col gap-2">
-            {clicksByCategory.map((c) => (
-              <HBar key={c.cat ?? "null"} label={catLabel(c.cat)} value={Number(c.n)} max={maxCat} />
-            ))}
-          </div>
-        </Card>
-        {/* Fonte */}
-        <Card title="Cliques por fonte — 30 dias">
-          <div className="flex flex-col gap-2">
-            {clicksBySrc.length === 0 && <p className="text-sm text-zinc-400">Sem cliques.</p>}
-            {clicksBySrc.map((r) => (
-              <HBar key={r.src} label={srcLabel(r.src)} badge={srcBadge(r.src)} value={Number(r.n)} max={maxSrc} />
-            ))}
-          </div>
+        {/* Subscribers */}
+        <Card title={`Subscribers (${subsTotal})`}>
+          {recentSubs.length === 0 ? (
+            <p className="text-sm text-zinc-400">Nenhum email capturado ainda.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {recentSubs.map((s) => (
+                <li key={s.email} className="flex items-center justify-between">
+                  <span className="font-mono text-xs">{s.email}</span>
+                  <span className="text-xs text-zinc-400">
+                    {s.createdAt.toLocaleDateString("pt-BR")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
 
@@ -733,37 +577,6 @@ export default async function AdminPage() {
               <HBar key={m.merchant} label={m.merchant} value={Number(m.n)} max={maxMerchant} />
             ))}
             {topMerchants.length === 0 && <p className="text-sm text-zinc-400">Sem cliques.</p>}
-          </div>
-        </Card>
-      </div>
-
-      <div className="mb-8 grid gap-4 lg:grid-cols-3">
-        {/* Terminando em breve */}
-        <Card title="Terminando em breve">
-          <p className="mb-3 text-3xl font-extrabold tabular-nums">{endingCount}</p>
-          <p className="mb-3 text-xs text-zinc-500">ofertas ativas com fim em menos de 72h</p>
-          <ol className="flex flex-col gap-1">
-            {endingTop.map((p, i) => (
-              <li key={p.id}>
-                <Link
-                  href={`/produto/${p.id}`}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-                >
-                  <span className="text-xs font-extrabold text-zinc-300">{i + 1}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{p.title}</span>
-                  <span className="text-xs font-bold text-zinc-400">{Number(p.n)} cliques</span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </Card>
-        {/* Sem imagem */}
-        <Card title="Produtos sem imagem">
-          <div className="flex flex-col gap-2">
-            {noImage.length === 0 && <p className="text-sm text-zinc-400">Nenhum. Catálogo limpo.</p>}
-            {noImage.map((r) => (
-              <HBar key={r.src} label={srcLabel(r.src)} badge={srcBadge(r.src)} value={Number(r.n)} max={Math.max(1, ...noImage.map((x) => Number(x.n)))} />
-            ))}
           </div>
         </Card>
       </div>
