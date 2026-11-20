@@ -128,17 +128,18 @@ export async function GET(
               }}
             >
               {isAmazon ? (
-                // seta-sorriso da logo Amazon desenhada inline
-                // (SVG externo e instavel no next/og)
-                <svg width="88" height="34" viewBox="0 0 88 34">
+                // seta-sorriso oficial da logo Amazon (path real do wordmark,
+                // viewBox recortada na regiao do simbolo) — SVG externo
+                // e instavel no next/og
+                <svg width="110" height="20" viewBox="80 88 370 62">
                   <path
-                    d="M4 26 Q42 42 74 10"
-                    stroke="#ff9900"
-                    strokeWidth="5"
-                    fill="none"
-                    strokeLinecap="round"
+                    d="m 374.00642,142.18404 c -34.99948,25.79739 -85.72909,39.56123 -129.40634,39.56123 -61.24255,0 -116.37656,-22.65135 -158.08757,-60.32496 -3.2771,-2.96252 -0.34083,-6.9999 3.59171,-4.69283 45.01431,26.19064 100.67269,41.94697 158.16623,41.94697 38.774689,0 81.4295,-8.02237 120.6499,-24.67006 5.92501,-2.51683 10.87999,3.88009 5.08607,8.17965"
+                    fill="#ff9900"
                   />
-                  <path d="M66 3 L78 11 L64 19 Z" fill="#ff9900" />
+                  <path
+                    d="m 388.55678,125.53635 c -4.45688,-5.71527 -29.57261,-2.70033 -40.84585,-1.36327 -3.43442,0.41947 -3.95874,-2.56925 -0.86517,-4.71905 20.00346,-14.07844 52.82696,-10.01483 56.65462,-5.2958 3.82764,4.74526 -0.99624,37.64741 -19.79373,53.35128 -2.88385,2.41195 -5.63662,1.12734 -4.35198,-2.07113 4.2209,-10.53917 13.68519,-34.16054 9.20211,-39.90203"
+                    fill="#ff9900"
+                  />
                 </svg>
               ) : storeLogoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -176,12 +177,12 @@ export async function GET(
                 style={{
                   fontSize: 34,
                   fontWeight: isAmazon ? 900 : 800,
-                  color: isAmazon ? "#ff9900" : "#99f6e4",
-                  letterSpacing: isAmazon ? -1 : 1,
-                  textTransform: isAmazon ? "none" : "uppercase",
+                  color: isAmazon ? "#ffffff" : "#99f6e4",
+                  letterSpacing: isAmazon ? 2 : 1,
+                  textTransform: "uppercase",
                 }}
               >
-                {isAmazon ? "amazon" : product.merchant}
+                {product.merchant}
               </div>
             </div>
           )}
