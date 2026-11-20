@@ -258,7 +258,7 @@ src/
     categories.ts / format.ts / urgency.ts / site.ts / shortener.ts
     reports.ts                   # receita/comissão estimada via APIs das redes
 scripts/
-  sync.ts / checklinks.ts / recheck.ts / recategorize.ts / ml-auth.ts
+  sync.ts / checklinks.ts / recheck.ts / recategorize.ts / dedup.ts / ml-auth.ts
 prisma/schema.prisma
 ```
 
