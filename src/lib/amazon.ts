@@ -157,6 +157,19 @@ function num(v: unknown): number | undefined {
   return typeof n === "number" && Number.isFinite(n) ? n : undefined;
 }
 
+// Preco vindo de API terceira: numero, "38.09", "38,09" ou "R$ 1.234,56"
+function parsePriceVal(v: unknown): number | undefined {
+  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
+  if (typeof v !== "string") return undefined;
+  const s = v.replace(/[^\d.,]/g, "");
+  if (!s) return undefined;
+  // formato BR: ponto milhar + virgula decimal
+  const n = s.includes(",")
+    ? Number(s.replace(/\./g, "").replace(",", "."))
+    : Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function parseSearchItems(json: Record<string, unknown>): AmzItem[] {
   const items = (json.SearchResult as Record<string, unknown> | undefined)
     ?.Items as Record<string, unknown>[] | undefined;
@@ -394,10 +407,50 @@ function stripTags(html: string): string {
     .trim();
 }
 
-// Melhor esforco: baixa a pagina do produto e extrai og:title,
-// preco atual/lista e imagem principal. Amazon costuma devolver
-// captcha para datacenter — nesse caso devolve error explicativo.
+// SerpApi (engine=amazon_product) — API terceira que le a Amazon sem
+// sofrer o bloqueio de datacenter. Gratis: 100 buscas/mes, suficiente
+// para cadastro manual. Configurar SERPAPI_KEY.
+async function lookupViaSerpApi(asin: string): Promise<AmzLookup | null> {
+  const key = process.env.SERPAPI_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(
+      `https://serpapi.com/search.json?engine=amazon_product&asin=${asin}&api_key=${key}`,
+      { signal: AbortSignal.timeout(15_000) },
+    );
+    const json = (await res.json()) as Record<string, unknown>;
+    const p = json.product_results as Record<string, unknown> | undefined;
+    if (!p || json.error) return { asin, error: String(json.error ?? "produto não encontrado") };
+    const priceOf = (o: unknown) => {
+      const r = o as Record<string, unknown> | undefined;
+      return parsePriceVal(r?.extracted_price ?? r?.raw);
+    };
+    const price = priceOf(p.price);
+    const wasPrice = priceOf(p.was_price);
+    const images = p.images as Record<string, unknown>[] | undefined;
+    const imageUrl =
+      (images?.[0]?.link as string | undefined) ??
+      (p.image as string | undefined);
+    return {
+      asin,
+      title: (p.title as string | undefined)?.slice(0, 300),
+      price,
+      oldPrice: wasPrice && price != null && wasPrice > price ? wasPrice : undefined,
+      imageUrl,
+    };
+  } catch {
+    return null; // cai pro scrape direto
+  }
+}
+
+// Melhor esforco: SerpApi primeiro (contorna o bloqueio de IP de
+// datacenter); se nao houver chave ou falhar, baixa a pagina do
+// produto e extrai og:title, preco atual/lista e imagem principal.
+// Amazon costuma devolver captcha para datacenter — nesse caso
+// devolve error explicativo e o form aceita preenchimento manual.
 export async function lookupAmazonProduct(asin: string): Promise<AmzLookup> {
+  const viaApi = await lookupViaSerpApi(asin);
+  if (viaApi?.title || viaApi?.error) return viaApi;
   const out: AmzLookup = { asin };
   try {
     const res = await fetch(amzUrl(asin), {
