@@ -30,8 +30,8 @@ const notExpired = {
 };
 
 // Duas abas: "Produtos" = catalogo unificado de produtos e ofertas de
-// TODAS as fontes (ranking por desconto); "Cupons" = itens com codigo
-// de cupom, de qualquer fonte (ordenados pelo que termina antes).
+// TODAS as fontes (ranking por desconto); "Cupons" = todo item de
+// cupom/oferta (couponCode ou campanha Lomadee), de qualquer fonte.
 const TABS = {
   produtos: {
     label: "Produtos",
@@ -78,10 +78,15 @@ export async function HomeExperience({
   const cfg = TABS[tab];
 
   // Produtos: tudo que e item de afiliado vendavel, de todas as fontes,
-  // num ranking so. Cupons: so itens com codigo de cupom (couponCode
-  // nao nulo/vazio — NULL e "" caem fora pelo <> '' do SQL).
+  // num ranking so. Cupons: todo item de cupom/oferta — couponCode de
+  // qualquer fonte + campanhas Lomadee camp- (ofertas com ou sem codigo).
   const sourceCond = isCouponTab
-    ? { couponCode: { not: "" } }
+    ? {
+        OR: [
+          { couponCode: { not: "" } },
+          { externalId: { startsWith: "camp-lomadee:" } },
+        ],
+      }
     : {
         OR: [
           { externalId: { startsWith: "prod-lomadee:" } },
@@ -233,12 +238,15 @@ export async function HomeExperience({
           _count: { _all: true },
         })
       : Promise.resolve([]),
-    // Total de cupons do catalogo inteiro (sem filtros) p/ o cabecalho
+    // Total de cupons/ofertas do catalogo inteiro (sem filtros) p/ o cabecalho
     prisma.product.count({
       where: {
         active: true,
         imageUrl: { not: null },
-        couponCode: { not: "" },
+        OR: [
+          { couponCode: { not: "" } },
+          { externalId: { startsWith: "camp-lomadee:" } },
+        ],
         AND: [notExpired],
       },
     }),

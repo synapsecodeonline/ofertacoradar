@@ -42,7 +42,7 @@ npm run dev          # http://localhost:3000
 
 | Rota | Tipo | Descrição |
 |---|---|---|
-| `/` | página | **O catálogo** — duas abas: `Produtos` (padrão, catálogo unificado de produtos e ofertas de **todas** as fontes, ranking por maior desconto) e `?aba=cupons` (itens com `couponCode` de qualquer fonte, ordenados por expiração). Busca, categorias, subtipos e grid paginado. URLs antigas `?aba=lomadee\|ml\|awin\|amazon\|produtos\|ofertas\|lojas` e `?fonte=` convergem para a aba Produtos. |
+| `/` | página | **O catálogo** — duas abas: `Produtos` (padrão, catálogo unificado de produtos e ofertas de **todas** as fontes, ranking por maior desconto) e `?aba=cupons` (todo item de cupom/oferta — `couponCode` de qualquer fonte + campanhas `camp-lomadee:`, ordenados por expiração). Busca, categorias, subtipos e grid paginado. URLs antigas `?aba=lomadee\|ml\|awin\|amazon\|produtos\|ofertas\|lojas` e `?fonte=` convergem para a aba Produtos. |
 | `/cupons` | route handler | Redirect 302 → `/?aba=cupons` (a página de cupons virou aba da home; redirect preserva links/SEO antigos). |
 | `/produto/[id]` | página | Detalhe: preço, cupom copiável, countdown, prova social, relacionados, share, JSON-LD `Product`+`BreadcrumbList`. Dispara sync em `after()`. |
 | `/ir/[id]` | route handler | Redirect 302 para a loja **registrando clique** (pulando admin logado e bots). `?src=` → `utm_source`. Por fonte: `ml:` → `matt_tool`/`matt_word`; `amz:` → força `?tag=`; `prod-lomadee:` sem affiliateUrl → shortener `lmdee.link`. |
@@ -107,7 +107,7 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ### UX / Conversão
 
-- Duas abas no menu: **Produtos** (catálogo unificado de todas as fontes) e **Cupons** (itens com código de cupom).
+- Duas abas no menu: **Produtos** (catálogo unificado de todas as fontes — busca cobre produtos, ofertas e cupons) e **Cupons** (itens de cupom/oferta: `couponCode` de qualquer fonte + campanhas Lomadee).
 - Aba Produtos: ranking por maior desconto forçado (busca e filtros respeitam). Aba Cupons: ordenada pelos que terminam primeiro.
 - "Lojas em destaque" na aba Produtos — qualquer loja com itens ativos.
 - Busca (`?q=`), filtro de loja (`?loja=`), categoria (`?categoria=`) e subtipo (`?tipo=`).
