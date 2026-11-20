@@ -7,6 +7,9 @@
 //   --delay MS    pausa entre requests (default: 4000)
 //   --only TRECHO filtra URLs que contenham o trecho (ex: deals)
 //   --dry         so lista o que encontrou, nao grava no banco
+//   --max-new N   maximo de produtos NOVOS gravados nesta execucao
+//                 (existentes so atualizam). Ao atingir, para de buscar
+//                 paginas — menos requests = menos risco de bloqueio.
 //
 // Se a Amazon mudar o HTML, o parser avisa "0 produtos numa pagina
 // que deveria ter" — ajuste os regex de extract() abaixo.
@@ -35,6 +38,7 @@ const MAX_PAGES = Number(arg("pages") ?? SOURCES.length);
 const DELAY = Number(arg("delay") ?? 5000);
 const ONLY = arg("only")?.toLowerCase();
 const DRY = process.argv.includes("--dry");
+const MAX_NEW = Number(arg("max-new") ?? Infinity);
 
 type Found = {
   asin: string;
@@ -163,9 +167,19 @@ async function main() {
   console.log(`${urls.length} pagina(s) para raspar.\n`);
 
   const seen = new Set<string>();
-  let total = 0, inserted = 0, skipped = 0, errors = 0;
+  // ASINs ja cadastrados: servem pra contar so produtos NOVOS na cota
+  const existing = new Set(
+    (
+      await prisma.product.findMany({
+        where: { externalId: { startsWith: "amz:" } },
+        select: { externalId: true },
+      })
+    ).map((p) => p.externalId!),
+  );
+  let total = 0, inserted = 0, updated = 0, skipped = 0, errors = 0, newCount = 0, quotaHit = false;
 
   for (const url of urls) {
+    if (quotaHit) break;
     console.log(`→ ${url}`);
     const { html, blocked } = await fetchPage(url);
     if (!html) {
@@ -192,6 +206,11 @@ async function main() {
       }
       seen.add(p.asin);
       total++;
+      const isNew = !existing.has(`amz:${p.asin}`);
+      if (isNew && newCount >= MAX_NEW) {
+        quotaHit = true;
+        break; // cota de novos cheia — para de gravar E de buscar paginas
+      }
       if (DRY) {
         console.log(`   [dry] ${p.asin} | ${p.title.slice(0, 60)} | R$ ${p.price}`);
         continue;
@@ -209,11 +228,17 @@ async function main() {
           oldPrice: p.oldPrice,
           imageUrl: p.imageUrl,
         });
+        if (isNew) newCount++;
+        else updated++;
         inserted++;
       } catch (e) {
         console.log(`   erro ${p.asin}: ${e instanceof Error ? e.message : e}`);
       }
       await sleep(150); // respiro entre inserts
+    }
+    if (quotaHit) {
+      console.log(`  cota de ${MAX_NEW} produtos novos atingida — parando.`);
+      break;
     }
     await sleep(DELAY);
   }
@@ -222,7 +247,7 @@ async function main() {
     where: { active: true, externalId: { startsWith: "amz:" } },
   });
   console.log(
-    `\nPronto: ${total} unicos | ${inserted} gravados | ${skipped} pulados | ${errors} paginas com erro.\n` +
+    `\nPronto: ${total} unicos | ${inserted} gravados (${newCount} novos, ${updated} atualizados) | ${skipped} pulados | ${errors} paginas com erro.\n` +
       `Amazon ativos no site: ${ativos}`,
   );
 }

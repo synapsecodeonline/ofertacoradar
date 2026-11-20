@@ -15,6 +15,7 @@
 //   --limit N  maximo de produtos nesta execucao
 import { chromium, type Response } from "playwright";
 import { prisma } from "../src/lib/db";
+import { discountPctOf } from "../src/lib/format";
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -43,11 +44,18 @@ const DELAY = Number(arg("delay") ?? 3000);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Verdict = "eligible" | "ineligible" | "unknown";
+type PagePrices = { price: number | null; oldPrice: number | null };
+
+const brlNum = (s: string | null | undefined) => {
+  if (!s) return null;
+  const n = Number(s.replace(/[^\d,]/g, "").replace(/\./g, "").replace(",", "."));
+  return n > 0 ? n : null;
+};
 
 async function checkAsin(
   page: import("playwright").Page,
   asin: string,
-): Promise<Verdict> {
+): Promise<{ verdict: Verdict; prices: PagePrices }> {
   let apiBody = "";
   let apiSeen = false;
   const onResp = (res: Response) => {
@@ -62,23 +70,56 @@ async function checkAsin(
       waitUntil: "load",
       timeout: 45000,
     });
-    // espera a SiteStripe disparar a chamada /associate
+    // espera a barra SiteStripe renderizar (ate 20s) — sem ela nao da
+    // pra concluir nada; depois espera a chamada /associate (ate 10s)
+    await page
+      .waitForSelector("#nav-AssociateStripe", { timeout: 20000 })
+      .catch(() => {});
     for (let i = 0; i < 20 && !apiBody; i++) await sleep(500);
     await sleep(1500);
-    const dom = await page.evaluate(() => ({
-      getLink: !!document.getElementById("amzn-ss-get-link-button"),
-      stripe: !!document.getElementById("nav-AssociateStripe"),
-      captcha: /digitar os caracteres|enter the characters|não somos robôs|unusual traffic/i.test(
-        document.body?.innerText?.slice(0, 3000) ?? "",
-      ),
-    }));
-    if (dom.captcha) return "unknown";
+    // evaluate com STRING: funcoes TS viram __name() do esbuild e quebram
+    // no browser. String nao passa pelo transform.
+    const dom = (await page.evaluate(`(() => {
+      const txt = (sel) => document.querySelector(sel)?.textContent?.trim() ?? "";
+      return {
+        getLink: !!document.getElementById("amzn-ss-get-link-button"),
+        stripe: !!document.getElementById("nav-AssociateStripe"),
+        captcha: /digitar os caracteres|enter the characters|não somos robôs|unusual traffic/i.test(
+          document.body?.innerText?.slice(0, 3000) ?? "",
+        ),
+        // precos da pagina do produto — listagem nao mostra "De: R$ X",
+        // mas a pagina sim (a-text-price/basisPrice = preco de tabela)
+        price:
+          txt("#corePriceDisplay .a-offscreen") ||
+          txt("#corePrice_feature_div .a-offscreen") ||
+          txt(".a-price .a-offscreen"),
+        listPrice:
+          txt(".a-text-price .a-offscreen") ||
+          txt("#priceblock_ourprice") ||
+          txt(".basisPrice .a-offscreen") ||
+          txt("#listPrice"),
+      };
+    })()`)) as {
+      getLink: boolean;
+      stripe: boolean;
+      captcha: boolean;
+      price: string;
+      listPrice: string;
+    };
+    const prices: PagePrices = {
+      price: brlNum(dom.price),
+      oldPrice: null,
+    };
+    const list = brlNum(dom.listPrice);
+    if (list && prices.price && list > prices.price) prices.oldPrice = list;
+    if (dom.captcha) return { verdict: "unknown", prices };
     const apiEligible = /"eligible"\s*:/.test(apiBody);
-    if (apiEligible || dom.getLink) return "eligible";
-    if (apiSeen && apiBody) return "ineligible"; // API respondeu sem eligible
-    return "unknown";
+    if (apiEligible || dom.getLink)
+      return { verdict: "eligible", prices };
+    if (apiSeen && apiBody) return { verdict: "ineligible", prices };
+    return { verdict: "unknown", prices };
   } catch {
-    return "unknown";
+    return { verdict: "unknown", prices: { price: null, oldPrice: null } };
   } finally {
     page.off("response", onResp);
   }
@@ -99,7 +140,7 @@ async function main() {
 
   const products = await prisma.product.findMany({
     where: { active: true, externalId: { startsWith: "amz:" } },
-    select: { id: true, externalId: true, title: true },
+    select: { id: true, externalId: true, title: true, price: true, oldPrice: true },
     orderBy: { createdAt: "asc" },
   });
   const pending = products
@@ -134,7 +175,21 @@ async function main() {
 
   for (const p of pending) {
     const asin = p.externalId!.slice(4);
-    const verdict = await checkAsin(page, asin);
+    const { verdict, prices } = await checkAsin(page, asin);
+    // aprofunda a visita: atualiza preco/preco de tabela (desconto) do produto
+    if (verdict !== "unknown" && prices.price != null) {
+      const oldPrice = prices.oldPrice; // null = sem desconto na pagina
+      if (prices.price !== p.price || oldPrice !== p.oldPrice) {
+        await prisma.product.update({
+          where: { id: p.id },
+          data: {
+            price: prices.price,
+            oldPrice,
+            discountPct: discountPctOf({ price: prices.price, oldPrice }),
+          },
+        });
+      }
+    }
     if (verdict === "eligible") {
       ok++;
       consecutiveUnknown = 0;

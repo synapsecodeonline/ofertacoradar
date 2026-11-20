@@ -210,6 +210,7 @@ npm run amz:scrape                 # raspa todas as fontes e grava
 npm run amz:scrape -- --pages 2    # limita a N paginas
 npm run amz:scrape -- --only deals # so URLs que contenham "deals"
 npm run amz:scrape -- --delay 8000 # pausa maior entre requests
+npm run amz:scrape -- --max-new 5  # no maximo 5 produtos NOVOS (resto so atualiza)
 ```
 
 - **Fontes** (editáveis em `SOURCES` no script): `/gp/bestsellers` geral + verticais (eletrônicos, cozinha, beleza) e `/deals`.
@@ -218,7 +219,7 @@ npm run amz:scrape -- --delay 8000 # pausa maior entre requests
 - **Rate limit**: pausa de 5s entre páginas; se a Amazon devolver página de bloqueio (~4KB), o script **aborta** pedindo para aguardar. Não rode em loop.
 - **Layout mudou?** Se uma página válida retornar "0 produtos extraídos", o parser (`extract()`) precisa de ajuste — os seletores atuais estão comentados no script.
 - Requer `.env` com `DATABASE_URL` (e `AMZ_TAG`, com default `synapsecodeon-20`).
-- **Agendamento local**: `scripts/amz-cron.sh` é o wrapper para cron (resolve o node do nvm e loga em `logs/amz-scrape.log`). Ex.: `0 7 * * * /caminho/do/repo/scripts/amz-cron.sh` roda todo dia às 7h — exige a máquina ligada; se a Amazon bloquear, o script aborta e o log mostra.
+- **Agendamento local**: `scripts/amz-cron.sh` é o wrapper para cron (resolve o node do nvm e loga em `logs/amz-scrape.log`). Cron instalado: `0 7 * * *` → scrape com `--max-new 5` (**máx. 5 produtos novos/dia**) + verify de elegibilidade — exige a máquina ligada; se a Amazon bloquear, o script aborta e o log mostra.
 
 ### Verificação de elegibilidade de afiliado (`scripts/amz-verify.ts` → `npm run amz:verify`)
 

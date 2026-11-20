@@ -12,7 +12,9 @@ LOG=logs/amz-scrape.log
 [ -f "$LOG" ] && [ "$(stat -c%s "$LOG")" -gt 1048576 ] && tail -c 524288 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
 
 echo "===== $(date -Is) =====" >> "$LOG"
-npx tsx --env-file=.env scripts/amz-scrape.ts "$@" >> "$LOG" 2>&1
+# --max-new 5: no maximo 5 produtos NOVOS por dia (preço de catalogo ja
+# existente continua atualizando). "$@" primeiro: argumento manual vence.
+npx tsx --env-file=.env scripts/amz-scrape.ts "$@" --max-new 5 >> "$LOG" 2>&1
 echo "scrape exit=$? $(date -Is)" >> "$LOG"
 # verifica elegibilidade de afiliado so dos ASINs novos (sessao em
 # ~/.config/ofertacoradar/amz-state.json; se expirada, so loga e segue)
