@@ -5,6 +5,7 @@ import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { merchantLogo } from "@/lib/store-logo";
 import { sourceBadgeOf } from "@/lib/sources";
+import { AmazonMark } from "@/components/AmazonMark";
 import { IconArrowRight, IconFlame, IconTag } from "@/components/Icons";
 
 export default async function ProductCard({
@@ -17,6 +18,9 @@ export default async function ProductCard({
   showSource?: boolean;
 }) {
   const logo = await merchantLogo(product.merchant);
+  const isAmazon =
+    product.externalId?.startsWith("amz:") ||
+    product.merchant?.toLowerCase() === "amazon";
   const source = showSource ? sourceBadgeOf(product.externalId) : null;
   const discount = product.discountPct ?? discountPercent(product.price, product.oldPrice);
   const urgent = urgencyLabel(product.endsAt);
@@ -84,7 +88,9 @@ export default async function ProductCard({
         )}
         {product.merchant && (
           <span className="flex items-center gap-1.5 truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-            {logo ? (
+            {isAmazon ? (
+              <AmazonMark />
+            ) : logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logo}

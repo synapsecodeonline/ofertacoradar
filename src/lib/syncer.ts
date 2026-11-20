@@ -106,9 +106,29 @@ async function upsertByExternalId(
       data: touch,
     });
     if (sameUrl.count === 0) {
-      await prisma.product.create({
-        data: { ...data, externalId: p.externalId },
+      // Anti-duplicata: a Lomadee entrega o mesmo produto com SKUs/IDs
+      // diferentes (externalId novo, URL diferente). Se ja existe produto
+      // ativo da mesma fonte+loja+titulo, atualiza ele em vez de criar.
+      const family = p.externalId.split(":")[0];
+      const dupe = await prisma.product.findFirst({
+        where: {
+          active: true,
+          merchant,
+          title: p.title,
+          externalId: { startsWith: `${family}:` },
+        },
+        select: { id: true },
       });
+      if (dupe) {
+        await prisma.product.update({
+          where: { id: dupe.id },
+          data: touch,
+        });
+      } else {
+        await prisma.product.create({
+          data: { ...data, externalId: p.externalId },
+        });
+      }
     }
   }
 }
