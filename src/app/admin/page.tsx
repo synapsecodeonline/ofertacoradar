@@ -466,6 +466,12 @@ export default async function AdminPage() {
           >
             Exportar CSV
           </a>
+          <Link
+            href="/admin/kit"
+            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+          >
+            Kit Instagram
+          </Link>
           <AdminSyncButton />
           <Link
             href="/"
