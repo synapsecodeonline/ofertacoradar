@@ -9,6 +9,7 @@ import HashLink from "@/components/HashLink";
 import AuthButton from "@/components/AuthButton";
 import PageViewTracker from "@/components/PageViewTracker";
 import DbStatusBanner from "@/components/DbStatusBanner";
+import NavProgress from "@/components/NavProgress";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -184,6 +185,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </footer>
         <PageViewTracker />
+        <NavProgress />
       </body>
     </html>
   );
