@@ -9,6 +9,17 @@ import CopyCaption from "@/components/CopyCaption";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kit Instagram", robots: { index: false } };
 
+// Nome de arquivo amigavel: "01-air-fryer-philips-5l-feed.png"
+function fileSlug(title: string): string {
+  return title
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 // Painel de conteudo diario: ofertas sem expiracao com imagem e
 // legenda prontas para baixar/copiar e postar no Instagram.
 export default async function AdminKitPage() {
@@ -52,7 +63,10 @@ export default async function AdminKitPage() {
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3">
-          {kit.items.map((item, i) => (
+          {kit.items.map((item, i) => {
+            const num = String(i + 1).padStart(2, "0");
+            const slug = fileSlug(item.title);
+            return (
             <article
               key={item.id}
               className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
@@ -94,14 +108,14 @@ export default async function AdminKitPage() {
                 <div className="mt-auto flex flex-wrap gap-2 pt-2">
                   <a
                     href={item.cardUrl}
-                    download={`oferta-${item.id}-feed.png`}
+                    download={`${num}-${slug}-feed.png`}
                     className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                   >
                     ↓ Feed
                   </a>
                   <a
                     href={item.cardStoryUrl}
-                    download={`oferta-${item.id}-story.png`}
+                    download={`${num}-${slug}-story.png`}
                     className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-bold text-zinc-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-300"
                   >
                     ↓ Story
@@ -118,7 +132,8 @@ export default async function AdminKitPage() {
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
