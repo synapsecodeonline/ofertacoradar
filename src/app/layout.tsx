@@ -187,6 +187,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/?aba=cupons" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
                 Cupons
               </Link>
+              <Link href="/politica-de-devolucao" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Devolução e troca
+              </Link>
+              <Link href="/politica-de-privacidade" className="text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400">
+                Privacidade
+              </Link>
               <a
                 href={
                   process.env.NEXT_PUBLIC_INSTAGRAM_URL ??

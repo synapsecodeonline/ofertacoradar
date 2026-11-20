@@ -18,6 +18,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "hourly",
       priority: 0.8,
     },
+    {
+      url: `${base}/politica-de-devolucao`,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${base}/politica-de-privacidade`,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
     // Landing pages de categoria (SEO)
     ...CATEGORY_ORDER.map((c) => ({
       url: `${base}/categoria/${c}`,
