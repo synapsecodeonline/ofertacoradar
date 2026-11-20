@@ -145,6 +145,7 @@ export async function HomeExperience({
     subtypeFacets,
     couponTotal,
     srcRows,
+    amzRail,
   ] = await Promise.all([
     prisma.product.findMany({
       where: listWhere,
@@ -270,6 +271,24 @@ export async function HomeExperience({
         AND ("endsAt" IS NULL OR "endsAt" >= now())
       GROUP BY "merchant"
     `,
+    // Trilha "Amazon em destaque": fonte pequena (~74 itens) some no
+    // ranking global por desconto — o rail garante visibilidade na home.
+    // So na visao padrao da aba Produtos (sem busca/filtro/paginacao).
+    tab === "produtos" && !query && !merchant && page === 1
+      ? prisma.product.findMany({
+          where: {
+            active: true,
+            imageUrl: { not: null },
+            AND: [
+              { externalId: { startsWith: "amz:" } },
+              notZeroPrice,
+              notExpired,
+            ],
+          },
+          orderBy: { discountPct: { sort: "desc", nulls: "last" } },
+          take: 12,
+        })
+      : Promise.resolve([]),
   ]);
 
   // Mapa nome da marca -> logo p/ secao "Lojas em destaque"
@@ -367,12 +386,14 @@ export async function HomeExperience({
   const items = pageItems.filter((p) => !flashIds.has(p.id));
 
   // Cliques por produto (30d) para prova social nos cards
+  // (grid + trilha Amazon)
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
-  const clickGroups = items.length
+  const clickIds = [...items.map((p) => p.id), ...amzRail.map((p) => p.id)];
+  const clickGroups = clickIds.length
     ? await prisma.click.groupBy({
         by: ["productId"],
         where: {
-          productId: { in: items.map((p) => p.id) },
+          productId: { in: clickIds },
           createdAt: { gte: monthAgo },
         },
         _count: { _all: true },
@@ -478,6 +499,36 @@ export async function HomeExperience({
             })}
           </div>
         </CollapsibleSection>
+      )}
+
+      {/* Amazon em destaque: os ~74 itens amz: nao aparecem no top do
+          ranking global — trilha horizontal garante >=10 visiveis. */}
+      {amzRail.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+                Ofertas selecionadas
+              </p>
+              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                Amazon
+              </h2>
+            </div>
+            <HashLink
+              href="/?loja=Amazon#catalogo"
+              className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Ver todas →
+            </HashLink>
+          </div>
+          <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin]">
+            {amzRail.map((p) => (
+              <div key={p.id} className="w-36 shrink-0 snap-start sm:w-44">
+                <ProductCard product={p} clicks={clickMap.get(p.id)} />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {categoryList.length > 0 && (
