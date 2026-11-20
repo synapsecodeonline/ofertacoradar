@@ -22,13 +22,17 @@ import { join } from "path";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-// Paginas fonte: best-sellers geral + verticais quentes + ofertas do dia
+// Paginas fonte: deals e nichos quentes primeiro — com --max-new a cota
+// enche pelas primeiras URLs, entao o que tem mais desconto/nicho vem antes.
+// Buscas /s?k= usam o mesmo data-asin dos cards.
 const SOURCES = [
+  "https://www.amazon.com.br/deals",
+  "https://www.amazon.com.br/gp/bestsellers/baby",
+  "https://www.amazon.com.br/s?k=mamadeira",
   "https://www.amazon.com.br/gp/bestsellers",
   "https://www.amazon.com.br/gp/bestsellers/electronics",
   "https://www.amazon.com.br/gp/bestsellers/kitchen",
   "https://www.amazon.com.br/gp/bestsellers/beauty",
-  "https://www.amazon.com.br/deals",
 ];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
