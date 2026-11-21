@@ -4,6 +4,8 @@ Agregador brasileiro de **ofertas, cupons e produtos com links de afiliado** —
 
 **Produção:** https://ofertacoradar.vercel.app · **Instagram:** https://instagram.com/ofertacoradar
 
+Além do site, o projeto gera automaticamente um **kit diário de divulgação para o Instagram** (reel + cards + legenda) enviado por email — ver seção dedicada abaixo.
+
 ---
 
 ## Stack
@@ -17,6 +19,8 @@ Agregador brasileiro de **ofertas, cupons e produtos com links de afiliado** —
 | Deploy | Vercel |
 | Sync 24/7 | cron-job.org → `GET /api/cron/sync?key=$CRON_SECRET` a cada 1min |
 | Parser de feed | `fast-xml-parser` |
+| Vídeo do kit | `ffmpeg-static` (reel 1080×1920 com xfade, Ken Burns, gradiente, legendas ASS) |
+| Email do kit | Resend API (`RESEND_API_KEY`) |
 | Imagens sociais | `next/og` (`ImageResponse`) — `/api/card/[id]` e `/api/og` |
 | APIs externas | Lomadee, Mercado Livre (OAuth2), Amazon PA-API 5.0 (SigV4), SerpApi |
 | Scripts | `tsx` |
@@ -93,6 +97,72 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 - `BLOCKED_URL_PARTS`/`BLOCKED_MERCHANTS` em `upsert.ts`: **Rovitex** bloqueada (catálogo Lomadee desatualizado, links quebrados) até o usuário liberar.
 - `BLOCKED_IMAGE_HOSTS`: `vestis.vteximg.com.br` e `shopinfo.vteximg.com.br` (contas VTEX inativas) — produto com imagem desses hosts nem entra no banco.
+
+---
+
+## Kit diário do Instagram (`scripts/daily-kit.ts`)
+
+Automação completa de divulgação: todo dia **08:00** o cron local
+(`scripts/kit-cron.sh`, entrada `0 8 * * *` no crontab) roda
+`npm run kit:daily` e envia um email com tudo pronto para postar.
+
+### Cronograma semanal de temas
+
+| Dia | Tema | Categorias |
+|---|---|---|
+| Segunda | TECH & ELETRÔNICOS | eletronicos, celulares, informatica, games, tv-audio, fotografia, software |
+| Terça | CASA & DECORAÇÃO | casa-decoracao, decoracao, iluminacao, textil-cama, moveis, cozinha, eletro* |
+| Quarta | BELEZA & CUIDADOS | beleza, maquiagem, skincare, cabelo, perfumaria, saude, suplementos |
+| Quinta | MODA & ESTILO | moda-*, calcados*, bolsas-mochilas, acessorios-moda, oculos, joias, lingerie |
+| Sexta | ESPORTE & FITNESS | esporte-lazer, fitness, ciclismo, camping, esporte-infantil |
+| Sábado | MERCADO & LAR | supermercado, mercearia, limpeza-higiene, alimentos, pets, bebe, brinquedos |
+| Domingo | ACHADINHOS & SURPRESAS | ofertas (maiores descontos) |
+
+### Conteúdo gerado
+
+- **Reel MP4** 1080×1920@30fps (~21s): intro com logo (`assets/logo.jpeg`)
+  + tema do dia, um clip por produto usando **o mesmo card story**
+  enviado no email (vídeo e imagem sempre condizentes), outro com CTA.
+  Efeitos: degradê teal animado (`gradients`), Ken Burns, vinheta, grão,
+  transições `xfade` fade 0.5s, barra de progresso verde, fonte
+  **Ubuntu Sans** (ASS).
+- **Cards PNG** feed 1080×1080 e story 1080×1920 via `/api/card/[id]`.
+- **Email** = guia do dia: cronograma de postagem (12h reel, stories
+  15/18/21h, 20h feed), cards por produto com link da página e **uma
+  legenda combinada** cobrindo todos os itens (reel/feed exibem todos;
+  story não tem legenda).
+- `kit-out/` guarda cópia local de tudo (gitignored) + `sent.json`
+  (memória de enviados).
+
+### Regras de seleção (o que garante qualidade)
+
+1. **Categoria canônica** (`src/lib/categories.ts`) ∈ tema do dia.
+2. **Título confirma o tema** (regex por tema) — falso positivo do
+   classificador não entra.
+3. **Veto de substantivo-produto** (esporte): "pijama de basquete" é
+   roupa, não esporte — o objeto vendido manda.
+4. **Desconto ≥ 10%** (`MIN_DISC`) — markdown de 3-5% não é oferta.
+5. **Sem repetição**: IDs enviados nos últimos 14 dias são excluídos
+   (`kit-out/sent.json`); janela relaxa 14→7→3→0 dias se o tema
+   tiver <2 ofertas frescas. Fallback honesto: tema vazio →
+   "achadinhos" com aviso no email.
+6. **Família dedup**: variações de cor/tamanho do mesmo produto viram 1.
+
+### Áudio do reel (à prova de falhas)
+
+`ensureMusic()`: `music/*.mp3` locais (versionados, rotação diária por
+dia-do-ano) → download `KIT_MUSIC_URL`/`MUSIC_URL` → **pad sintetico**
+gerado pelo próprio ffmpeg. `reelHasAudio()` verifica o MP4 final e
+remuxa se necessário — reel nunca sai mudo. Mix: faixa contínua única
+(não fatias por clipe), `dynaudnorm` + `alimiter`, fade in/out nas
+pontas apenas.
+
+### Testes manuais
+
+```bash
+npm run kit:daily                    # gera e envia com o tema de hoje
+KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
+```
 
 ---
 
@@ -175,6 +245,11 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 | `NEXT_PUBLIC_SITE_URL` | recomendado | URL canônica — sitemap/canonical/OG/JSON-LD |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | auth do `/admin` |
 | `NEXT_PUBLIC_INSTAGRAM_URL` | não | link do Instagram |
+| `RESEND_API_KEY` | kit | chave Resend — envio do kit diário por email |
+| `KIT_EMAIL` | kit | destinatário(s) do kit (vírgula separa vários) |
+| `RESEND_FROM` | não | remetente (default `onboarding@resend.dev`) |
+| `KIT_MUSIC_URL` / `KIT_MUSIC_URLS` | não | faixa(s) remota(s) de música do reel (vírgula separa; `music/*.mp3` locais têm prioridade) |
+| `KIT_THEME_DAY` | não | força tema do kit em testes (0=dom … 6=sáb) |
 
 \* O sync incremental de Lomadee exige `LOMADEE_API_KEY`; `FEED_URL` só no sync manual.
 
@@ -252,6 +327,9 @@ npm run start      # serve o build
 npm run lint       # ESLint
 npm run sync       # sync manual (tsx --env-file=.env)
 npm run amz:scrape # scrape local do catalogo Amazon (ver secao abaixo)
+npm run kit:daily  # kit Instagram: reel + cards + email (ver secao acima)
+npm run recategorize         # dry-run da reclassificacao de categorias
+npm run recategorize -- --apply   # aplica (cuidado: reclassifica o banco)
 npm run db:push    # prisma db push
 npx tsc --noEmit   # typecheck
 npx vercel --prod --yes   # deploy manual
@@ -271,6 +349,8 @@ src/
     produto/[id]/page.tsx        # detalhe + JSON-LD + after(sync)
     ir/[id]/route.ts             # redirect afiliado + click (after)
     admin/page.tsx               # painel: KPIs, sync, form Amazon, export
+    admin/kit/                   # preview visual do kit Instagram (login)
+    categoria/[slug]/           # paginas de categoria indexaveis
     login/                       # login Supabase
     api/
       pv/route.ts                # pageviews (sentinela, ignora bot/admin)
@@ -298,9 +378,15 @@ src/
     adminSession.ts              # hasAdminSession() — atalho por cookie
     linkcheck.ts                 # validação link+imagem (prefixos checáveis)
     categories.ts / format.ts / urgency.ts / site.ts / shortener.ts
+    instagram.ts / instagramKit.ts   # captions + pool do kit diario
     reports.ts                   # receita/comissão estimada via APIs das redes
 scripts/
   sync.ts / checklinks.ts / recheck.ts / recategorize.ts / dedup.ts / ml-auth.ts
+  daily-kit.ts                  # kit diario: reel ffmpeg + cards + email Resend
+  kit-cron.sh / amz-cron.sh     # wrappers de cron (node do nvm + log)
+music/                          # faixas do reel (rotacao diaria, versionadas)
+assets/logo.jpeg                # marca usada no intro/outro do reel
+kit-out/                        # saida do kit (gitignored): reel, PNGs, sent.json
 prisma/schema.prisma
 ```
 
@@ -309,7 +395,13 @@ prisma/schema.prisma
 ## Roadmap sugerido
 
 - [x] Sincronizador Awin (`aw:`) — pronto; falta só configurar `AWIN_FEEDS`/`AWIN_AFFID` quando os anunciantes forem aprovados
+- [x] Kit diário do Instagram — reel + cards + email automáticos (cron 8h)
+- [x] Classificação de categorias robusta — descrição como fallback, decode de entidades, `npm run recategorize`
 - [ ] Amazon PA-API quando a conta Creators atingir 10 vendas/30 dias (credenciais `AMZ_API_KEY`/`AMZ_API_SECRET`)
 - [ ] Reconciliar conversões via API `/orders` Lomadee (cliques → vendas → receita real)
-- [ ] Páginas `/categoria/[slug]` e `/lojas` indexáveis (SEO)
+- [x] Páginas `/categoria/[slug]` indexáveis (SEO)
+- [ ] Google Shopping feed (Merchant Center)
 - [ ] Usar `/api/card/[id]` como `og:image` por produto
+- [ ] Postagem automática no Instagram via API Meta (aguarda app review)
+
+> Pendências detalhadas e priorizadas em [`PENDENCIAS.md`](./PENDENCIAS.md).
