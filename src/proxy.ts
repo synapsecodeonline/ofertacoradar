@@ -1,7 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Dominios antigos do projeto: redirecionamento permanente (308)
+// consolida SEO no dominio canonico e evita conteudo duplicado.
+// Previews *.vercel.app continuam funcionando (nao estao na lista).
+const LEGACY_HOSTS = [
+  "ofertacoradar.vercel.app",
+  "ofertacoradar-murex.vercel.app",
+];
+const CANONICAL_HOST = "ofertacoradar.com.br";
+
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get("host")?.split(":")[0] ?? "";
+  if (LEGACY_HOSTS.includes(host)) {
+    const url = request.nextUrl.clone();
+    url.host = CANONICAL_HOST;
+    url.protocol = "https:";
+    url.port = "";
+    return NextResponse.redirect(url, 308);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
