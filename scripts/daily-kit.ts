@@ -124,14 +124,77 @@ function recordSent(ids: number[]) {
 const MIN_DISC = 10;
 const hasRealDiscount = (it: KitItem) => (it.discountPct ?? 0) >= MIN_DISC;
 
-function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
-  const match = items.filter(
-    (it) =>
-      hasRealDiscount(it) &&
-      theme.cats.includes(canonicalCategory(it.category)) &&
-      theme.re.test(it.title) &&
-      !theme.veto?.test(it.title),
+// Marcas que o publico brasileiro reconhece na hora — produto de
+// marca conhecida converte mais que white-label pelo mesmo desconto.
+// Testa titulo + merchant; palavra inteira para nao pegar "nike" em
+// "caneca niketinha".
+const KNOWN_BRANDS = new RegExp(
+  "\\b(" +
+    [
+      // tech
+      "samsung", "apple", "iphone", "ipad", "macbook", "airpods", "motorola",
+      "xiaomi", "redmi", "poco", "realme", "nokia", "intelbras", "positivo",
+      "sony", "jbl", "philips", "logitech", "razer", "hyperx", "redragon",
+      "canon", "nikon", "gopro", "dji", "anker", "baseus", "ugreen", "elgato",
+      // games
+      "nintendo", "switch", "playstation", "ps5", "ps4", "xbox", "steam",
+      // esporte
+      "nike", "adidas", "puma", "fila", "mizuno", "asics", "olympikus",
+      "lacoste", "hurley", "quiksilver", "oakley", "vans", "converse",
+      "new balance", "kappa", "umbro", "topper", "diadora", "skechers",
+      "under armour", "havaianas", "ipanema", "melissa", "rider",
+      // casa/eletro
+      "philips", "braun", "elgin", "britania", "continental", "tramontina",
+      "lavo", "oxford", "midea", "consul", "brastemp", "electrolux", "arno",
+      "oster", "philco", "euro", "lorenzetti", "docol", "hydra", "fischer",
+      "multilaser", "tcl", "aoc", "lenovo", "dell", "acer",
+      // moda/varejo
+      "renner", "riachuelo", "c&a", "marisa", "forever 21", "zara",
+      "lee", "wrangler", "timberland", "champion", "cea", "mormaii",
+      "colcci", "animale", "doktor", "aramis", "hering",
+      // beleza
+      "natura", "avon", "boticario", "eudora", "quem disse berenice",
+      "dailus", "marcelo", "lancaster", "olay", "nivea", "dove", "seda",
+      "pantene", "johnson", "needs", "viella", "vult", "bruna tavares",
+      "haskell", "marcelo beauty", "vizzela", "ambiderm", "golde",
+      // alimentacao/bebidas
+      "heineken", "skol", "brahma", "antartica", "guarana", "itambe",
+      "parmalat", "nestle", "danone", "coca", "pepsi", "del valle",
+      "tang", "fanta", "sprite", "mineirinho", "aquarius", "gatorade",
+      "monster", "red bull", "tnt", "fusion", "integral medica",
+      // pets
+      "pedigree", "whiskas", "friskies", "purina", "royal canin",
+      "premier", "catier", "nobit", "premier pet",
+      // bebe
+      "johnson", "pampers", "huggies", "tommee", "chicco", "philips avent",
+    ].join("|") +
+    ")\\b",
+  "i",
+);
+const isKnownBrand = (it: KitItem) =>
+  KNOWN_BRANDS.test(`${it.title} ${it.merchant ?? ""}`);
+
+// Score de popularidade: cliques (7d) dominam; marca conhecida da
+// vantagem para produtos com poucos cliques; desconto desempata.
+const BRAND_BOOST = 40;
+function kitScore(it: KitItem) {
+  return (
+    it.clicks * 3 +
+    (isKnownBrand(it) ? BRAND_BOOST : 0) +
+    (it.discountPct ?? 0)
   );
+}
+
+function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
+  const match = items
+    .filter(
+      (it) =>
+        hasRealDiscount(it) &&
+        theme.cats.includes(canonicalCategory(it.category)) &&
+        theme.re.test(it.title) &&
+        !theme.veto?.test(it.title),
+    )
+    .sort((a, b) => kitScore(b) - kitScore(a));
   const seen = new Set<string>();
   const diverse = match.filter((it) => {
     const k = familyKey(it.title);
@@ -604,8 +667,16 @@ async function main() {
   if (matched < 2) {
     themeUsed = { dia, ...THEMES[0] };
     const excl = idsSentWithin(sent, SENT_KEEP_DAYS);
-    const fresh = pool.items.filter((it) => hasRealDiscount(it) && !excl.has(it.id));
-    items = (fresh.length >= 2 ? fresh : pool.items.filter(hasRealDiscount)).slice(0, 4);
+    const fresh = pool.items
+      .filter((it) => hasRealDiscount(it) && !excl.has(it.id))
+      .sort((a, b) => kitScore(b) - kitScore(a));
+    const fallback =
+      fresh.length >= 2
+        ? fresh
+        : pool.items
+            .filter(hasRealDiscount)
+            .sort((a, b) => kitScore(b) - kitScore(a));
+    items = fallback.slice(0, 4);
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
   }

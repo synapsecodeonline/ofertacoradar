@@ -15,7 +15,7 @@ export type KitItem = {
   discountPct: number | null;
   couponCode: string | null;
   category: string | null;
-  clicks24h: number;
+  clicks: number;
   pageUrl: string;
   cardUrl: string;
   cardStoryUrl: string;
@@ -47,7 +47,7 @@ function toKitItem(p: Product, c: number, site: string): KitItem {
     discountPct: p.discountPct,
     couponCode: p.couponCode,
     category: p.category,
-    clicks24h: c,
+    clicks: c,
     pageUrl: `${site}/produto/${p.id}`,
     cardUrl: `${site}/api/card/${p.id}?size=feed`,
     cardStoryUrl: `${site}/api/card/${p.id}?size=story`,
@@ -64,6 +64,11 @@ function toKitItem(p: Product, c: number, site: string): KitItem {
   };
 }
 
+// Janela de popularidade do kit: 7 dias. Cliques de 24h sao ruido —
+// produto conhecido tem tracao constante e nao pode depender de ter
+// sido clicado hoje para aparecer.
+const CLICK_WINDOW_DAYS = 7;
+
 // Pool tematico: varre os produtos elegiveis com maior desconto e
 // filtra pela categoria canonica. O pool geral ordena por cliques e
 // so pega o top — nichos (esporte, pets...) nunca apareciam no kit
@@ -73,7 +78,7 @@ export async function getThemedPool(
   limit = 40,
 ): Promise<KitItem[]> {
   if (cats.length === 0) return [];
-  const dayAgo = new Date(Date.now() - 24 * 3_600_000);
+  const dayAgo = new Date(Date.now() - CLICK_WINDOW_DAYS * 24 * 3_600_000);
   const candidates = await prisma.product.findMany({
     where: KIT_WHERE,
     orderBy: { discountPct: "desc" },
@@ -99,12 +104,12 @@ export async function getThemedPool(
     .map(({ p, clicks: c }) => toKitItem(p, c, site));
 }
 
-// Kit de ofertas para Instagram: mais clicadas nas ultimas 24h,
+// Kit de ofertas para Instagram: mais clicadas nos ultimos 7 dias,
 // completando com maiores descontos. Compartilhado entre
 // /api/instagram/kit (JSON) e /admin/kit (pagina visual).
 async function buildKit(count: number, takeMult: number) {
   const now = new Date();
-  const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
+  const dayAgo = new Date(now.getTime() - CLICK_WINDOW_DAYS * 24 * 3_600_000);
   const n = Math.min(200, Math.max(1, count));
 
   const clicks = await prisma.click.groupBy({
