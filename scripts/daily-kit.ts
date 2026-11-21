@@ -87,27 +87,55 @@ function familyKey(title: string): string {
 // (SENT_FILE e declarado junto de OUT_DIR, mais abaixo.)
 const SENT_KEEP_DAYS = 14;
 
-function loadSent(): Record<string, number[]> {
+// Formato: { "2026-11-21": { ids: [...], fams: [...] } } — fams sao
+// familyKey() dos titulos. A exclusao por familia impede que o MESMO
+// produto volte por outra fonte/ID (ex: fone na Lomadee e no ML).
+// Compat: entradas antigas em array puro [ids] ainda sao lidas.
+type SentEntry = { ids: number[]; fams: string[] };
+type SentBook = Record<string, SentEntry>;
+
+function loadSent(): SentBook {
   try {
-    return JSON.parse(readFileSync(SENT_FILE, "utf8"));
+    const raw = JSON.parse(readFileSync(SENT_FILE, "utf8")) as Record<
+      string,
+      number[] | { ids?: number[]; fams?: string[] }
+    >;
+    const out: SentBook = {};
+    for (const [day, v] of Object.entries(raw)) {
+      out[day] = Array.isArray(v)
+        ? { ids: v, fams: [] }
+        : { ids: v.ids ?? [], fams: v.fams ?? [] };
+    }
+    return out;
   } catch {
     return {};
   }
 }
 
-function idsSentWithin(sent: Record<string, number[]>, days: number): Set<number> {
+function sentWithin(sent: SentBook, days: number): { ids: Set<number>; fams: Set<string> } {
   const cutoff = Date.now() - days * 86_400_000;
   const ids = new Set<number>();
-  for (const [day, list] of Object.entries(sent)) {
-    if (new Date(day).getTime() >= cutoff) list.forEach((id) => ids.add(id));
+  const fams = new Set<string>();
+  for (const [day, e] of Object.entries(sent)) {
+    if (new Date(day).getTime() >= cutoff) {
+      e.ids.forEach((id) => ids.add(id));
+      e.fams.forEach((f) => fams.add(f));
+    }
   }
-  return ids;
+  return { ids, fams };
 }
 
-function recordSent(ids: number[]) {
+const isSent = (excl: { ids: Set<number>; fams: Set<string> }, it: KitItem) =>
+  excl.ids.has(it.id) || excl.fams.has(familyKey(it.title));
+
+function recordSent(items: KitItem[]) {
   const sent = loadSent();
   const today = new Date().toISOString().slice(0, 10);
-  sent[today] = [...new Set([...(sent[today] ?? []), ...ids])];
+  const prev = sent[today] ?? { ids: [], fams: [] };
+  sent[today] = {
+    ids: [...new Set([...prev.ids, ...items.map((it) => it.id)])],
+    fams: [...new Set([...prev.fams, ...items.map((it) => familyKey(it.title))])],
+  };
   const cutoff = Date.now() - SENT_KEEP_DAYS * 86_400_000;
   for (const day of Object.keys(sent)) {
     if (new Date(day).getTime() < cutoff) delete sent[day];
@@ -174,13 +202,25 @@ const KNOWN_BRANDS = new RegExp(
 const isKnownBrand = (it: KitItem) =>
   KNOWN_BRANDS.test(`${it.title} ${it.merchant ?? ""}`);
 
-// Score de popularidade: cliques (7d) dominam; marca conhecida da
-// vantagem para produtos com poucos cliques; desconto desempata.
-const BRAND_BOOST = 40;
+// Lojas grandes que o publico confia — produto vendido por varejista
+// conhecido e mais atraente que loja generica pelo mesmo preco.
+const KNOWN_STORES = new RegExp(
+  "\\b(amazon|mercado livre|shopee|magalu|magazine luiza|casas bahia|" +
+    "americanas|netshoes|kabum|pichau|fast shop|carrefour|dafiti|extra)\\b",
+  "i",
+);
+const isKnownStore = (it: KitItem) =>
+  KNOWN_STORES.test(`${it.merchant ?? ""} ${it.title}`);
+
+// Score de popularidade: cliques (7d) dominam; marca/loja conhecida
+// da vantagem para produtos com poucos cliques; desconto desempata.
+const BRAND_BOOST = 80;
+const STORE_BOOST = 25;
 function kitScore(it: KitItem) {
   return (
     it.clicks * 3 +
     (isKnownBrand(it) ? BRAND_BOOST : 0) +
+    (isKnownStore(it) ? STORE_BOOST : 0) +
     (it.discountPct ?? 0)
   );
 }
@@ -646,15 +686,17 @@ async function main() {
     (it) => hasRealDiscount(it) && !seen.has(it.id) && seen.add(it.id),
   );
 
-  // Rotacao: exclui o que ja saiu nos ultimos 14 dias. Se o tema
-  // apertar, relaxa a janela (7 -> 3 -> 0) ate ter 2+ ofertas.
+  // Rotacao: exclui IDs E familias enviadas nos ultimos 14 dias —
+  // o mesmo produto nao pode voltar por outra fonte/ID. Se o tema
+  // apertar, relaxa a janela (14 -> 7 -> 3), mas NUNCA zera: produto
+  // repetido queima a confianca do email.
   const sent = loadSent();
   let picked = { items: [] as KitItem[], matched: 0 };
-  for (const win of [14, 7, 3, 0]) {
-    const excl = win > 0 ? idsSentWithin(sent, win) : new Set<number>();
-    const poolNow = base.filter((it) => !excl.has(it.id));
+  for (const win of [14, 7, 3]) {
+    const excl = sentWithin(sent, win);
+    const poolNow = base.filter((it) => !isSent(excl, it));
     picked = pickForTheme(poolNow, theme, 4);
-    if (picked.matched >= 2 || win === 0) break;
+    if (picked.matched >= 2) break;
   }
   let items = picked.items;
 
@@ -666,17 +708,13 @@ async function main() {
   let themeNote = "";
   if (matched < 2) {
     themeUsed = { dia, ...THEMES[0] };
-    const excl = idsSentWithin(sent, SENT_KEEP_DAYS);
-    const fresh = pool.items
-      .filter((it) => hasRealDiscount(it) && !excl.has(it.id))
-      .sort((a, b) => kitScore(b) - kitScore(a));
-    const fallback =
-      fresh.length >= 2
-        ? fresh
-        : pool.items
-            .filter(hasRealDiscount)
-            .sort((a, b) => kitScore(b) - kitScore(a));
-    items = fallback.slice(0, 4);
+    const excl = sentWithin(sent, SENT_KEEP_DAYS);
+    // Sem plano B que ignore a exclusão: se houver menos de 2 ofertas
+    // novas, o kit sai menor — repetir produto e pior que kit curto.
+    items = pool.items
+      .filter((it) => hasRealDiscount(it) && !isSent(excl, it))
+      .sort((a, b) => kitScore(b) - kitScore(a))
+      .slice(0, 4);
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
   }
@@ -941,7 +979,7 @@ async function main() {
     console.log(`Kit salvo em ${OUT_DIR} como fallback.`);
     process.exit(1);
   }
-  recordSent(kit.items.map((it) => it.id));
+  recordSent(kit.items);
   console.log(`Kit enviado para ${to} — ${kit.items.length} ofertas, reel ${reelName}`);
 }
 
