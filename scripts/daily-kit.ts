@@ -195,18 +195,28 @@ function synthPad(path: string, durS: number) {
   ]);
 }
 
+// Rotacao de faixas: KIT_MUSIC_URLS="url1,url2,url3" no .env — o kit
+// escolhe uma por dia (dia-do-ano % total). Sem a env, usa MUSIC_URL.
+const MUSIC_URLS = (process.env.KIT_MUSIC_URLS ?? MUSIC_URL)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 // Garante que existe arquivo de audio utilizavel: cache -> download
 // -> pad sintetico. Nunca devolve null — reel sempre sai com som.
-async function ensureMusic(dir: string): Promise<string> {
-  const cache = join(OUT_DIR, "music.mp3");
+async function ensureMusic(dir: string, idx = 0): Promise<string> {
+  const slot = idx % MUSIC_URLS.length;
+  const legacy = join(OUT_DIR, "music.mp3");
+  const cache = join(OUT_DIR, `music-${slot}.mp3`);
+  // O cache antigo (music.mp3) vale para a faixa 0 — evita re-download.
+  if (slot === 0 && existsSync(legacy)) return legacy;
   if (existsSync(cache)) return cache;
-  const url = process.env.KIT_MUSIC_URL ?? MUSIC_URL;
-  const tmp = join(dir, "music.mp3");
-  if (await download(url, tmp)) {
+  const tmp = join(dir, `music-${slot}.mp3`);
+  if (await download(MUSIC_URLS[slot], tmp)) {
     writeFileSync(cache, readFileSync(tmp));
     return cache;
   }
-  console.log("Musica indisponivel — gerando pad sintetico de fallback.");
+  console.log(`Musica ${slot} indisponivel — gerando pad sintetico.`);
   synthPad(cache, 60);
   return cache;
 }
@@ -378,10 +388,13 @@ function assembleReel(dir: string, clips: string[], reelPath: string) {
     dur += CLIP_S - XFADE_S;
   }
   // Barra de progresso no topo — detalhe que dá ar profissional
+  // dynaudnorm nivela o volume ao longo do reel: trechos quietos da
+  // musica sobem, trechos fortes descem — acaba o "corte" de audio.
+  // alimiter segura os picos depois da normalizacao.
   fc +=
     `[${prevV}]drawbox=x=0:y=0:w='min(t/${total.toFixed(2)}*${W}\\,${W})':h=10:` +
     `color=0x34d399:t=fill,format=yuv420p[vout];` +
-    `[${prevA}]alimiter=limit=0.95[aout]`;
+    `[${prevA}]dynaudnorm=f=250:g=15:m=6:p=0.9,alimiter=limit=0.9[aout]`;
 
   run([
     ...args,
@@ -501,8 +514,10 @@ async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
 
   // Musica de fundo: cache local -> download -> pad sintetico.
-  // Nunca null: o reel sempre sai com faixa de audio.
-  const music = await ensureMusic(dir);
+  // Nunca null: o reel sempre sai com faixa de audio. A faixa do dia
+  // roda na rotacao KIT_MUSIC_URLS (dia-do-ano % total de faixas).
+  const musicIdx = Math.floor(Date.now() / 86_400_000);
+  const music = await ensureMusic(dir, musicIdx);
 
   // 1) Clips do reel — cada clip recebe uma fatia da musica (offset)
   const logoPath = join(process.cwd(), "assets", "logo.jpeg");
