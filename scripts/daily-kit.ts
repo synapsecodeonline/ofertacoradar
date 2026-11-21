@@ -19,6 +19,35 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getInstagramKit, type KitItem } from "../src/lib/instagramKit";
 import { formatPrice } from "../src/lib/format";
+import { canonicalCategory } from "../src/lib/categories";
+
+// Cronograma semanal: cada dia tem um tema que guia a selecao das
+// ofertas e o texto do reel/email. getDay(): 0=dom ... 6=sab.
+const THEMES: Record<number, { nome: string; sub: string; cats: string[] }> = {
+  1: { nome: "TECH & ELETRÔNICOS", sub: "Celulares, games, informática e gadgets", cats: ["eletronicos", "celulares", "informatica", "games", "tv-audio", "fotografia", "software", "eletronicos-infantil"] },
+  2: { nome: "CASA & DECORAÇÃO", sub: "Móveis, cozinha, eletro e organização", cats: ["casa-decoracao", "decoracao", "iluminacao", "textil-cama", "moveis", "cozinha", "eletrodomesticos", "eletro-cocina", "eletro-limpeza", "climatizacao", "organizacao"] },
+  3: { nome: "BELEZA & CUIDADOS", sub: "Skincare, maquiagem, cabelo e saúde", cats: ["beleza", "maquiagem", "skincare", "cabelo", "perfumaria", "saude", "suplementos", "beleza-infantil"] },
+  4: { nome: "MODA & ESTILO", sub: "Roupas, calçados, bolsas e acessórios", cats: ["moda-feminina", "moda-masculina", "moda-infantil", "calcados", "calcados-infantil", "bolsas-mochilas", "acessorios-moda", "oculos", "joias-relogios", "moda-praia", "moda-praia-infantil", "lingerie", "vestidos", "calcas", "blusas"] },
+  5: { nome: "ESPORTE & FITNESS", sub: "Academia, ciclismo, camping e lazer", cats: ["esporte-lazer", "fitness", "ciclismo", "camping", "esporte-infantil"] },
+  6: { nome: "MERCADO & LAR", sub: "Supermercado, pets, bebê e limpeza", cats: ["supermercado", "mercearia", "limpeza-higiene", "alimentos-bebidas", "pets", "bebe", "brinquedos"] },
+  0: { nome: "ACHADINHOS & SURPRESAS", sub: "Os maiores descontos do momento, de tudo", cats: ["ofertas"] },
+};
+
+const DIAS = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
+
+function themeOf(d = new Date()) {
+  return { dia: DIAS[d.getDay()], ...THEMES[d.getDay()] };
+}
+
+// Seleciona 4 itens priorizando os do tema do dia; completa com os
+// melhores gerais quando o tema tem poucas ofertas.
+function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
+  const match = items.filter((it) =>
+    theme.cats.includes(canonicalCategory(it.category)),
+  );
+  const rest = items.filter((it) => !match.includes(it));
+  return [...match, ...rest].slice(0, n);
+}
 
 const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -209,11 +238,14 @@ function slug(s: string) {
 
 async function main() {
   console.log("Gerando kit diario...");
-  const kit = await getInstagramKit(4);
-  if (kit.items.length === 0) {
+  const theme = themeOf();
+  const pool = await getInstagramKit(12);
+  const items = pickForTheme(pool.items, theme, 4);
+  if (items.length === 0) {
     console.log("Nenhuma oferta valida hoje — kit vazio.");
     return;
   }
+  const kit = { ...pool, items };
 
   const dir = mkdtempSync(join(tmpdir(), "kit-"));
   mkdirSync(OUT_DIR, { recursive: true });
@@ -222,9 +254,10 @@ async function main() {
   const clips: string[] = [];
   clips.push(
     textClip(dir, "intro", [
-      { text: "OFERTAÇO RADAR", y: 780, style: "Big" },
-      { text: "OFERTAS VERIFICADAS TODO DIA", y: 960, style: "Sub" },
-      { text: "MAIORES DESCONTOS DO MOMENTO", y: 1060, style: "Url" },
+      { text: "OFERTAÇO RADAR", y: 740, style: "Big" },
+      { text: theme.nome, y: 920, style: "Sub" },
+      { text: theme.sub.toUpperCase(), y: 1010, style: "Url" },
+      { text: "OFERTAS VERIFICADAS TODO DIA", y: 1120, style: "Url" },
     ]),
   );
 
@@ -344,10 +377,21 @@ async function main() {
       <p style="margin:0;font-size:12px"><a href="${it.pageUrl}" style="color:#059669">${it.pageUrl}</a></p>
     </div>`;
 
+  const semana = [1, 2, 3, 4, 5, 6, 0]
+    .map((d) => {
+      const t = themeOf(new Date(Date.now() - ((new Date().getDay() - d + 7) % 7) * 86400000));
+      return `${t.dia}: ${t.nome}`;
+    })
+    .join(" &nbsp;·&nbsp; ");
+
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#18181b">
-      <h1 style="color:#059669;margin-bottom:4px">O que postar hoje — ${new Date().toLocaleDateString("pt-BR")}</h1>
-      <p style="color:#71717a;font-size:13px;margin-top:0">Siga a ordem abaixo. As imagens/vídeo estão anexos neste email.</p>
+      <h1 style="color:#059669;margin-bottom:4px">${theme.dia} — ${theme.nome}</h1>
+      <p style="color:#71717a;font-size:13px;margin-top:0">${theme.sub}. Siga a ordem abaixo — imagens/vídeo anexos.</p>
+
+      <div style="background:#f4f4f5;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:12px;color:#52525b;line-height:1.7">
+        <b>Cronograma da semana:</b> ${semana}
+      </div>
 
       <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;font-size:13px;line-height:1.6">
         <b>12h</b> — posta o <b>reel-*.mp4</b> nos Reels (legenda = item 1 abaixo)<br>
@@ -374,7 +418,7 @@ async function main() {
     body: JSON.stringify({
       from: process.env.RESEND_FROM ?? "Ofertaço Radar <onboarding@resend.dev>",
       to: to.split(",").map((e) => e.trim()).filter(Boolean),
-      subject: `O que postar hoje — ${kit.items.length} ofertas (${new Date().toLocaleDateString("pt-BR")})`,
+      subject: `${theme.dia} — ${theme.nome} · ${kit.items.length} ofertas`,
       html,
       attachments,
     }),
