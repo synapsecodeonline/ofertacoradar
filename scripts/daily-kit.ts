@@ -454,7 +454,7 @@ function buildCronograma(items: KitItem[]): string {
     "",
     "12h00  REELS (arquivo reel-*.mp4)",
     "       -> posta nos Reels E no feed (o reel aparece nos dois)",
-    "       -> legenda: item 1 do legendas.txt",
+    "       -> legenda: a combinada (bloco LEGENDA do email)",
     "       -> e o formato que mais alcanca gente nova",
     "",
   ];
@@ -471,7 +471,7 @@ function buildCronograma(items: KitItem[]): string {
   L.push(
     "20h00  POST FEED",
     "       -> imagem: 01-*-feed.png (card quadrado)",
-    "       -> legenda completa do item 1 (a melhor oferta do dia)",
+    "       -> legenda: a MESMA combinada do reel (cobre todos os itens)",
     "       -> esse post fica no perfil — e vitrine permanente",
     "",
     "DICA: nos stories use o sticker 'link' apontando direto",
@@ -482,6 +482,27 @@ function buildCronograma(items: KitItem[]): string {
   if (c) L.push(`Item 3 do dia: ${c.title}`);
   if (d) L.push(`Item 4 do dia: ${d.title}`);
   return L.join("\n") + "\n";
+}
+
+// Legenda UNICA do reel/feed: o video mostra todos os produtos e o
+// post do feed tambem — uma legenda por item nao faz sentido.
+// Lista compacta de cada oferta + CTA generico.
+function kitCaption(items: KitItem[]): string {
+  const lines = items.map((it, i) => {
+    const price = it.price != null ? formatPrice(it.price, it.currency) : "";
+    const disc = it.discountPct ? ` (-${it.discountPct}%)` : "";
+    const title = it.title.length > 60 ? it.title.slice(0, 57) + "…" : it.title;
+    return `${i + 1}️⃣ ${title}${price ? ` — ${price}` : ""}${disc}`;
+  });
+  return [
+    `🔥 OFERTAÇO RADAR — ${items.length} ofertas verificadas hoje!`,
+    "",
+    ...lines,
+    "",
+    "👉 Links na bio e nos stories 🛸",
+    "",
+    "#ofertas #achadinhos #promocao #desconto #ofertacaoradar #economia",
+  ].join("\n");
 }
 
 function escapeHtml(s: string) {
@@ -643,6 +664,9 @@ async function main() {
       `=== ${i + 1}. ${item.title} ===\n${item.caption}\nLink: ${item.pageUrl}\n`,
     );
   }
+  // A legenda do reel/feed e a combinada — as individuais ficam no
+  // arquivo so como referencia extra.
+  const combinedCaption = kitCaption(kit.items);
 
   clips.push(
     textClip(
@@ -703,7 +727,10 @@ async function main() {
 
   // 4) Copia tudo para kit-out (backup local)
   writeFileSync(join(OUT_DIR, reelName), readFileSync(reelPath));
-  writeFileSync(join(OUT_DIR, "legendas.txt"), captions.join("\n"));
+  writeFileSync(
+    join(OUT_DIR, "legendas.txt"),
+    `=== LEGENDA DO REEL/FEED (usar esta) ===\n\n${combinedCaption}\n\n=== LEGENDAS INDIVIDUAIS (referencia) ===\n\n${captions.join("\n")}`,
+  );
   writeFileSync(join(OUT_DIR, "cronograma.txt"), cronograma);
   for (const a of attachments) {
     if (a.filename.endsWith(".png")) {
@@ -729,8 +756,7 @@ async function main() {
         ${it.merchant ? ` · ${it.merchant}` : ""}
         ${it.discountPct ? ` · <b style="color:#dc2626">-${it.discountPct}%</b>` : ""}
       </p>
-      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#71717a">LEGENDA p/ REEL E FEED (copiar e colar — story não tem legenda):</p>
-      <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f4f4f5;border-radius:8px;padding:10px;margin:0 0 8px">${escapeHtml(it.caption)}</pre>
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#71717a">LINK DA PÁGINA DO PRODUTO (sticker dos stories):</p>
       <p style="margin:0;font-size:12px"><a href="${it.pageUrl}" style="color:#059669">${it.pageUrl}</a></p>
     </div>`;
 
@@ -759,10 +785,15 @@ async function main() {
               `<b>${[15, 18, 21, 21][i]}h</b> — story com <b>0${i + 1}-*-story.png</b> (story não tem legenda; a imagem já mostra preço/off — use o sticker de link)`,
           )
           .join("<br>")}
-        <br><b>20h</b> — post no feed com <b>01-*-feed.png</b> + legenda completa do item 1
+        <br><b>20h</b> — post no feed com <b>01-*-feed.png</b> + a legenda combinada (bloco verde abaixo)
       </div>
 
       ${kit.items.map((it, i) => itemCard(it, i, ["REEL + STORY + FEED", "STORY", "STORY", "STORY"][i] ?? "STORY")).join("")}
+
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:16px;margin:16px 0">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:800;color:#065f46">📋 LEGENDA DO REEL E DO FEED (copiar e colar — cobre todos os produtos):</p>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:#fff;border-radius:8px;padding:12px;margin:0">${escapeHtml(combinedCaption)}</pre>
+      </div>
 
       <p style="color:#71717a;font-size:12px;margin-top:16px">
         Nos stories, use o sticker de link apontando pra página do produto (converte mais que "link na bio").
