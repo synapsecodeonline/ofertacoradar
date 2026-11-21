@@ -225,6 +225,19 @@ function kitScore(it: KitItem) {
   );
 }
 
+// Embaralha dentro do top-N: os candidatos ja estao ordenados por
+// score (cliques + marca + loja + desconto), entao sorteamos so entre
+// os melhores — varia o kit a cada envio sem perder qualidade.
+const SHUFFLE_TOP = 14;
+function pickShuffled<T>(sorted: T[], n: number): T[] {
+  const top = sorted.slice(0, Math.min(sorted.length, SHUFFLE_TOP));
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  return top.slice(0, n);
+}
+
 function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
   const match = items
     .filter(
@@ -242,7 +255,7 @@ function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4
     seen.add(k);
     return true;
   });
-  return { items: diverse.slice(0, n), matched: match.length };
+  return { items: pickShuffled(diverse, n), matched: match.length };
 }
 
 const require = createRequire(import.meta.url);
@@ -711,10 +724,12 @@ async function main() {
     const excl = sentWithin(sent, SENT_KEEP_DAYS);
     // Sem plano B que ignore a exclusão: se houver menos de 2 ofertas
     // novas, o kit sai menor — repetir produto e pior que kit curto.
-    items = pool.items
-      .filter((it) => hasRealDiscount(it) && !isSent(excl, it))
-      .sort((a, b) => kitScore(b) - kitScore(a))
-      .slice(0, 4);
+    items = pickShuffled(
+      pool.items
+        .filter((it) => hasRealDiscount(it) && !isSent(excl, it))
+        .sort((a, b) => kitScore(b) - kitScore(a)),
+      4,
+    );
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
   }
