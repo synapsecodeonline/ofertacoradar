@@ -462,7 +462,8 @@ function buildCronograma(items: KitItem[]): string {
     L.push(
       `${storyHour[i]}h00  STORY ${i + 1}`,
       `       -> imagem: 0${i + 1}-*-story.png`,
-      `       -> legenda do item ${i + 1} nos stories`,
+      `       -> story NAO tem legenda — a imagem ja tem preco/off`,
+      `       -> opcional: texto curto por cima ("-40% so hoje")`,
       `       -> sticker de link: ${it.pageUrl}`,
       "",
     );
@@ -728,7 +729,7 @@ async function main() {
         ${it.merchant ? ` · ${it.merchant}` : ""}
         ${it.discountPct ? ` · <b style="color:#dc2626">-${it.discountPct}%</b>` : ""}
       </p>
-      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#71717a">LEGENDA (copiar e colar):</p>
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#71717a">LEGENDA p/ REEL E FEED (copiar e colar — story não tem legenda):</p>
       <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f4f4f5;border-radius:8px;padding:10px;margin:0 0 8px">${escapeHtml(it.caption)}</pre>
       <p style="margin:0;font-size:12px"><a href="${it.pageUrl}" style="color:#059669">${it.pageUrl}</a></p>
     </div>`;
@@ -755,7 +756,7 @@ async function main() {
         ${kit.items
           .map(
             (it, i) =>
-              `<b>${[15, 18, 21, 21][i]}h</b> — story com <b>0${i + 1}-*-story.png</b> + legenda do item ${i + 1}`,
+              `<b>${[15, 18, 21, 21][i]}h</b> — story com <b>0${i + 1}-*-story.png</b> (story não tem legenda; a imagem já mostra preço/off — use o sticker de link)`,
           )
           .join("<br>")}
         <br><b>20h</b> — post no feed com <b>01-*-feed.png</b> + legenda completa do item 1
