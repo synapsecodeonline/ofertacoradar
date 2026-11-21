@@ -18,20 +18,36 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getInstagramPool, type KitItem } from "../src/lib/instagramKit";
+import {
+  getInstagramPool,
+  getThemedPool,
+  type KitItem,
+} from "../src/lib/instagramKit";
 import { formatPrice } from "../src/lib/format";
 import { canonicalCategory } from "../src/lib/categories";
 
 // Cronograma semanal: cada dia tem um tema que guia a selecao das
 // ofertas e o texto do reel/email. getDay(): 0=dom ... 6=sab.
-const THEMES: Record<number, { nome: string; sub: string; cats: string[] }> = {
-  1: { nome: "TECH & ELETRÔNICOS", sub: "Celulares, games, informática e gadgets", cats: ["eletronicos", "celulares", "informatica", "games", "tv-audio", "fotografia", "software", "eletronicos-infantil"] },
-  2: { nome: "CASA & DECORAÇÃO", sub: "Móveis, cozinha, eletro e organização", cats: ["casa-decoracao", "decoracao", "iluminacao", "textil-cama", "moveis", "cozinha", "eletrodomesticos", "eletro-cocina", "eletro-limpeza", "climatizacao", "organizacao"] },
-  3: { nome: "BELEZA & CUIDADOS", sub: "Skincare, maquiagem, cabelo e saúde", cats: ["beleza", "maquiagem", "skincare", "cabelo", "perfumaria", "saude", "suplementos", "beleza-infantil"] },
-  4: { nome: "MODA & ESTILO", sub: "Roupas, calçados, bolsas e acessórios", cats: ["moda-feminina", "moda-masculina", "moda-infantil", "calcados", "calcados-infantil", "bolsas-mochilas", "acessorios-moda", "oculos", "joias-relogios", "moda-praia", "moda-praia-infantil", "lingerie", "vestidos", "calcas", "blusas"] },
-  5: { nome: "ESPORTE & FITNESS", sub: "Academia, ciclismo, camping e lazer", cats: ["esporte-lazer", "fitness", "ciclismo", "camping", "esporte-infantil"] },
-  6: { nome: "MERCADO & LAR", sub: "Supermercado, pets, bebê e limpeza", cats: ["supermercado", "mercearia", "limpeza-higiene", "alimentos-bebidas", "pets", "bebe", "brinquedos"] },
-  0: { nome: "ACHADINHOS & SURPRESAS", sub: "Os maiores descontos do momento, de tudo", cats: ["ofertas"] },
+// titleRe: o classificador do catalogo tem falsos positivos ("pasta
+// com elastico" virou fitness por causa da palavra "elastico").
+// Para o kit, o item so conta pro tema se a CATEGORIA canonica bater
+// E o titulo tiver palavra do tema — imagem tem que condizer.
+const TECH_RE = /celular|smartphone|iphone|galaxy|xiaomi|motorola|notebook|laptop|tablet|ipad|smartwatch|fone|headphone|airpods|smart ?tv|\btv\b|soundbar|caixa de som|home theater|c[aâ]mera|camera|gopro|drone|console|playstation|ps[45]|xbox|nintendo|switch|informatica|computador|pc gamer|monitor|teclado|mouse|ssd|hd externo|power ?bank|carregador|projetor|kindle|echo dot/i;
+const CASA_RE = /sof[aá]|mesa|cadeira|cama|travesseiro|almofada|cortina|tapete|guarda-roupa|rack|estante|ba[uú]|closet|cozinha|panela|frigideira|assadeira|pote|organiza|lumin[aá]ria|abajur|geladeira|fog[aã]o|micro-ondas|air fryer|fritadeira|ventilador|climatizador|umidificador|purificador|cafeteira|liquidificador|batedeira|processador|arrodeira|jogo americano|toalha|cobertor|edredom|len[cç]ol|manta/i;
+const BELEZA_RE = /skincare|serum|s[ií]rico|hidratante|maquiagem|batom|base|m[aá]scara|rimel|delineador|blush|corretivo|primer|shampoo|condicionador|progressiva|cronograma capilar|perfume|col[oô]nia|desodorante|protetor solar|vitamina|suplemento|col[aá]geno|whey|creatina|espelho|pincel|esponja|repelente/i;
+const MODA_RE = /vestido|blusa|cal[cç]a|saia|shorts|bermuda|moletom|jaqueta|camisa|camiseta|regata|conjunto|biqu[ií]ni|sung[aã]|cal[cç]ado|t[eê]nis|sapato|sand[aá]lia|chinelo|rasteirinha|scarpin|bota|coturno|papete|bolsa|mochila|carteira|pochete|[oó]culos|rel[oó]gio|joia|brinco|colar|pulseira|anel|lingerie|suti[aã]|calcinha|cueca|pijama|body|cropped|sueter|cardigan|tricot|camisola|casaco|blazer|colete|macac[aã]o|jardineira|legging|necessaire|mala/i;
+const ESP_RE = /futebol|futsal|society|basquete|v[oô]lei|handebol|t[eê]nis|badminton|squash|frescobol|h[oó]quei|rugby|boxe|jiu.?jitsu|\bmma\b|crossfit|calistenia|street workout|\bgym\b|academia|fitness|muscula[cç][aã]o|gin[aá]stica|yoga|pilates|corrida|maratona|ciclismo|bike|bicicleta|camping|trilha|pesca|ca[cç]a|nata[cç][aã]o|spinning|el[ií]ptico|esteira|halter|anilha|supino|rosca|leg press|crossover|remada|crucifixo|agachamento|hip thrust|gl[uú]teo|b[ií]ceps|tr[ií]ceps|panturrilha|abdomen|\bcore\b|whey|creatina|bcaa|glutamina|pr[eé]-?treino|termog[eê]nico|albumina|col[aá]geno|meião|meirao|meia de compress|camiseta dry|regata dry|short dry|bermuda cyclist|top fitness|squeeze|garrafa t[eé]rmica|mochila de hidrata|corda de pular|faixa el[aá]stica|luva de academia|luva de treino|protetor bucal|capacete|joelheira|cotoveleira|bola de|raquete|chuteira|caneleira|rede de|cesta de basquete|tapete de yoga|colchonete|kettlebell|saco de pancada|botas de trilha|barraca|saco de dormir|lanterna|filtro de [aá]gua|pote tr[eê]mico|headband|bra[cç]adeira/i;
+const MERCADO_RE = /supermercado|arroz|feij[aã]o|a[cç][uú]car|caf[eé]|macarr[aã]o|a[z]eite|[oó]leo|detergente|sab[aã]o|sapon[aá]ceo|desinfetante|[aá]gua sanit|limpeza|pano de ch[aã]o|saco de lixo|papel higi[eê]nico|guardanapo|fralda|len[cç]o umedecido|wipes|pet|cachorro|gato|racao|r[aç][aã]o|coleira|arranhador|areia de gato|petisco|mam[aadeira]|chupeta|biber[oó]n|pur[eé] de frutas|maionese|ketchup|mostarda|molho|tempero|especiaria|farinha|fermento|chocolate|bombom|biscoito|bolacha|gelatina|achocolatado|leite|iogurte|queijo|presunto|manteiga|margarina|doce de leite|leite condensado|pa[cç]oca|pipoca|amendoim|castanha|nozes|granola|aveia|goma de mascar|chiclete|balinha|salgadinho|snack|cebola|alho|batata|cenoura|tomate|abobrinha|berinjela|quiabo|abacate|banana|ma[cç][aã]|laranja|lim[aã]o|morango|uva|melancia|mam[aã]o|p[eé] de moleque|wafer|oreo|bis/i;
+const TODOS_RE = /[\s\S]/;
+
+const THEMES: Record<number, { nome: string; sub: string; cats: string[]; re: RegExp }> = {
+  1: { nome: "TECH & ELETRÔNICOS", sub: "Celulares, games, informática e gadgets", cats: ["eletronicos", "celulares", "informatica", "games", "tv-audio", "fotografia", "software", "eletronicos-infantil"], re: TECH_RE },
+  2: { nome: "CASA & DECORAÇÃO", sub: "Móveis, cozinha, eletro e organização", cats: ["casa-decoracao", "decoracao", "iluminacao", "textil-cama", "moveis", "cozinha", "eletrodomesticos", "eletro-cocina", "eletro-limpeza", "climatizacao", "organizacao"], re: CASA_RE },
+  3: { nome: "BELEZA & CUIDADOS", sub: "Skincare, maquiagem, cabelo e saúde", cats: ["beleza", "maquiagem", "skincare", "cabelo", "perfumaria", "saude", "suplementos", "beleza-infantil"], re: BELEZA_RE },
+  4: { nome: "MODA & ESTILO", sub: "Roupas, calçados, bolsas e acessórios", cats: ["moda-feminina", "moda-masculina", "moda-infantil", "calcados", "calcados-infantil", "bolsas-mochilas", "acessorios-moda", "oculos", "joias-relogios", "moda-praia", "moda-praia-infantil", "lingerie", "vestidos", "calcas", "blusas"], re: MODA_RE },
+  5: { nome: "ESPORTE & FITNESS", sub: "Academia, ciclismo, camping e lazer", cats: ["esporte-lazer", "fitness", "ciclismo", "camping", "esporte-infantil"], re: ESP_RE },
+  6: { nome: "MERCADO & LAR", sub: "Supermercado, pets, bebê e limpeza", cats: ["supermercado", "mercearia", "limpeza-higiene", "alimentos-bebidas", "pets", "bebe", "brinquedos"], re: MERCADO_RE },
+  0: { nome: "ACHADINHOS & SURPRESAS", sub: "Os maiores descontos do momento, de tudo", cats: ["ofertas"], re: TODOS_RE },
 };
 
 const DIAS = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
@@ -40,14 +56,40 @@ function themeOf(d = new Date()) {
   return { dia: DIAS[d.getDay()], ...THEMES[d.getDay()] };
 }
 
+// Chave de familia: tira variacoes de cor/tamanho/modelo para não
+// encher o kit com o mesmo produto em 4 versoes (ex: 10 meiões).
+function familyKey(title: string): string {
+  return title
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/[-–—|]/)[0]
+    .replace(/\b(\d+\s?(mm|cm|ml|l|kg|g|w|v|ah|pp?|pol|"|')|p|m|g|gg|gg?|un|und|kit|jogo|combo|pack|caixa|display|novo|nova|promocao|oferta)\b/g, " ")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" ");
+}
+
 // Seleciona 4 itens priorizando os do tema do dia; completa com os
-// melhores gerais quando o tema tem poucas ofertas.
+// melhores gerais quando o tema tem poucas ofertas. Dedup por
+// familia evita 4 versoes do mesmo produto (ex: meião em 10 cores).
 function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
-  const match = items.filter((it) =>
-    theme.cats.includes(canonicalCategory(it.category)),
+  const match = items.filter(
+    (it) =>
+      theme.cats.includes(canonicalCategory(it.category)) &&
+      theme.re.test(it.title),
   );
   const rest = items.filter((it) => !match.includes(it));
-  return { items: [...match, ...rest].slice(0, n), matched: match.length };
+  const seen = new Set<string>();
+  const diverse = [...match, ...rest].filter((it) => {
+    const k = familyKey(it.title);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return { items: diverse.slice(0, n), matched: match.length };
 }
 
 const require = createRequire(import.meta.url);
@@ -358,8 +400,20 @@ async function main() {
   console.log("Gerando kit diario...");
   const dia = DIAS[new Date().getDay()];
   const theme = themeOf();
-  const pool = await getInstagramPool(80);
-  const picked = pickForTheme(pool.items, theme, 4);
+  // Pool tematico busca direto no banco por categoria canonica —
+  // o pool geral (top por cliques/desconto) nao alcanca nichos.
+  const [pool, themedRaw] = await Promise.all([
+    getInstagramPool(80),
+    getThemedPool(theme.cats, 12),
+  ]);
+  // Pool tematico traz falsos positivos do classificador — so
+  // entram os que o titulo confirma o tema.
+  const themed = themedRaw.filter((it) => theme.re.test(it.title));
+  const seen = new Set<number>();
+  const combined = [...themed, ...pool.items].filter(
+    (it) => !seen.has(it.id) && seen.add(it.id),
+  );
+  const picked = pickForTheme(combined, theme, 4);
   let items = picked.items;
 
   // Se o tema do dia tem menos de 2 ofertas no catalogo, e melhor
