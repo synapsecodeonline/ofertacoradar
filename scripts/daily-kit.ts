@@ -13,6 +13,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -202,9 +203,28 @@ const MUSIC_URLS = (process.env.KIT_MUSIC_URLS ?? MUSIC_URL)
   .map((s) => s.trim())
   .filter(Boolean);
 
-// Garante que existe arquivo de audio utilizavel: cache -> download
-// -> pad sintetico. Nunca devolve null — reel sempre sai com som.
+// Fundo dos clips de texto: degradê teal em diagonal com rotacao
+// sutil — muito mais vivo que o verde chapado, mesma identidade.
+const BG_CLIP = `gradients=s=${W}x${H}:r=30:d=${CLIP_S}:` +
+  `c0=0x12564f:c1=0x0a3a35:c2=0x052a26:c3=0x020f0d:n=4:` +
+  `x0=0:y0=0:x1=${W}:y1=${H}:speed=0.015`;
+
+// Faixas locais em music/*.mp3 tem prioridade — arquivo local nunca
+// falha download e fica versionado no repo. Rotaciona por dia.
+function localTracks(): string[] {
+  const dir = join(process.cwd(), "music");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.toLowerCase().endsWith(".mp3"))
+    .sort()
+    .map((f) => join(dir, f));
+}
+
+// Garante que existe arquivo de audio utilizavel: faixas locais ->
+// cache/remoto -> pad sintetico. Nunca devolve null.
 async function ensureMusic(dir: string, idx = 0): Promise<string> {
+  const locals = localTracks();
+  if (locals.length > 0) return locals[idx % locals.length];
   const slot = idx % MUSIC_URLS.length;
   const legacy = join(OUT_DIR, "music.mp3");
   const cache = join(OUT_DIR, `music-${slot}.mp3`);
@@ -264,7 +284,7 @@ function textClip(
   const ass = assFile(dir, name, events);
   const out = join(dir, `${name}.mp4`);
   const args = [
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    "-f", "lavfi", "-t", String(CLIP_S), "-i", BG_CLIP,
   ];
   if (logoPath) args.push("-loop", "1", "-t", String(CLIP_S), "-i", logoPath);
   const audioIdx = logoPath ? 2 : 1;
@@ -312,7 +332,7 @@ function productClip(
   // zoompan gera o proprio movimento (Ken Burns) — zoom sutil de 1.0 a ~1.12
   run([
     "-i", imgPath,
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    "-f", "lavfi", "-t", String(CLIP_S), "-i", BG_CLIP,
     ...audioInput(music, offsetS),
     "-filter_complex",
     `[0:v]scale=1760:-2:force_original_aspect_ratio=decrease,` +
