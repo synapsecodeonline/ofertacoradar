@@ -1,5 +1,5 @@
 import { syncPrisma as prisma } from "./db";
-import { discountPctOf } from "./format";
+import { decodeEntities, discountPctOf } from "./format";
 import { resolveCategory, resolveSubtype } from "./categories";
 import type { NormalizedProduct } from "./feed";
 
@@ -33,16 +33,26 @@ export async function upsertByExternalId(
   ) {
     return;
   }
-  const category = resolveCategory(p.category, p.title, merchant, segment);
+  // Feeds mandam entidades HTML ("Roup&#xE3;o") — decodifica antes de
+  // classificar e de exibir, senao a palavra nunca casa e o usuario
+  // ve a entidade crua.
+  const title = decodeEntities(p.title);
+  const description = p.description ? decodeEntities(p.description) : p.description;
+  let category = resolveCategory(p.category, title, merchant, segment, description);
+  // Campanha Lomadee sem sinal de produto ("15% OFF na loja X") e uma
+  // oferta generica — vai para "ofertas", nao para "outros".
+  if (category === "outros" && p.externalId?.startsWith("camp-")) {
+    category = "ofertas";
+  }
   const data = {
-    title: p.title,
-    description: p.description,
+    title,
+    description,
     imageUrl: p.imageUrl,
     price: p.price,
     oldPrice: p.oldPrice,
     discountPct: discountPctOf(p),
     category,
-    subtype: resolveSubtype(category, p.title),
+    subtype: resolveSubtype(category, title),
     merchant,
     organizationId: p.organizationId ?? null,
     url: p.url,

@@ -1,5 +1,5 @@
 import { prisma } from "../src/lib/db";
-import { discountPctOf } from "../src/lib/format";
+import { decodeEntities, discountPctOf } from "../src/lib/format";
 import { resolveCategory, resolveSubtype } from "../src/lib/categories";
 import {
   fetchFeed,
@@ -100,21 +100,27 @@ async function main() {
   const upsertOne = async (p: (typeof products)[number]) => {
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
-    const category = resolveCategory(
+    const title = decodeEntities(p.title);
+    const description = p.description ? decodeEntities(p.description) : p.description;
+    let category = resolveCategory(
       p.category,
-      p.title,
+      title,
       merchant,
       p.organizationId ? brandSegments.get(p.organizationId) : undefined,
+      description,
     );
+    if (category === "outros" && p.externalId?.startsWith("camp-")) {
+      category = "ofertas";
+    }
     const data = {
-      title: p.title,
-      description: p.description,
+      title,
+      description,
       imageUrl: p.imageUrl,
       price: p.price,
       oldPrice: p.oldPrice,
       discountPct: discountPctOf(p),
       category,
-      subtype: resolveSubtype(category, p.title),
+      subtype: resolveSubtype(category, title),
       merchant,
       organizationId: p.organizationId ?? null,
       url: p.url,
