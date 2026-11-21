@@ -216,6 +216,32 @@ function productClip(
   return out;
 }
 
+// Clip a partir do card story (1080x1920): Ken Burns + grade + fade.
+// E a mesma imagem que vai pro story — video e card ficam identicos.
+function cardClip(
+  dir: string,
+  name: string,
+  cardPath: string,
+  music: string | null,
+  offsetS: number,
+) {
+  const out = join(dir, `${name}.mp4`);
+  run([
+    "-i", cardPath,
+    ...audioInput(music, offsetS),
+    "-filter_complex",
+    `[0:v]scale=2160:3840:force_original_aspect_ratio=decrease,` +
+      `zoompan=z='min(1+0.0012*on,1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
+      `d=${CLIP_S * 30}:s=${W}x${H}:fps=30,` +
+      `${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
+    "-map", "[vout]", "-map", "1:a",
+    ...audioMap(0.22),
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+    "-c:a", "aac", "-shortest", out,
+  ]);
+  return out;
+}
+
 // Cronograma de postagem — horarios de pico do publico de ofertas
 // no Brasil (almoco ~12h, fim de tarde ~18h, noite ~20-21h).
 function buildCronograma(items: KitItem[]): string {
@@ -317,10 +343,35 @@ async function main() {
   const attachments: { filename: string; content: string }[] = [];
   const captions: string[] = [];
 
+  const cardKey = process.env.CRON_SECRET ?? "";
+
   for (const [i, item] of kit.items.entries()) {
     const offset = (i + 1) * CLIP_S;
-    const img = join(dir, `prod-${i}.jpg`);
-    const hasImg = item.imageUrl ? await download(item.imageUrl, img) : false;
+
+    // Cards primeiro: o reel usa o MESMO card story do post —
+    // video e imagem sempre condizentes com o tema do dia.
+    const storyPath = join(dir, `card-${i}-story.png`);
+    const feedPath = join(dir, `card-${i}-feed.png`);
+    const hasStory = await download(
+      `${kit.siteUrl}/api/card/${item.id}?size=story&key=${cardKey}`,
+      storyPath,
+    );
+    const hasFeed = await download(
+      `${kit.siteUrl}/api/card/${item.id}?size=feed&key=${cardKey}`,
+      feedPath,
+    );
+    if (hasStory) {
+      attachments.push({
+        filename: `${String(i + 1).padStart(2, "0")}-${slug(item.title)}-story.png`,
+        content: readFileSync(storyPath).toString("base64"),
+      });
+    }
+    if (hasFeed) {
+      attachments.push({
+        filename: `${String(i + 1).padStart(2, "0")}-${slug(item.title)}-feed.png`,
+        content: readFileSync(feedPath).toString("base64"),
+      });
+    }
 
     const fallbackEvents: Ev[] = [
       { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
@@ -330,35 +381,28 @@ async function main() {
       { text: "LINK NA BIO", y: 1840, style: "Foot" },
     ];
 
-    let clip: string;
-    if (hasImg) {
+    let clip: string | null = null;
+    if (hasStory) {
       try {
-        clip = productClip(dir, `p${i}`, item, img, music, offset);
+        clip = cardClip(dir, `p${i}`, storyPath, music, offset);
       } catch (e) {
-        console.log(`Clip ${i} falhou, usando texto:`, String(e).slice(0, 140));
-        clip = textClip(dir, `p${i}`, fallbackEvents, music, offset);
+        console.log(`Clip ${i} (card) falhou:`, String(e).slice(0, 140));
       }
-    } else {
+    }
+    if (!clip && item.imageUrl) {
+      const img = join(dir, `prod-${i}.jpg`);
+      if (await download(item.imageUrl, img)) {
+        try {
+          clip = productClip(dir, `p${i}`, item, img, music, offset);
+        } catch (e) {
+          console.log(`Clip ${i} (foto) falhou:`, String(e).slice(0, 140));
+        }
+      }
+    }
+    if (!clip) {
       clip = textClip(dir, `p${i}`, fallbackEvents, music, offset);
     }
     clips.push(clip);
-
-    // 2) Cards PNG (feed + story) via /api/card com chave do cron
-    const key = process.env.CRON_SECRET ?? "";
-    for (const size of ["feed", "story"] as const) {
-      const cardPath = join(dir, `card-${i}-${size}.png`);
-      if (
-        await download(
-          `${kit.siteUrl}/api/card/${item.id}?size=${size}&key=${key}`,
-          cardPath,
-        )
-      ) {
-        attachments.push({
-          filename: `${String(i + 1).padStart(2, "0")}-${slug(item.title)}-${size}.png`,
-          content: readFileSync(cardPath).toString("base64"),
-        });
-      }
-    }
 
     captions.push(
       `=== ${i + 1}. ${item.title} ===\n${item.caption}\nLink: ${item.pageUrl}\n`,
