@@ -72,18 +72,17 @@ function familyKey(title: string): string {
     .join(" ");
 }
 
-// Seleciona 4 itens priorizando os do tema do dia; completa com os
-// melhores gerais quando o tema tem poucas ofertas. Dedup por
-// familia evita 4 versoes do mesmo produto (ex: meião em 10 cores).
+// Seleciona itens do tema do dia — APENAS os verificados por
+// categoria+titulo (o kit nunca mistura tema com oferta aleatoria).
+// Dedup por familia evita 4 versoes do mesmo produto (ex: meião).
 function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
   const match = items.filter(
     (it) =>
       theme.cats.includes(canonicalCategory(it.category)) &&
       theme.re.test(it.title),
   );
-  const rest = items.filter((it) => !match.includes(it));
   const seen = new Set<string>();
-  const diverse = [...match, ...rest].filter((it) => {
+  const diverse = match.filter((it) => {
     const k = familyKey(it.title);
     if (seen.has(k)) return false;
     seen.add(k);
@@ -338,6 +337,7 @@ function assembleReel(dir: string, clips: string[], reelPath: string) {
 // no Brasil (almoco ~12h, fim de tarde ~18h, noite ~20-21h).
 function buildCronograma(items: KitItem[]): string {
   const [a, b, c, d] = items;
+  const storyHour = [15, 18, 21, 21];
   const L: string[] = [
     "CRONOGRAMA DE POSTAGEM — Kit do dia",
     "=====================================",
@@ -351,28 +351,26 @@ function buildCronograma(items: KitItem[]): string {
     "       -> legenda: item 1 do legendas.txt",
     "       -> e o formato que mais alcanca gente nova",
     "",
-    "15h00  STORY 1",
-    "       -> imagem: 01-*-story.png",
-    "       -> legenda do item 1 nos stories",
-    "       -> sticker de link: https://ofertacoradar.vercel.app/produto/" + a.id,
-    "",
-    "18h00  STORY 2",
-    "       -> imagem: 02-*-story.png",
-    "       -> legenda do item 2",
-    "",
+  ];
+  items.forEach((it, i) => {
+    L.push(
+      `${storyHour[i]}h00  STORY ${i + 1}`,
+      `       -> imagem: 0${i + 1}-*-story.png`,
+      `       -> legenda do item ${i + 1} nos stories`,
+      `       -> sticker de link: ${it.pageUrl}`,
+      "",
+    );
+  });
+  L.push(
     "20h00  POST FEED",
     "       -> imagem: 01-*-feed.png (card quadrado)",
     "       -> legenda completa do item 1 (a melhor oferta do dia)",
     "       -> esse post fica no perfil — e vitrine permanente",
     "",
-    "21h00  STORY 3 + 4",
-    "       -> imagens: 03 e 04 *-story.png",
-    "       -> legendas dos itens 3 e 4",
-    "       -> feche o dia lembrando: LINK NA BIO",
-    "",
     "DICA: nos stories use o sticker 'link' apontando direto",
     "para a pagina do produto — converte mais que 'link na bio'.",
-  ];
+    "Se o reel vier sem audio, escolha um som em alta ao postar.",
+  );
   if (b) L.push("", `Item 2 do dia: ${b.title}`);
   if (c) L.push(`Item 3 do dia: ${c.title}`);
   if (d) L.push(`Item 4 do dia: ${d.title}`);
@@ -404,7 +402,7 @@ async function main() {
   // o pool geral (top por cliques/desconto) nao alcanca nichos.
   const [pool, themedRaw] = await Promise.all([
     getInstagramPool(80),
-    getThemedPool(theme.cats, 12),
+    getThemedPool(theme.cats, 40),
   ]);
   // Pool tematico traz falsos positivos do classificador — so
   // entram os que o titulo confirma o tema.
@@ -627,10 +625,13 @@ async function main() {
 
       <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;font-size:13px;line-height:1.6">
         <b>12h</b> — posta o <b>reel-*.mp4</b> nos Reels (legenda = item 1 abaixo)<br>
-        <b>15h</b> — story com a imagem <b>01-*-story.png</b> + legenda do item 1<br>
-        <b>18h</b> — story com <b>02-*-story.png</b> + legenda do item 2<br>
-        <b>20h</b> — post no feed com <b>01-*-feed.png</b> + legenda completa do item 1<br>
-        <b>21h</b> — stories <b>03 e 04 *-story.png</b> + legendas dos itens 3 e 4
+        ${kit.items
+          .map(
+            (it, i) =>
+              `<b>${[15, 18, 21, 21][i]}h</b> — story com <b>0${i + 1}-*-story.png</b> + legenda do item ${i + 1}`,
+          )
+          .join("<br>")}
+        <br><b>20h</b> — post no feed com <b>01-*-feed.png</b> + legenda completa do item 1
       </div>
 
       ${kit.items.map((it, i) => itemCard(it, i, ["REEL + STORY + FEED", "STORY", "STORY", "STORY"][i] ?? "STORY")).join("")}
