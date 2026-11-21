@@ -189,7 +189,7 @@ async function main() {
         clip = textClip(dir, `p${i}`, [
           { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
           ...(item.price != null
-            ? [{ text: formatPrice(item.price, item.currency), y: 1150, style: "Price" }]
+            ? [{ text: formatPrice(item.price, item.currency) ?? "", y: 1150, style: "Price" }]
             : []),
           { text: "LINK NA BIO", y: 1840, style: "Foot" },
         ]);
@@ -198,7 +198,7 @@ async function main() {
       clip = textClip(dir, `p${i}`, [
         { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
         ...(item.price != null
-          ? [{ text: formatPrice(item.price, item.currency), y: 1150, style: "Price" }]
+          ? [{ text: formatPrice(item.price, item.currency) ?? "", y: 1150, style: "Price" }]
           : []),
         { text: "LINK NA BIO", y: 1840, style: "Foot" },
       ]);
