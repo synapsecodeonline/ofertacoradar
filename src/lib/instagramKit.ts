@@ -5,6 +5,7 @@ import { instagramCaption } from "@/lib/instagram";
 export type KitItem = {
   id: number;
   title: string;
+  imageUrl: string | null;
   merchant: string | null;
   price: number | null;
   oldPrice: number | null;
@@ -64,6 +65,7 @@ export async function getInstagramKit(
     .map(({ p, clicks: c }) => ({
       id: p.id,
       title: p.title,
+      imageUrl: p.imageUrl,
       merchant: p.merchant,
       price: p.price,
       oldPrice: p.oldPrice,

@@ -32,15 +32,20 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // Cards para redes sociais: apenas usuários autenticados
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+  // Cards para redes sociais: usuários autenticados OU cron com chave
+  const cronKey = new URL(req.url).searchParams.get("key");
+  const isCron =
+    !!process.env.CRON_SECRET && cronKey === process.env.CRON_SECRET;
+  if (!isCron) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        return new Response("Login necessário", { status: 401 });
+      }
+    } catch {
       return new Response("Login necessário", { status: 401 });
     }
-  } catch {
-    return new Response("Login necessário", { status: 401 });
   }
 
   const { id } = await params;
