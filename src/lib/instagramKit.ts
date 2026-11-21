@@ -23,12 +23,10 @@ export type KitItem = {
 // Kit de ofertas para Instagram: mais clicadas nas ultimas 24h,
 // completando com maiores descontos. Compartilhado entre
 // /api/instagram/kit (JSON) e /admin/kit (pagina visual).
-export async function getInstagramKit(
-  count = 10,
-): Promise<{ generatedAt: string; siteUrl: string; items: KitItem[] }> {
+async function buildKit(count: number, takeMult: number) {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
-  const n = Math.min(20, Math.max(1, count));
+  const n = Math.min(200, Math.max(1, count));
 
   const clicks = await prisma.click.groupBy({
     by: ["productId"],
@@ -52,7 +50,7 @@ export async function getInstagramKit(
       ],
     },
     orderBy: { discountPct: "desc" },
-    take: n * 4,
+    take: n * takeMult,
   });
 
   const items: KitItem[] = candidates
@@ -90,4 +88,19 @@ export async function getInstagramKit(
     }));
 
   return { generatedAt: now.toISOString(), siteUrl: siteUrl(), items };
+}
+
+export function getInstagramKit(
+  count = 10,
+): Promise<{ generatedAt: string; siteUrl: string; items: KitItem[] }> {
+  const n = Math.min(20, Math.max(1, count));
+  return buildKit(n, 4);
+}
+
+// Pool amplo para o kit diario: precisa cobrir varias categorias
+// para o cronograma semanal ter ofertas de cada tema.
+export function getInstagramPool(
+  limit = 80,
+): Promise<{ generatedAt: string; siteUrl: string; items: KitItem[] }> {
+  return buildKit(limit, 4);
 }

@@ -10,6 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -17,7 +18,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getInstagramKit, type KitItem } from "../src/lib/instagramKit";
+import { getInstagramPool, type KitItem } from "../src/lib/instagramKit";
 import { formatPrice } from "../src/lib/format";
 import { canonicalCategory } from "../src/lib/categories";
 
@@ -46,7 +47,7 @@ function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4
     theme.cats.includes(canonicalCategory(it.category)),
   );
   const rest = items.filter((it) => !match.includes(it));
-  return [...match, ...rest].slice(0, n);
+  return { items: [...match, ...rest].slice(0, n), matched: match.length };
 }
 
 const require = createRequire(import.meta.url);
@@ -137,12 +138,13 @@ const MUSIC_URL =
 // Grade cinematico: contraste/saturacao, grao sutil e vinheta.
 const GRADE = "eq=contrast=1.06:saturation=1.12,noise=alls=5:allf=t,vignette=angle=PI/4.5";
 
-// Audio de fundo: fatia da musica no offset do clip (ou silencio)
+// Audio de fundo: fatia continua da musica no offset do clip
+// (ou silencio). Duracao exata do clip para o xfade alinhar.
 function audioInput(music: string | null, offsetS: number): string[] {
   if (!music) {
-    return ["-f", "lavfi", "-t", "4.5", "-i", "anullsrc=r=44100:cl=stereo"];
+    return ["-f", "lavfi", "-t", String(CLIP_S), "-i", "anullsrc=r=44100:cl=stereo"];
   }
-  return ["-ss", String(offsetS), "-t", "4.5", "-i", music];
+  return ["-ss", String(offsetS), "-t", String(CLIP_S), "-i", music];
 }
 
 function audioMap(vol: number) {
@@ -160,9 +162,9 @@ function textClip(
   const ass = assFile(dir, name, events);
   const out = join(dir, `${name}.mp4`);
   run([
-    "-f", "lavfi", "-t", String(CLIP_S + 0.3), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
     ...audioInput(music, offsetS),
-    "-vf", `subtitles=${ass},${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p`,
+    "-vf", `subtitles=${ass},fps=30,${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p`,
     "-map", "0:v", "-map", "1:a",
     ...audioMap(0.2),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
@@ -199,14 +201,14 @@ function productClip(
   // zoompan gera o proprio movimento (Ken Burns) — zoom sutil de 1.0 a ~1.12
   run([
     "-i", imgPath,
-    "-f", "lavfi", "-t", String(CLIP_S + 0.3), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
     ...audioInput(music, offsetS),
     "-filter_complex",
     `[0:v]scale=1760:-2:force_original_aspect_ratio=decrease,` +
       `zoompan=z='min(1+0.0012*on,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
       `d=${CLIP_S * 30}:s=880x1100:fps=30[prod];` +
-      `[1:v][prod]overlay=(W-w)/2:390:shortest=1[v0];` +
-      `[v0]subtitles=${ass},${GRADE},` +
+      `[1:v][prod]overlay=(W-w)/2:390:shortest=1,` +
+      `fps=30,subtitles=${ass},${GRADE},` +
       `fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
     "-map", "[vout]", "-map", "2:a",
     ...audioMap(0.22),
@@ -226,20 +228,68 @@ function cardClip(
   offsetS: number,
 ) {
   const out = join(dir, `${name}.mp4`);
+  // zoompan em 2x + downscale = Ken Burns sem jitter (zoompan em
+  // resolucao final produz tremido; renderizar grande e reduzir
+  // suaviza o movimento).
   run([
     "-i", cardPath,
     ...audioInput(music, offsetS),
     "-filter_complex",
     `[0:v]scale=2160:3840:force_original_aspect_ratio=decrease,` +
       `zoompan=z='min(1+0.0012*on,1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-      `d=${CLIP_S * 30}:s=${W}x${H}:fps=30,` +
-      `${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
+      `d=${CLIP_S * 30}:s=2160x3840:fps=30,` +
+      `scale=${W}:${H},${GRADE},fade=t=in:st=0:d=0.4,` +
+      `fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
     "-map", "[vout]", "-map", "1:a",
     ...audioMap(0.22),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
     "-c:a", "aac", "-shortest", out,
   ]);
   return out;
+}
+
+// Transicao entre clips: fade elegante de 0.5s. xfade exige mesmo
+// fps/resolucao/pixfmt/timebase — por isso todos os clips sao
+// normalizados para 1080x1920@30fps yuv420p.
+const XFADE_S = 0.5;
+
+function assembleReel(dir: string, clips: string[], reelPath: string) {
+  const n = clips.length;
+  const total = n * CLIP_S - (n - 1) * XFADE_S;
+  const args: string[] = [];
+  for (const c of clips) args.push("-i", c);
+
+  // Normaliza cada input: timebase, fps, pixfmt, audio 44.1k
+  let fc = "";
+  for (let i = 0; i < n; i++) {
+    fc += `[${i}:v]settb=AVTB,fps=30,format=yuv420p,setsar=1[v${i}];`;
+    fc += `[${i}:a]aresample=44100[a${i}];`;
+  }
+  let prevV = "v0";
+  let prevA = "a0";
+  let dur = CLIP_S;
+  for (let i = 1; i < n; i++) {
+    const off = (dur - XFADE_S).toFixed(2);
+    fc += `[${prevV}][v${i}]xfade=transition=fade:duration=${XFADE_S}:offset=${off}[vx${i}];`;
+    fc += `[${prevA}][a${i}]acrossfade=d=${XFADE_S}:c1=tri:c2=tri[ax${i}];`;
+    prevV = `vx${i}`;
+    prevA = `ax${i}`;
+    dur += CLIP_S - XFADE_S;
+  }
+  // Barra de progresso no topo — detalhe que dá ar profissional
+  fc +=
+    `[${prevV}]drawbox=x=0:y=0:w='min(t/${total.toFixed(2)}*${W}\\,${W})':h=10:` +
+    `color=0x34d399:t=fill,format=yuv420p[vout];` +
+    `[${prevA}]alimiter=limit=0.95[aout]`;
+
+  run([
+    ...args,
+    "-filter_complex", fc,
+    "-map", "[vout]", "-map", "[aout]",
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+    "-t", total.toFixed(2), reelPath,
+  ]);
 }
 
 // Cronograma de postagem — horarios de pico do publico de ofertas
@@ -306,9 +356,24 @@ function slug(s: string) {
 
 async function main() {
   console.log("Gerando kit diario...");
+  const dia = DIAS[new Date().getDay()];
   const theme = themeOf();
-  const pool = await getInstagramKit(12);
-  const items = pickForTheme(pool.items, theme, 4);
+  const pool = await getInstagramPool(80);
+  const picked = pickForTheme(pool.items, theme, 4);
+  let items = picked.items;
+
+  // Se o tema do dia tem menos de 2 ofertas no catalogo, e melhor
+  // ser honesto: vira "achadinhos" (maiores descontos) em vez de
+  // rotular almofada como "esporte".
+  const matched = picked.matched;
+  let themeUsed = theme;
+  let themeNote = "";
+  if (matched < 2) {
+    themeUsed = { dia, ...THEMES[0] };
+    items = pool.items.slice(0, 4);
+    themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
+    console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
+  }
   if (items.length === 0) {
     console.log("Nenhuma oferta valida hoje — kit vazio.");
     return;
@@ -318,10 +383,21 @@ async function main() {
   const dir = mkdtempSync(join(tmpdir(), "kit-"));
   mkdirSync(OUT_DIR, { recursive: true });
 
-  // Musica de fundo (uma vez por execucao)
-  const musicPath = join(dir, "music.mp3");
-  const music = (await download(MUSIC_URL, musicPath)) ? musicPath : null;
-  if (!music) console.log("Musica indisponivel — reel sai sem fundo.");
+  // Musica de fundo: cache local (kit-out/music.mp3) para nao
+  // depender de download a cada execucao / rate limit do Commons.
+  // KIT_MUSIC_URL permite trocar a faixa via env.
+  const musicCache = join(OUT_DIR, "music.mp3");
+  const musicUrl = process.env.KIT_MUSIC_URL ?? MUSIC_URL;
+  let music: string | null = existsSync(musicCache) ? musicCache : null;
+  if (!music) {
+    const tmp = join(dir, "music.mp3");
+    if (await download(musicUrl, tmp)) {
+      writeFileSync(musicCache, readFileSync(tmp));
+      music = musicCache;
+    } else {
+      console.log("Musica indisponivel — reel sai sem fundo.");
+    }
+  }
 
   // 1) Clips do reel — cada clip recebe uma fatia da musica (offset)
   const clips: string[] = [];
@@ -331,8 +407,8 @@ async function main() {
       "intro",
       [
         { text: "OFERTAÇO RADAR", y: 740, style: "Big" },
-        { text: theme.nome, y: 920, style: "Sub" },
-        { text: theme.sub.toUpperCase(), y: 1010, style: "Url" },
+        { text: themeUsed.nome, y: 920, style: "Sub" },
+        { text: themeUsed.sub.toUpperCase(), y: 1010, style: "Url" },
         { text: "OFERTAS VERIFICADAS TODO DIA", y: 1120, style: "Url" },
       ],
       music,
@@ -422,13 +498,14 @@ async function main() {
     ),
   );
 
-  // 3) Concatena o reel
-  const listFile = join(dir, "concat.txt");
-  writeFileSync(listFile, clips.map((c) => `file '${c}'`).join("\n"));
+  // 3) Monta o reel com transicoes xfade (fade elegante entre cenas)
   const reelPath = join(dir, "reel.mp4");
   try {
-    run(["-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", reelPath]);
-  } catch {
+    assembleReel(dir, clips, reelPath);
+  } catch (e) {
+    console.log("xfade falhou, usando concat:", String(e).slice(0, 160));
+    const listFile = join(dir, "concat.txt");
+    writeFileSync(listFile, clips.map((c) => `file '${c}'`).join("\n"));
     run([
       "-f", "concat", "-safe", "0", "-i", listFile,
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
@@ -486,8 +563,9 @@ async function main() {
 
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#18181b">
-      <h1 style="color:#059669;margin-bottom:4px">${theme.dia} — ${theme.nome}</h1>
-      <p style="color:#71717a;font-size:13px;margin-top:0">${theme.sub}. Siga a ordem abaixo — imagens/vídeo anexos.</p>
+      <h1 style="color:#059669;margin-bottom:4px">${themeUsed.dia} — ${themeUsed.nome}</h1>
+      <p style="color:#71717a;font-size:13px;margin-top:0">${themeUsed.sub}. Siga a ordem abaixo — imagens/vídeo anexos.</p>
+      ${themeNote ? `<p style="color:#b45309;font-size:12px;background:#fffbeb;border-radius:8px;padding:8px 10px">${themeNote}</p>` : ""}
 
       <div style="background:#f4f4f5;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:12px;color:#52525b;line-height:1.7">
         <b>Cronograma da semana:</b> ${semana}
@@ -505,7 +583,9 @@ async function main() {
 
       <p style="color:#71717a;font-size:12px;margin-top:16px">
         Nos stories, use o sticker de link apontando pra página do produto (converte mais que "link na bio").
-        As ofertas não expiram — pode repostar as que performarem melhor.
+        As ofertas não expiram — pode repostar as que performarem melhor.<br><br>
+        <b>🎵 Música:</b> se o reel vier sem áudio, na hora de postar escolha um som em alta
+        (botão "áudio" na tela do reel) — música trending ajuda o algoritmo a distribuir.
       </p>
     </div>`;
 
@@ -518,7 +598,7 @@ async function main() {
     body: JSON.stringify({
       from: process.env.RESEND_FROM ?? "Ofertaço Radar <onboarding@resend.dev>",
       to: to.split(",").map((e) => e.trim()).filter(Boolean),
-      subject: `${theme.dia} — ${theme.nome} · ${kit.items.length} ofertas`,
+      subject: `${themeUsed.dia} — ${themeUsed.nome} · ${kit.items.length} ofertas`,
       html,
       attachments,
     }),
