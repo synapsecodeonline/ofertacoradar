@@ -10,7 +10,8 @@
       `RESEND_FROM=kit@ofertacoradar.com.br`.
 - [x] ~~Domínio próprio~~ — `ofertacoradar.com.br` + `www` na Vercel
       com SSL ativo; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
-      verificado (falta só submeter o sitemap no painel).
+      verificado e sitemap processado (dividido em índice + 23
+      sub-sitemaps de 1000 URLs).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.
