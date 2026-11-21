@@ -295,7 +295,7 @@ async function main() {
     },
     body: JSON.stringify({
       from: process.env.RESEND_FROM ?? "Ofertaço Radar <onboarding@resend.dev>",
-      to: [to],
+      to: to.split(",").map((e) => e.trim()).filter(Boolean),
       subject: `Kit do dia — ${kit.items.length} ofertas (${new Date().toLocaleDateString("pt-BR")})`,
       html,
       attachments,
