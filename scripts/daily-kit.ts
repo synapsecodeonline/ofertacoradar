@@ -145,6 +145,51 @@ function productClip(dir: string, name: string, item: KitItem, imgPath: string) 
   return out;
 }
 
+// Cronograma de postagem — horarios de pico do publico de ofertas
+// no Brasil (almoco ~12h, fim de tarde ~18h, noite ~20-21h).
+function buildCronograma(items: KitItem[]): string {
+  const [a, b, c, d] = items;
+  const L: string[] = [
+    "CRONOGRAMA DE POSTAGEM — Kit do dia",
+    "=====================================",
+    "",
+    "REGRA DE OURO: nao poste tudo de uma vez.",
+    "Espalhe ao longo do dia — cada post e um toque novo",
+    "no algoritmo e mais uma chance de clique.",
+    "",
+    "12h00  REELS (arquivo reel-*.mp4)",
+    "       -> posta nos Reels E no feed (o reel aparece nos dois)",
+    "       -> legenda: item 1 do legendas.txt",
+    "       -> e o formato que mais alcanca gente nova",
+    "",
+    "15h00  STORY 1",
+    "       -> imagem: 01-*-story.png",
+    "       -> legenda do item 1 nos stories",
+    "       -> sticker de link: https://ofertacoradar.vercel.app/produto/" + a.id,
+    "",
+    "18h00  STORY 2",
+    "       -> imagem: 02-*-story.png",
+    "       -> legenda do item 2",
+    "",
+    "20h00  POST FEED",
+    "       -> imagem: 01-*-feed.png (card quadrado)",
+    "       -> legenda completa do item 1 (a melhor oferta do dia)",
+    "       -> esse post fica no perfil — e vitrine permanente",
+    "",
+    "21h00  STORY 3 + 4",
+    "       -> imagens: 03 e 04 *-story.png",
+    "       -> legendas dos itens 3 e 4",
+    "       -> feche o dia lembrando: LINK NA BIO",
+    "",
+    "DICA: nos stories use o sticker 'link' apontando direto",
+    "para a pagina do produto — converte mais que 'link na bio'.",
+  ];
+  if (b) L.push("", `Item 2 do dia: ${b.title}`);
+  if (c) L.push(`Item 3 do dia: ${c.title}`);
+  if (d) L.push(`Item 4 do dia: ${d.title}`);
+  return L.join("\n") + "\n";
+}
+
 function slug(s: string) {
   return s
     .normalize("NFD")
@@ -208,14 +253,21 @@ async function main() {
     }
     clips.push(clip);
 
-    // 2) Cards PNG (feed) via /api/card com chave do cron
+    // 2) Cards PNG (feed + story) via /api/card com chave do cron
     const key = process.env.CRON_SECRET ?? "";
-    const cardPath = join(dir, `card-${i}.png`);
-    if (await download(`${kit.siteUrl}/api/card/${item.id}?size=feed&key=${key}`, cardPath)) {
-      attachments.push({
-        filename: `${String(i + 1).padStart(2, "0")}-${slug(item.title)}-feed.png`,
-        content: readFileSync(cardPath).toString("base64"),
-      });
+    for (const size of ["feed", "story"] as const) {
+      const cardPath = join(dir, `card-${i}-${size}.png`);
+      if (
+        await download(
+          `${kit.siteUrl}/api/card/${item.id}?size=${size}&key=${key}`,
+          cardPath,
+        )
+      ) {
+        attachments.push({
+          filename: `${String(i + 1).padStart(2, "0")}-${slug(item.title)}-${size}.png`,
+          content: readFileSync(cardPath).toString("base64"),
+        });
+      }
     }
 
     captions.push(
@@ -254,9 +306,17 @@ async function main() {
     content: Buffer.from(captions.join("\n")).toString("base64"),
   });
 
+  // 5) Cronograma de postagem — formato que maximiza alcance
+  const cronograma = buildCronograma(kit.items);
+  attachments.push({
+    filename: "cronograma.txt",
+    content: Buffer.from(cronograma).toString("base64"),
+  });
+
   // 4) Copia tudo para kit-out (backup local)
   writeFileSync(join(OUT_DIR, reelName), readFileSync(reelPath));
   writeFileSync(join(OUT_DIR, "legendas.txt"), captions.join("\n"));
+  writeFileSync(join(OUT_DIR, "cronograma.txt"), cronograma);
   for (const a of attachments) {
     if (a.filename.endsWith(".png")) {
       writeFileSync(join(OUT_DIR, a.filename), Buffer.from(a.content, "base64"));
