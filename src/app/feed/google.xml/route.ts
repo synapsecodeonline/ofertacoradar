@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
+import { brandFromTitle } from "@/lib/brands";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,16 @@ export async function GET() {
   const items = products
     .map((p) => {
       const link = `${base}/produto/${p.id}`;
-      const price = `${p.price!.toFixed(2)} ${p.currency || "BRL"}`;
+      const cur = p.currency || "BRL";
+      // Semantica Google: price = preco cheio (oldPrice quando ha
+      // desconto), sale_price = preco promocional atual. Sem oldPrice,
+      // price ja e o valor cobrado.
+      const hasSale = !!(p.oldPrice && p.oldPrice > p.price!);
+      const regular = hasSale ? p.oldPrice! : p.price!;
+      const price = `${regular.toFixed(2)} ${cur}`;
+      const salePrice = `${p.price!.toFixed(2)} ${cur}`;
+      const brand =
+        brandFromTitle(p.title) ?? p.merchant ?? "Ofertaço Radar";
       return `    <item>
       <g:id>${p.id}</g:id>
       <title>${esc(p.title.slice(0, 150))}</title>
@@ -51,9 +61,9 @@ export async function GET() {
       <link>${esc(link)}</link>
       <g:image_link>${esc(p.imageUrl!)}</g:image_link>
       <g:price>${esc(price)}</g:price>
-      ${p.oldPrice && p.oldPrice > p.price! ? `<g:sale_price>${esc(price)}</g:sale_price>` : ""}
+      ${hasSale ? `<g:sale_price>${esc(salePrice)}</g:sale_price>` : ""}
       <g:availability>in_stock</g:availability>
-      <g:brand>${esc(p.merchant ?? "Ofertaço Radar")}</g:brand>
+      <g:brand>${esc(brand)}</g:brand>
       <g:product_type>${esc(p.category ?? "ofertas")}</g:product_type>
       ${p.couponCode ? `<g:coupon_code>${esc(p.couponCode)}</g:coupon_code>` : ""}
       <g:condition>new</g:condition>

@@ -26,6 +26,7 @@ import {
 } from "../src/lib/instagramKit";
 import { formatPrice } from "../src/lib/format";
 import { canonicalCategory } from "../src/lib/categories";
+import { KNOWN_BRANDS } from "../src/lib/brands";
 
 // Cronograma semanal: cada dia tem um tema que guia a selecao das
 // ofertas e o texto do reel/email. getDay(): 0=dom ... 6=sab.
@@ -152,53 +153,6 @@ function recordSent(items: KitItem[]) {
 const MIN_DISC = 10;
 const hasRealDiscount = (it: KitItem) => (it.discountPct ?? 0) >= MIN_DISC;
 
-// Marcas que o publico brasileiro reconhece na hora — produto de
-// marca conhecida converte mais que white-label pelo mesmo desconto.
-// Testa titulo + merchant; palavra inteira para nao pegar "nike" em
-// "caneca niketinha".
-const KNOWN_BRANDS = new RegExp(
-  "\\b(" +
-    [
-      // tech
-      "samsung", "apple", "iphone", "ipad", "macbook", "airpods", "motorola",
-      "xiaomi", "redmi", "poco", "realme", "nokia", "intelbras", "positivo",
-      "sony", "jbl", "philips", "logitech", "razer", "hyperx", "redragon",
-      "canon", "nikon", "gopro", "dji", "anker", "baseus", "ugreen", "elgato",
-      // games
-      "nintendo", "switch", "playstation", "ps5", "ps4", "xbox", "steam",
-      // esporte
-      "nike", "adidas", "puma", "fila", "mizuno", "asics", "olympikus",
-      "lacoste", "hurley", "quiksilver", "oakley", "vans", "converse",
-      "new balance", "kappa", "umbro", "topper", "diadora", "skechers",
-      "under armour", "havaianas", "ipanema", "melissa", "rider",
-      // casa/eletro
-      "philips", "braun", "elgin", "britania", "continental", "tramontina",
-      "lavo", "oxford", "midea", "consul", "brastemp", "electrolux", "arno",
-      "oster", "philco", "euro", "lorenzetti", "docol", "hydra", "fischer",
-      "multilaser", "tcl", "aoc", "lenovo", "dell", "acer",
-      // moda/varejo
-      "renner", "riachuelo", "c&a", "marisa", "forever 21", "zara",
-      "lee", "wrangler", "timberland", "champion", "cea", "mormaii",
-      "colcci", "animale", "doktor", "aramis", "hering",
-      // beleza
-      "natura", "avon", "boticario", "eudora", "quem disse berenice",
-      "dailus", "marcelo", "lancaster", "olay", "nivea", "dove", "seda",
-      "pantene", "johnson", "needs", "viella", "vult", "bruna tavares",
-      "haskell", "marcelo beauty", "vizzela", "ambiderm", "golde",
-      // alimentacao/bebidas
-      "heineken", "skol", "brahma", "antartica", "guarana", "itambe",
-      "parmalat", "nestle", "danone", "coca", "pepsi", "del valle",
-      "tang", "fanta", "sprite", "mineirinho", "aquarius", "gatorade",
-      "monster", "red bull", "tnt", "fusion", "integral medica",
-      // pets
-      "pedigree", "whiskas", "friskies", "purina", "royal canin",
-      "premier", "catier", "nobit", "premier pet",
-      // bebe
-      "johnson", "pampers", "huggies", "tommee", "chicco", "philips avent",
-    ].join("|") +
-    ")\\b",
-  "i",
-);
 const isKnownBrand = (it: KitItem) =>
   KNOWN_BRANDS.test(`${it.title} ${it.merchant ?? ""}`);
 
