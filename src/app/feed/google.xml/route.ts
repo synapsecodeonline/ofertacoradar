@@ -9,6 +9,10 @@ export const dynamic = "force-dynamic";
 // Link aponta para /produto/[id] (pagina canonica com CTA de afiliado).
 const esc = (s: string) =>
   s
+    // Remove chars de controle invalidos em XML 1.0 (bell, etc.) —
+    // titles/descricoes de feeds de afiliado trazem lixo que quebra
+    // o parse do Merchant Center.
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
