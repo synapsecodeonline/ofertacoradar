@@ -28,6 +28,9 @@ const W = 1080;
 const H = 1920;
 const CLIP_S = 4;
 const OUT_DIR = join(process.cwd(), "kit-out");
+// siteUrl() cairia em localhost fora da Vercel — forca o dominio real
+// para links dos cards/legendas e download dos PNGs.
+process.env.NEXT_PUBLIC_SITE_URL ??= "https://ofertacoradar.vercel.app";
 
 // ASS: cores em &HAABBGGRR. Styles usados nos eventos.
 const STYLES = `

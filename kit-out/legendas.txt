@@ -9,7 +9,7 @@ De R$ 5.651 por apenas R$ 996,67 na Sofá na Caixa.
 .
 
 #sofanacaixa #textilcama #oferta #desconto #promocao
-Link: http://localhost:3000/produto/118828
+Link: https://ofertacoradar.vercel.app/produto/118828
 
 === 2. Kit 4 Almofadas Tecido Bouclé - Cor Verde Musgo - 45x45cm ===
 🔥 82% OFF em Kit 4 Almofadas Tecido Bouclé - Cor Verde Musgo - 45x45cm!
@@ -22,7 +22,7 @@ De R$ 5.651 por apenas R$ 996,67 na Sofá na Caixa.
 .
 
 #sofanacaixa #textilcama #oferta #desconto #promocao
-Link: http://localhost:3000/produto/118832
+Link: https://ofertacoradar.vercel.app/produto/118832
 
 === 3. Kit 4 Almofadas Tecido Bouclé - Cor Azul - 45x45cm ===
 🔥 82% OFF em Kit 4 Almofadas Tecido Bouclé - Cor Azul - 45x45cm!
@@ -35,7 +35,7 @@ De R$ 5.651 por apenas R$ 996,67 na Sofá na Caixa.
 .
 
 #sofanacaixa #textilcama #oferta #desconto #promocao
-Link: http://localhost:3000/produto/118815
+Link: https://ofertacoradar.vercel.app/produto/118815
 
 === 4. Kit 4 Almofada Tecido Côtelé Prime - Cor Linho - 45x45cm ===
 🔥 82% OFF em Kit 4 Almofada Tecido Côtelé Prime - Cor Linho - 45x45cm!
@@ -48,4 +48,4 @@ De R$ 5.651 por apenas R$ 996,67 na Sofá na Caixa.
 .
 
 #sofanacaixa #textilcama #oferta #desconto #promocao
-Link: http://localhost:3000/produto/118792
+Link: https://ofertacoradar.vercel.app/produto/118792
