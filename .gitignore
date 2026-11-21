@@ -48,3 +48,4 @@ img.png
 
 # logs do cron local
 logs/
+kit-out/
