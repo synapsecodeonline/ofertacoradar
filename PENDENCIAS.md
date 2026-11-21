@@ -5,16 +5,12 @@
 
 ## ⏳ Dependem de ação sua / terceiros
 
-- [x] ~~Conta Resend~~ — conta `noletodasilvaa@gmail.com` criada e
-      testada (envia só para si mesma no plano free). Conta ativa
-      atual: `synapsecode.online@gmail.com`. Envio para múltiplos
-      destinatários depende do item "Domínio no Resend" abaixo.
-- [ ] **Domínio no Resend** — `ofertacoradar.com.br` já está na Vercel e
-      como `NEXT_PUBLIC_SITE_URL`. Falta: (a) DNS no registro.br
-      (A @ → 216.198.79.1 e 64.29.17.1; CNAME www → cname.vercel-dns.com);
-      (b) adicionar o domínio em resend.com/domains e copiar os
-      registros DKIM/SPF pro DNS. Depois disso o envio libera para
-      qualquer destinatário e o remetente vira `kit@ofertacoradar.com.br`.
+- [x] ~~Conta Resend~~ — domínio `ofertacoradar.com.br` verificado;
+      envio liberado para qualquer destinatário com
+      `RESEND_FROM=kit@ofertacoradar.com.br`.
+- [x] ~~Domínio próprio~~ — `ofertacoradar.com.br` + `www` na Vercel
+      com SSL ativo; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
+      verificado (falta só submeter o sitemap no painel).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.
