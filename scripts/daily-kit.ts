@@ -115,14 +115,14 @@ process.env.NEXT_PUBLIC_SITE_URL ??= "https://ofertacoradar.vercel.app";
 const STYLES = `
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Title,DejaVu Sans,58,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
-Style: Meta,DejaVu Sans,48,&H00E4F699,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
-Style: Price,DejaVu Sans,100,&H0034D399,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,40,40,0,1
-Style: Badge,DejaVu Sans,84,&H00FFFFFF,&H000000FF,&H002626DC,&H00000000,-1,0,0,0,100,100,0,0,3,22,0,5,40,40,0,1
-Style: Foot,DejaVu Sans,42,&H00FFFFFF,&H000000FF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,3,16,0,5,40,40,0,1
-Style: Big,DejaVu Sans,110,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,40,40,0,1
-Style: Sub,DejaVu Sans,56,&H00E4F699,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
-Style: Url,DejaVu Sans,52,&H00E4F699,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
+Style: Title,Ubuntu Sans,58,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
+Style: Meta,Ubuntu Sans,48,&H00E4F699,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
+Style: Price,Ubuntu Sans,100,&H0034D399,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,40,40,0,1
+Style: Badge,Ubuntu Sans,84,&H00FFFFFF,&H000000FF,&H002626DC,&H00000000,-1,0,0,0,100,100,0,0,3,22,0,5,40,40,0,1
+Style: Foot,Ubuntu Sans,42,&H00FFFFFF,&H000000FF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,3,16,0,5,40,40,0,1
+Style: Big,Ubuntu Sans,110,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,40,40,0,1
+Style: Sub,Ubuntu Sans,56,&H00E4F699,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
+Style: Url,Ubuntu Sans,52,&H00E4F699,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,2,1,5,40,40,0,1
 `;
 
 type Ev = { text: string; y: number; style: string };
@@ -180,9 +180,50 @@ function wrap(text: string, max: number): string[] {
 }
 
 // Musica de fundo: Funky Souls (Amarià) — CC-BY 3.0, via Wikimedia Commons.
-// Baixada uma vez por execucao; se falhar, o reel sai sem musica.
 const MUSIC_URL =
   "https://commons.wikimedia.org/wiki/Special:Redirect/file/Amari%C3%A0_-_Funky_Souls_(2019).mp3";
+
+// Pad sintetico: acorde de La maior sustenido suave — fallback que
+// garante audio no reel mesmo se a musica falhar E a sintese tambem
+// (improvavel, mas e gerada localmente pelo proprio ffmpeg).
+function synthPad(path: string, durS: number) {
+  run([
+    "-f", "lavfi", "-t", String(durS), "-i",
+    "aevalsrc=0.10*sin(2*PI*220*t)+0.07*sin(2*PI*277.18*t)+0.06*sin(2*PI*329.63*t)+0.04*sin(2*PI*440*t):s=44100",
+    "-af", "lowpass=f=1400,volume=0.9,afade=t=in:st=0:d=1.5,afade=t=out:st=" + (durS - 2).toFixed(1) + ":d=2",
+    "-c:a", "libmp3lame", "-q:a", "4", path,
+  ]);
+}
+
+// Garante que existe arquivo de audio utilizavel: cache -> download
+// -> pad sintetico. Nunca devolve null — reel sempre sai com som.
+async function ensureMusic(dir: string): Promise<string> {
+  const cache = join(OUT_DIR, "music.mp3");
+  if (existsSync(cache)) return cache;
+  const url = process.env.KIT_MUSIC_URL ?? MUSIC_URL;
+  const tmp = join(dir, "music.mp3");
+  if (await download(url, tmp)) {
+    writeFileSync(cache, readFileSync(tmp));
+    return cache;
+  }
+  console.log("Musica indisponivel — gerando pad sintetico de fallback.");
+  synthPad(cache, 60);
+  return cache;
+}
+
+// Verifica se o MP4 final tem stream de audio (protecao contra
+// regressao: reel mudo nao pode sair no email).
+function reelHasAudio(path: string): boolean {
+  try {
+    const out = execFileSync(ffmpegPath, ["-hide_banner", "-i", path], {
+      stdio: "pipe",
+    });
+    return /Audio:/.test(String(out));
+  } catch (e) {
+    // ffmpeg -i sai com codigo 1 mas imprime as streams no stderr
+    return /Audio:/.test(String((e as { stderr?: Buffer }).stderr ?? ""));
+  }
+}
 
 // Grade cinematico: contraste/saturacao, grao sutil e vinheta.
 const GRADE = "eq=contrast=1.06:saturation=1.12,noise=alls=5:allf=t,vignette=angle=PI/4.5";
@@ -200,21 +241,32 @@ function audioMap(vol: number) {
   return ["-af", `volume=${vol}`];
 }
 
-// Clip de texto puro (intro/outro)
+// Clip de texto puro (intro/outro). Com logoPath, sobrepoe a marca
+// no topo — o logo tem fundo escuro que casa com o teal do fundo.
 function textClip(
   dir: string,
   name: string,
   events: Ev[],
   music: string | null,
   offsetS: number,
+  logoPath?: string,
 ) {
   const ass = assFile(dir, name, events);
   const out = join(dir, `${name}.mp4`);
-  run([
+  const args = [
     "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
-    ...audioInput(music, offsetS),
-    "-vf", `subtitles=${ass},fps=30,${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p`,
-    "-map", "0:v", "-map", "1:a",
+  ];
+  if (logoPath) args.push("-loop", "1", "-t", String(CLIP_S), "-i", logoPath);
+  const audioIdx = logoPath ? 2 : 1;
+  args.push(...audioInput(music, offsetS));
+  const grade = `subtitles=${ass},fps=30,${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p`;
+  const vf = logoPath
+    ? `[1:v]scale=230:-1,format=yuv420p[lg];[0:v][lg]overlay=(W-w)/2:190[base];[base]${grade}[vout]`
+    : `[0:v]${grade}[vout]`;
+  run([
+    ...args,
+    "-filter_complex", vf,
+    "-map", "[vout]", "-map", `${audioIdx}:a`,
     ...audioMap(0.2),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-shortest", out,
@@ -404,8 +456,13 @@ function slug(s: string) {
 
 async function main() {
   console.log("Gerando kit diario...");
-  const dia = DIAS[new Date().getDay()];
-  const theme = themeOf();
+  // KIT_THEME_DAY (0-6) forca um tema — usado em testes para validar
+  // que o material de outro dia chega condizente.
+  const themeDay = process.env.KIT_THEME_DAY
+    ? Number(process.env.KIT_THEME_DAY)
+    : new Date().getDay();
+  const dia = DIAS[themeDay];
+  const theme = { dia, ...THEMES[themeDay] };
   // Pool tematico busca direto no banco por categoria canonica —
   // o pool geral (top por cliques/desconto) nao alcanca nichos.
   const [pool, themedRaw] = await Promise.all([
@@ -443,36 +500,27 @@ async function main() {
   const dir = mkdtempSync(join(tmpdir(), "kit-"));
   mkdirSync(OUT_DIR, { recursive: true });
 
-  // Musica de fundo: cache local (kit-out/music.mp3) para nao
-  // depender de download a cada execucao / rate limit do Commons.
-  // KIT_MUSIC_URL permite trocar a faixa via env.
-  const musicCache = join(OUT_DIR, "music.mp3");
-  const musicUrl = process.env.KIT_MUSIC_URL ?? MUSIC_URL;
-  let music: string | null = existsSync(musicCache) ? musicCache : null;
-  if (!music) {
-    const tmp = join(dir, "music.mp3");
-    if (await download(musicUrl, tmp)) {
-      writeFileSync(musicCache, readFileSync(tmp));
-      music = musicCache;
-    } else {
-      console.log("Musica indisponivel — reel sai sem fundo.");
-    }
-  }
+  // Musica de fundo: cache local -> download -> pad sintetico.
+  // Nunca null: o reel sempre sai com faixa de audio.
+  const music = await ensureMusic(dir);
 
   // 1) Clips do reel — cada clip recebe uma fatia da musica (offset)
+  const logoPath = join(process.cwd(), "assets", "logo.jpeg");
+  const logo = existsSync(logoPath) ? logoPath : undefined;
   const clips: string[] = [];
   clips.push(
     textClip(
       dir,
       "intro",
       [
-        { text: "OFERTAÇO RADAR", y: 740, style: "Big" },
-        { text: themeUsed.nome, y: 920, style: "Sub" },
-        { text: themeUsed.sub.toUpperCase(), y: 1010, style: "Url" },
-        { text: "OFERTAS VERIFICADAS TODO DIA", y: 1120, style: "Url" },
+        { text: "OFERTAÇO RADAR", y: 800, style: "Big" },
+        { text: themeUsed.nome, y: 980, style: "Sub" },
+        { text: themeUsed.sub.toUpperCase(), y: 1070, style: "Url" },
+        { text: "OFERTAS VERIFICADAS TODO DIA", y: 1160, style: "Url" },
       ],
       music,
       0,
+      logo,
     ),
   );
 
@@ -550,11 +598,12 @@ async function main() {
       dir,
       "outro",
       [
-        { text: "LINK NA BIO", y: 800, style: "Big" },
-        { text: "ofertacoradar.vercel.app/ofertas", y: 990, style: "Url" },
+        { text: "LINK NA BIO", y: 860, style: "Big" },
+        { text: "ofertacoradar.vercel.app/ofertas", y: 1050, style: "Url" },
       ],
       music,
       (kit.items.length + 1) * CLIP_S,
+      logo,
     ),
   );
 
@@ -571,6 +620,21 @@ async function main() {
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
       "-pix_fmt", "yuv420p", "-c:a", "aac", reelPath,
     ]);
+  }
+
+  // Protecao final: o reel TEM que ter audio. Se a montagem perdeu
+  // a trilha por qualquer motivo, remuxa com uma faixa silenciosa —
+  // melhor mudo controlado do que stream de audio corrompido.
+  if (!reelHasAudio(reelPath)) {
+    console.log("Reel sem audio detectado — remedindo com faixa silenciosa.");
+    const fixed = join(dir, "reel-fixed.mp4");
+    run([
+      "-i", reelPath,
+      "-f", "lavfi", "-t", "30", "-i", "anullsrc=r=44100:cl=stereo",
+      "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
+      "-shortest", fixed,
+    ]);
+    writeFileSync(reelPath, readFileSync(fixed));
   }
 
   const reelName = `reel-${new Date().toISOString().slice(0, 10)}.mp4`;
