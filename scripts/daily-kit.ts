@@ -83,9 +83,16 @@ function familyKey(title: string): string {
 // Seleciona itens do tema do dia — APENAS os verificados por
 // categoria+titulo (o kit nunca mistura tema com oferta aleatoria).
 // Dedup por familia evita 4 versoes do mesmo produto (ex: meião).
+// Piso de desconto para o kit: abaixo de 10% nao e "oferta" para o
+// publico (markdown de 3-5% parece preco normal). O pool geral
+// (KIT_WHERE) aceita >0 para o admin; o kit diario exige >=10.
+const MIN_DISC = 10;
+const hasRealDiscount = (it: KitItem) => (it.discountPct ?? 0) >= MIN_DISC;
+
 function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4) {
   const match = items.filter(
     (it) =>
+      hasRealDiscount(it) &&
       theme.cats.includes(canonicalCategory(it.category)) &&
       theme.re.test(it.title) &&
       !theme.veto?.test(it.title),
@@ -384,37 +391,43 @@ function cardClip(
 // normalizados para 1080x1920@30fps yuv420p.
 const XFADE_S = 0.5;
 
-function assembleReel(dir: string, clips: string[], reelPath: string) {
+function assembleReel(
+  dir: string,
+  clips: string[],
+  reelPath: string,
+  music: string,
+) {
   const n = clips.length;
   const total = n * CLIP_S - (n - 1) * XFADE_S;
   const args: string[] = [];
   for (const c of clips) args.push("-i", c);
+  // Audio: UMA faixa continua para o reel inteiro — nada de fatias
+  // por clipe (o acrossfade sobrepunha duas partes da musica e
+  // soava como corte). Entra como input extra no fim.
+  args.push("-ss", "0", "-t", total.toFixed(2), "-i", music);
 
-  // Normaliza cada input: timebase, fps, pixfmt, audio 44.1k
+  // Normaliza cada input de video: timebase, fps, pixfmt
   let fc = "";
   for (let i = 0; i < n; i++) {
     fc += `[${i}:v]settb=AVTB,fps=30,format=yuv420p,setsar=1[v${i}];`;
-    fc += `[${i}:a]aresample=44100[a${i}];`;
   }
   let prevV = "v0";
-  let prevA = "a0";
   let dur = CLIP_S;
   for (let i = 1; i < n; i++) {
     const off = (dur - XFADE_S).toFixed(2);
     fc += `[${prevV}][v${i}]xfade=transition=fade:duration=${XFADE_S}:offset=${off}[vx${i}];`;
-    fc += `[${prevA}][a${i}]acrossfade=d=${XFADE_S}:c1=tri:c2=tri[ax${i}];`;
     prevV = `vx${i}`;
-    prevA = `ax${i}`;
     dur += CLIP_S - XFADE_S;
   }
   // Barra de progresso no topo — detalhe que dá ar profissional
-  // dynaudnorm nivela o volume ao longo do reel: trechos quietos da
-  // musica sobem, trechos fortes descem — acaba o "corte" de audio.
-  // alimiter segura os picos depois da normalizacao.
   fc +=
     `[${prevV}]drawbox=x=0:y=0:w='min(t/${total.toFixed(2)}*${W}\\,${W})':h=10:` +
     `color=0x34d399:t=fill,format=yuv420p[vout];` +
-    `[${prevA}]dynaudnorm=f=250:g=15:m=6:p=0.9,alimiter=limit=0.9[aout]`;
+    // dynaudnorm nivela o volume; afade so nas pontas (entrada/saida
+    // suaves, miolo 100% linear — sem salto de volume no meio).
+    `[${n}:a]aresample=44100,atrim=duration=${total.toFixed(2)},asetpts=PTS-STARTPTS,` +
+    `volume=0.7,dynaudnorm=f=250:g=15:m=6:p=0.9,alimiter=limit=0.9,` +
+    `afade=t=in:st=0:d=0.8,afade=t=out:st=${(total - 1.5).toFixed(2)}:d=1.5[aout]`;
 
   run([
     ...args,
@@ -504,10 +517,12 @@ async function main() {
   ]);
   // Pool tematico traz falsos positivos do classificador — so
   // entram os que o titulo confirma o tema.
-  const themed = themedRaw.filter((it) => theme.re.test(it.title));
+  const themed = themedRaw.filter(
+    (it) => hasRealDiscount(it) && theme.re.test(it.title),
+  );
   const seen = new Set<number>();
   const combined = [...themed, ...pool.items].filter(
-    (it) => !seen.has(it.id) && seen.add(it.id),
+    (it) => hasRealDiscount(it) && !seen.has(it.id) && seen.add(it.id),
   );
   const picked = pickForTheme(combined, theme, 4);
   let items = picked.items;
@@ -520,7 +535,7 @@ async function main() {
   let themeNote = "";
   if (matched < 2) {
     themeUsed = { dia, ...THEMES[0] };
-    items = pool.items.slice(0, 4);
+    items = pool.items.filter(hasRealDiscount).slice(0, 4);
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
   }
@@ -645,15 +660,20 @@ async function main() {
   // 3) Monta o reel com transicoes xfade (fade elegante entre cenas)
   const reelPath = join(dir, "reel.mp4");
   try {
-    assembleReel(dir, clips, reelPath);
+    assembleReel(dir, clips, reelPath, music);
   } catch (e) {
     console.log("xfade falhou, usando concat:", String(e).slice(0, 160));
     const listFile = join(dir, "concat.txt");
     writeFileSync(listFile, clips.map((c) => `file '${c}'`).join("\n"));
+    // Fallback tambem usa a faixa continua — sem fatias de audio.
     run([
       "-f", "concat", "-safe", "0", "-i", listFile,
+      "-ss", "0", "-t", "30", "-i", music,
+      "-map", "0:v", "-map", "1:a",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
-      "-pix_fmt", "yuv420p", "-c:a", "aac", reelPath,
+      "-pix_fmt", "yuv420p", "-c:a", "aac",
+      "-af", "volume=0.7,dynaudnorm=f=250:g=15:m=6:p=0.9,alimiter=limit=0.9",
+      "-shortest", reelPath,
     ]);
   }
 
