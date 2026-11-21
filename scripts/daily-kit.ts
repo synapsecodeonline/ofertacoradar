@@ -269,7 +269,12 @@ const OUT_DIR = join(process.cwd(), "kit-out");
 const SENT_FILE = join(OUT_DIR, "sent.json");
 // siteUrl() cairia em localhost fora da Vercel — forca o dominio real
 // para links dos cards/legendas e download dos PNGs.
-process.env.NEXT_PUBLIC_SITE_URL ??= "https://ofertacoradar.vercel.app";
+process.env.NEXT_PUBLIC_SITE_URL ??= "https://ofertacoradar.com.br";
+// Host sem protocolo, para legendas gravadas no video (intro/outro).
+const SITE_HOST = process.env.NEXT_PUBLIC_SITE_URL!.replace(
+  /^https?:\/\//,
+  "",
+).replace(/\/$/, "");
 
 // ASS: cores em &HAABBGGRR. Styles usados nos eventos.
 const STYLES = `
@@ -483,7 +488,7 @@ function productClip(
     ...(disc !== null && disc > 0
       ? [{ text: `-${disc}% OFF`, y: 1660, style: "Badge" }]
       : []),
-    { text: "LINK NA BIO — ofertacoradar.vercel.app/ofertas", y: 1840, style: "Foot" },
+    { text: `LINK NA BIO — ${SITE_HOST}/ofertas`, y: 1840, style: "Foot" },
   ];
   const ass = assFile(dir, name, events);
 
@@ -846,7 +851,7 @@ async function main() {
       "outro",
       [
         { text: "LINK NA BIO", y: 860, style: "Big" },
-        { text: "ofertacoradar.vercel.app/ofertas", y: 1050, style: "Url" },
+        { text: `${SITE_HOST}/ofertas`, y: 1050, style: "Url" },
       ],
       music,
       (kit.items.length + 1) * CLIP_S,
