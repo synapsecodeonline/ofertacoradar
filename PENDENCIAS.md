@@ -39,8 +39,10 @@
 
 ## 📈 SEO / crescimento (backlog original)
 
-- [ ] **Google Shopping feed** — gerar XML/CSV de produtos para o
-      Merchant Center (comissão via links `/ir/` ou direto).
+- [x] **Google Shopping feed** — `/feed/google.xml` configurado no
+      Merchant Center (busca programada diária); ~20k produtos
+      aprovados. Acompanhar desaprovações por item e limpar feed
+      conforme o Google reportar.
 - [ ] **Search Console** — sitemap já existe; acompanhar indexação e
       corrigir páginas com erro.
 - [ ] **Páginas de categoria** — `/categoria/[slug]` já existe;
