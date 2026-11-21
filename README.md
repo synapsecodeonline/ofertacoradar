@@ -2,7 +2,7 @@
 
 Agregador brasileiro de **ofertas, cupons e produtos com links de afiliado** — Lomadee, Mercado Livre, Awin e Amazon. Catálogo ranqueado por desconto, com verificação contínua de disponibilidade, link e imagem. Foco em SEO, conversão e monetização via comissões.
 
-**Produção:** https://ofertacoradar.vercel.app · **Instagram:** https://instagram.com/ofertacoradar
+**Produção:** https://ofertacoradar.com.br · **Instagram:** https://instagram.com/ofertacoradar
 
 Além do site, o projeto gera automaticamente um **kit diário de divulgação para o Instagram** (reel + cards + legenda) enviado por email — ver seção dedicada abaixo.
 
