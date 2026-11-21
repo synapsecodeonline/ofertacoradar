@@ -190,6 +190,13 @@ function buildCronograma(items: KitItem[]): string {
   return L.join("\n") + "\n";
 }
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function slug(s: string) {
   return s
     .normalize("NFD")
@@ -301,17 +308,8 @@ async function main() {
     filename: reelName,
     content: readFileSync(reelPath).toString("base64"),
   });
-  attachments.push({
-    filename: "legendas.txt",
-    content: Buffer.from(captions.join("\n")).toString("base64"),
-  });
-
-  // 5) Cronograma de postagem — formato que maximiza alcance
+  // Cronograma de postagem — formato que maximiza alcance
   const cronograma = buildCronograma(kit.items);
-  attachments.push({
-    filename: "cronograma.txt",
-    content: Buffer.from(cronograma).toString("base64"),
-  });
 
   // 4) Copia tudo para kit-out (backup local)
   writeFileSync(join(OUT_DIR, reelName), readFileSync(reelPath));
@@ -332,19 +330,39 @@ async function main() {
     return;
   }
 
+  const itemCard = (it: KitItem, i: number, slot: string) => `
+    <div style="border:1px solid #e4e4e7;border-radius:12px;padding:16px;margin:12px 0">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#059669">${slot}</p>
+      <p style="margin:0 0 8px;font-size:15px;font-weight:800;color:#18181b">${i + 1}. ${it.title}</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#52525b">
+        ${it.price != null ? formatPrice(it.price, it.currency) : ""}
+        ${it.merchant ? ` · ${it.merchant}` : ""}
+        ${it.discountPct ? ` · <b style="color:#dc2626">-${it.discountPct}%</b>` : ""}
+      </p>
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#71717a">LEGENDA (copiar e colar):</p>
+      <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:#f4f4f5;border-radius:8px;padding:10px;margin:0 0 8px">${escapeHtml(it.caption)}</pre>
+      <p style="margin:0;font-size:12px"><a href="${it.pageUrl}" style="color:#059669">${it.pageUrl}</a></p>
+    </div>`;
+
   const html = `
-    <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-      <h1 style="color:#059669">Kit do dia — ${new Date().toLocaleDateString("pt-BR")}</h1>
-      <p>Anexo: <b>reel.mp4</b> pronto pra postar + ${kit.items.length} cards de feed + legendas.</p>
-      <ol>
-        ${kit.items
-          .map(
-            (it) =>
-              `<li><b>${it.title}</b> — ${it.price != null ? formatPrice(it.price, it.currency) : ""}</li>`,
-          )
-          .join("")}
-      </ol>
-      <p style="color:#71717a;font-size:12px">Poste o reel no Reels e os cards nos stories. Legendas em legendas.txt.</p>
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#18181b">
+      <h1 style="color:#059669;margin-bottom:4px">O que postar hoje — ${new Date().toLocaleDateString("pt-BR")}</h1>
+      <p style="color:#71717a;font-size:13px;margin-top:0">Siga a ordem abaixo. As imagens/vídeo estão anexos neste email.</p>
+
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;font-size:13px;line-height:1.6">
+        <b>12h</b> — posta o <b>reel-*.mp4</b> nos Reels (legenda = item 1 abaixo)<br>
+        <b>15h</b> — story com a imagem <b>01-*-story.png</b> + legenda do item 1<br>
+        <b>18h</b> — story com <b>02-*-story.png</b> + legenda do item 2<br>
+        <b>20h</b> — post no feed com <b>01-*-feed.png</b> + legenda completa do item 1<br>
+        <b>21h</b> — stories <b>03 e 04 *-story.png</b> + legendas dos itens 3 e 4
+      </div>
+
+      ${kit.items.map((it, i) => itemCard(it, i, ["REEL + STORY + FEED", "STORY", "STORY", "STORY"][i] ?? "STORY")).join("")}
+
+      <p style="color:#71717a;font-size:12px;margin-top:16px">
+        Nos stories, use o sticker de link apontando pra página do produto (converte mais que "link na bio").
+        As ofertas não expiram — pode repostar as que performarem melhor.
+      </p>
     </div>`;
 
   const r = await fetch("https://api.resend.com/emails", {
@@ -356,7 +374,7 @@ async function main() {
     body: JSON.stringify({
       from: process.env.RESEND_FROM ?? "Ofertaço Radar <onboarding@resend.dev>",
       to: to.split(",").map((e) => e.trim()).filter(Boolean),
-      subject: `Kit do dia — ${kit.items.length} ofertas (${new Date().toLocaleDateString("pt-BR")})`,
+      subject: `O que postar hoje — ${kit.items.length} ofertas (${new Date().toLocaleDateString("pt-BR")})`,
       html,
       attachments,
     }),
