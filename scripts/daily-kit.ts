@@ -101,7 +101,10 @@ const run = (args: string[]) =>
 
 async function download(url: string, dest: string): Promise<boolean> {
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(20_000),
+      headers: { "User-Agent": "OfertaçoRadar/1.0 (kit diario; synapsecode.online@gmail.com)" },
+    });
     if (!r.ok) return false;
     writeFileSync(dest, Buffer.from(await r.arrayBuffer()));
     return true;
@@ -126,23 +129,57 @@ function wrap(text: string, max: number): string[] {
   return lines.slice(0, 3);
 }
 
+// Musica de fundo: Funky Souls (Amarià) — CC-BY 3.0, via Wikimedia Commons.
+// Baixada uma vez por execucao; se falhar, o reel sai sem musica.
+const MUSIC_URL =
+  "https://commons.wikimedia.org/wiki/Special:Redirect/file/Amari%C3%A0_-_Funky_Souls_(2019).mp3";
+
+// Grade cinematico: contraste/saturacao, grao sutil e vinheta.
+const GRADE = "eq=contrast=1.06:saturation=1.12,noise=alls=5:allf=t,vignette=angle=PI/4.5";
+
+// Audio de fundo: fatia da musica no offset do clip (ou silencio)
+function audioInput(music: string | null, offsetS: number): string[] {
+  if (!music) {
+    return ["-f", "lavfi", "-t", "4.5", "-i", "anullsrc=r=44100:cl=stereo"];
+  }
+  return ["-ss", String(offsetS), "-t", "4.5", "-i", music];
+}
+
+function audioMap(vol: number) {
+  return ["-af", `volume=${vol}`];
+}
+
 // Clip de texto puro (intro/outro)
-function textClip(dir: string, name: string, events: Ev[]) {
+function textClip(
+  dir: string,
+  name: string,
+  events: Ev[],
+  music: string | null,
+  offsetS: number,
+) {
   const ass = assFile(dir, name, events);
   const out = join(dir, `${name}.mp4`);
   run([
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", "anullsrc=r=44100:cl=stereo",
-    "-vf", `subtitles=${ass}`,
+    "-f", "lavfi", "-t", String(CLIP_S + 0.3), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    ...audioInput(music, offsetS),
+    "-vf", `subtitles=${ass},${GRADE},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p`,
     "-map", "0:v", "-map", "1:a",
+    ...audioMap(0.2),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-shortest", out,
   ]);
   return out;
 }
 
-// Clip de produto: imagem central + legendas ASS
-function productClip(dir: string, name: string, item: KitItem, imgPath: string) {
+// Clip de produto: Ken Burns na imagem + legendas ASS + grade
+function productClip(
+  dir: string,
+  name: string,
+  item: KitItem,
+  imgPath: string,
+  music: string | null,
+  offsetS: number,
+) {
   const titleLines = wrap(item.title, 30);
   const price = item.price != null ? formatPrice(item.price, item.currency) : null;
   const disc = item.discountPct ?? null;
@@ -159,15 +196,20 @@ function productClip(dir: string, name: string, item: KitItem, imgPath: string) 
   const ass = assFile(dir, name, events);
 
   const out = join(dir, `${name}.mp4`);
+  // zoompan gera o proprio movimento (Ken Burns) — zoom sutil de 1.0 a ~1.12
   run([
-    "-loop", "1", "-framerate", "30", "-t", String(CLIP_S), "-i", imgPath,
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", `color=c=0x042f2e:s=${W}x${H}`,
-    "-f", "lavfi", "-t", String(CLIP_S), "-i", "anullsrc=r=44100:cl=stereo",
+    "-i", imgPath,
+    "-f", "lavfi", "-t", String(CLIP_S + 0.3), "-i", `color=c=0x042f2e:s=${W}x${H}`,
+    ...audioInput(music, offsetS),
     "-filter_complex",
-    `[0:v]scale=880:-2:force_original_aspect_ratio=decrease[prod];` +
-      `[1:v][prod]overlay=(W-w)/2:400[v0];` +
-      `[v0]subtitles=${ass},fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
+    `[0:v]scale=1760:-2:force_original_aspect_ratio=decrease,` +
+      `zoompan=z='min(1+0.0012*on,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
+      `d=${CLIP_S * 30}:s=880x1100:fps=30[prod];` +
+      `[1:v][prod]overlay=(W-w)/2:390:shortest=1[v0];` +
+      `[v0]subtitles=${ass},${GRADE},` +
+      `fade=t=in:st=0:d=0.4,fade=t=out:st=${CLIP_S - 0.4}:d=0.4,format=yuv420p[vout]`,
     "-map", "[vout]", "-map", "2:a",
+    ...audioMap(0.22),
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
     "-c:a", "aac", "-shortest", out,
   ]);
@@ -250,46 +292,54 @@ async function main() {
   const dir = mkdtempSync(join(tmpdir(), "kit-"));
   mkdirSync(OUT_DIR, { recursive: true });
 
-  // 1) Clips do reel
+  // Musica de fundo (uma vez por execucao)
+  const musicPath = join(dir, "music.mp3");
+  const music = (await download(MUSIC_URL, musicPath)) ? musicPath : null;
+  if (!music) console.log("Musica indisponivel — reel sai sem fundo.");
+
+  // 1) Clips do reel — cada clip recebe uma fatia da musica (offset)
   const clips: string[] = [];
   clips.push(
-    textClip(dir, "intro", [
-      { text: "OFERTAÇO RADAR", y: 740, style: "Big" },
-      { text: theme.nome, y: 920, style: "Sub" },
-      { text: theme.sub.toUpperCase(), y: 1010, style: "Url" },
-      { text: "OFERTAS VERIFICADAS TODO DIA", y: 1120, style: "Url" },
-    ]),
+    textClip(
+      dir,
+      "intro",
+      [
+        { text: "OFERTAÇO RADAR", y: 740, style: "Big" },
+        { text: theme.nome, y: 920, style: "Sub" },
+        { text: theme.sub.toUpperCase(), y: 1010, style: "Url" },
+        { text: "OFERTAS VERIFICADAS TODO DIA", y: 1120, style: "Url" },
+      ],
+      music,
+      0,
+    ),
   );
 
   const attachments: { filename: string; content: string }[] = [];
   const captions: string[] = [];
 
   for (const [i, item] of kit.items.entries()) {
+    const offset = (i + 1) * CLIP_S;
     const img = join(dir, `prod-${i}.jpg`);
     const hasImg = item.imageUrl ? await download(item.imageUrl, img) : false;
+
+    const fallbackEvents: Ev[] = [
+      { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
+      ...(item.price != null
+        ? [{ text: formatPrice(item.price, item.currency) ?? "", y: 1150, style: "Price" }]
+        : []),
+      { text: "LINK NA BIO", y: 1840, style: "Foot" },
+    ];
 
     let clip: string;
     if (hasImg) {
       try {
-        clip = productClip(dir, `p${i}`, item, img);
+        clip = productClip(dir, `p${i}`, item, img, music, offset);
       } catch (e) {
         console.log(`Clip ${i} falhou, usando texto:`, String(e).slice(0, 140));
-        clip = textClip(dir, `p${i}`, [
-          { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
-          ...(item.price != null
-            ? [{ text: formatPrice(item.price, item.currency) ?? "", y: 1150, style: "Price" }]
-            : []),
-          { text: "LINK NA BIO", y: 1840, style: "Foot" },
-        ]);
+        clip = textClip(dir, `p${i}`, fallbackEvents, music, offset);
       }
     } else {
-      clip = textClip(dir, `p${i}`, [
-        { text: wrap(item.title, 30).join("\\N"), y: 700, style: "Title" },
-        ...(item.price != null
-          ? [{ text: formatPrice(item.price, item.currency) ?? "", y: 1150, style: "Price" }]
-          : []),
-        { text: "LINK NA BIO", y: 1840, style: "Foot" },
-      ]);
+      clip = textClip(dir, `p${i}`, fallbackEvents, music, offset);
     }
     clips.push(clip);
 
@@ -316,10 +366,16 @@ async function main() {
   }
 
   clips.push(
-    textClip(dir, "outro", [
-      { text: "LINK NA BIO", y: 800, style: "Big" },
-      { text: "ofertacoradar.vercel.app/ofertas", y: 990, style: "Url" },
-    ]),
+    textClip(
+      dir,
+      "outro",
+      [
+        { text: "LINK NA BIO", y: 800, style: "Big" },
+        { text: "ofertacoradar.vercel.app/ofertas", y: 990, style: "Url" },
+      ],
+      music,
+      (kit.items.length + 1) * CLIP_S,
+    ),
   );
 
   // 3) Concatena o reel
