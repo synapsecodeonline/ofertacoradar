@@ -209,7 +209,11 @@ const kidRe = (prod: string) =>
 // vem antes dos pais genericos.
 export const KEYWORDS: [RegExp, string][] = [
   // ===== Infantil (prioridade máxima: separa do adulto) =====
-  [kidRe("esporte|esportes|futebol|v[oô]lei|v[oô]leis|basquete|handebol|bola|bolas|bicicleta|bicicletas|bike|bikes|patins|patinete|patinetes|hoverboard|monociclo|raquete|raquetes|capacete|capacetes|trenzinho|trenzinhos|t[eê]nis de mesa|ping.?pong|longboard|penny|casco|cascos"), "esporte-infantil"],
+  // Produto concreto vem ANTES de esporte: "pijama de basquete infantil"
+  // é roupa (moda-infantil), não equipamento — a palavra de esporte no
+  // titulo e só a estampa. Bola/bicicleta de verdade continuam em
+  // esporte-infantil porque nao tem substantivo de produto de outra
+  // categoria por perto.
   // Instrumentos de medição antes de pecas-veiculos: "jogo de micrômetros
   // com 12 peças" e medição, nao autopeca
   [/(?<![\p{L}\p{N}_])(micr[oô]metros?|paqu[ií]metros?|trenas?|mult[ií]metros?|man[oô]metros?|rel[oó]gios? comparadores?|paquimetros?)(?![\p{L}\p{N}_])/iu, "medicao-precisao"],
@@ -218,6 +222,10 @@ export const KEYWORDS: [RegExp, string][] = [
   [kidRe("shampoo|xampu|condicionador|sabonete|sabonetes|creme|cremes|hidratante|hidratantes|protetor solar|repelente|repelentes|pomada|pomadas|len[cç]o umedecido|lencos umedecidos|higiene|higi[eê]nico|higienico|higi[eê]nicos|higienicos|wipes|perfume|perfumes|colonia|colonias|desodorante|desodorantes|protetor labial|protetor facial|higiene bucal|escova de dente|fio dental"), "beleza-infantil"],
   [kidRe("celular|celulares|smartphone|smartphones|tablet|tablets|smartwatch|smartwatches|fone|headset|console|consoles|videogame|video game|videogames|camera|cameras|drone|drones|eletronico|eletrônico|eletronicos|eletrônicos|notebook|notebooks|computador|computadores|tv|televisao|televisão|televisores|radio|rádio|radios|rádios|caixa de som|microfone|microfones|carregador|carregadores|cabo|cabos|fone bluetooth|smart tv|soundbar|home theater|projetor|projetores"), "eletronicos-infantil"],
   [kidRe("vestido|vestidos|cal[cç]a|cal[cç]as|saia|saias|blusa|blusas|camisa|camisas|camiseta|camisetas|regata|regatas|moletom|moletoms|hoodie|hoodies|conjunto|conjuntos|pijama|pijamas|macac[aã]o|macac[aã]ões|jardineira|jardineiras|shorts|bermuda|bermudas|body|bodies|tricot|tricots|cardigan|cardigans|jaqueta|jaquetas|casaco|casacos|colete|coletes|tunica|túnica|t[uú]nicas|blusao|blusão|blusões|sutia|sutiã|sutiãs|calcinha|calcinhas|cueca|cuecas|look|looks|outfit|outfits|moda|fashion|estampad|listrad|roupa|roupas|vestuario|vestuário|confec|camisola|camisolas|negligee|macacaozinho|cropped|sueter|suéter|blus[aã]o"), "moda-infantil"],
+  // Esporte infantil por ultimo entre os kidRe: so pega o que nao tem
+  // substantivo de produto de outra categoria ("bola de futebol
+  // infantil" sim; "pijama de basquete infantil" nao — e pijama).
+  [kidRe("esporte|esportes|futebol|v[oô]lei|v[oô]leis|basquete|handebol|bola|bolas|bicicleta|bicicletas|bike|bikes|patins|patinete|patinetes|hoverboard|monociclo|raquete|raquetes|capacete|capacetes|trenzinho|trenzinhos|t[eê]nis de mesa|ping.?pong|longboard|penny|casco|cascos"), "esporte-infantil"],
 
   // ===== Auto / peças de veículos =====
   [/(?<![\p{L}\p{N}_])(bagageiro|ba[uú]\s*(lateral|traseiro|givi|shad|monolock|top.?case|motocicleta)|ba[uú]leto|bauleto|alforje|top.?case|mala para moto|quebra vento|protetor de (motor|tanque|carenagem|quadro)|capa de moto|hitch|engate.{0,25}(reboque|trailer|carro|moto|implemento|carreta)|reboque|macaco|tri[aâ]ngulo|estepe|calota|aba (de )?tanque|protetor de tanque)(?![\p{L}\p{N}_])/iu, "pecas-veiculos"],

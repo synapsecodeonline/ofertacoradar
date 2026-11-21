@@ -40,12 +40,19 @@ const ESP_RE = /futebol|futsal|society|basquete|v[oô]lei|handebol|t[eê]nis|bad
 const MERCADO_RE = /supermercado|arroz|feij[aã]o|a[cç][uú]car|caf[eé]|macarr[aã]o|a[z]eite|[oó]leo|detergente|sab[aã]o|sapon[aá]ceo|desinfetante|[aá]gua sanit|limpeza|pano de ch[aã]o|saco de lixo|papel higi[eê]nico|guardanapo|fralda|len[cç]o umedecido|wipes|pet|cachorro|gato|racao|r[aç][aã]o|coleira|arranhador|areia de gato|petisco|mam[aadeira]|chupeta|biber[oó]n|pur[eé] de frutas|maionese|ketchup|mostarda|molho|tempero|especiaria|farinha|fermento|chocolate|bombom|biscoito|bolacha|gelatina|achocolatado|leite|iogurte|queijo|presunto|manteiga|margarina|doce de leite|leite condensado|pa[cç]oca|pipoca|amendoim|castanha|nozes|granola|aveia|goma de mascar|chiclete|balinha|salgadinho|snack|cebola|alho|batata|cenoura|tomate|abobrinha|berinjela|quiabo|abacate|banana|ma[cç][aã]|laranja|lim[aã]o|morango|uva|melancia|mam[aã]o|p[eé] de moleque|wafer|oreo|bis/i;
 const TODOS_RE = /[\s\S]/;
 
-const THEMES: Record<number, { nome: string; sub: string; cats: string[]; re: RegExp }> = {
+// Veto de substantivo-produto: mesmo que o titulo tenha palavra do
+// tema ("pijama DE BASQUETE"), o objeto vendido manda — pijama e
+// roupa, nao equipamento esportivo. So vale para o tema esporte;
+// os demais temas ja sao protegidos pela categoria canonica.
+const ESP_VETO =
+  /pijama|camisola|cueca|calcinha|suti[aã]|negligee|len[cç]ol|travesseiro|almofada|jogo de cama|edredom|cobertor|manta|cortina|tapete|panela|frigideira|jogo de panelas|talher|tabua de corte|detergente|sab[aã]o|sabonete|shampoo|condicionador|batom|rimel|base facial|perfume|col[oô]nia|desodorante|protetor solar|rem[eé]dio|comprimido|antibi[oó]tico|curativo|band.?aid|term[oô]metro|fralda|chupeta|mamadeira|biber[oô]n|absorvente|papel higi[eê]nico|esponja|vassoura|rodo|saco de lixo|pano de ch[aã]o|[aá]gua sanit|desinfetante|sapato|scarpin|rasteirinha|chinelo|papete|coturno|salto|sapatenis|mochila escolar|caderno|caneta|marca.?texto|estojo|lancheira|agenda|planner|papelaria|livro|quadrinho|jogo de tabuleiro|boneco|barbie|lego|pel[uú]cia|funko|vestido|saia|blusa|camisa social|terno/i;
+
+const THEMES: Record<number, { nome: string; sub: string; cats: string[]; re: RegExp; veto?: RegExp }> = {
   1: { nome: "TECH & ELETRÔNICOS", sub: "Celulares, games, informática e gadgets", cats: ["eletronicos", "celulares", "informatica", "games", "tv-audio", "fotografia", "software", "eletronicos-infantil"], re: TECH_RE },
   2: { nome: "CASA & DECORAÇÃO", sub: "Móveis, cozinha, eletro e organização", cats: ["casa-decoracao", "decoracao", "iluminacao", "textil-cama", "moveis", "cozinha", "eletrodomesticos", "eletro-cocina", "eletro-limpeza", "climatizacao", "organizacao"], re: CASA_RE },
   3: { nome: "BELEZA & CUIDADOS", sub: "Skincare, maquiagem, cabelo e saúde", cats: ["beleza", "maquiagem", "skincare", "cabelo", "perfumaria", "saude", "suplementos", "beleza-infantil"], re: BELEZA_RE },
   4: { nome: "MODA & ESTILO", sub: "Roupas, calçados, bolsas e acessórios", cats: ["moda-feminina", "moda-masculina", "moda-infantil", "calcados", "calcados-infantil", "bolsas-mochilas", "acessorios-moda", "oculos", "joias-relogios", "moda-praia", "moda-praia-infantil", "lingerie", "vestidos", "calcas", "blusas"], re: MODA_RE },
-  5: { nome: "ESPORTE & FITNESS", sub: "Academia, ciclismo, camping e lazer", cats: ["esporte-lazer", "fitness", "ciclismo", "camping", "esporte-infantil"], re: ESP_RE },
+  5: { nome: "ESPORTE & FITNESS", sub: "Academia, ciclismo, camping e lazer", cats: ["esporte-lazer", "fitness", "ciclismo", "camping", "esporte-infantil"], re: ESP_RE, veto: ESP_VETO },
   6: { nome: "MERCADO & LAR", sub: "Supermercado, pets, bebê e limpeza", cats: ["supermercado", "mercearia", "limpeza-higiene", "alimentos-bebidas", "pets", "bebe", "brinquedos"], re: MERCADO_RE },
   0: { nome: "ACHADINHOS & SURPRESAS", sub: "Os maiores descontos do momento, de tudo", cats: ["ofertas"], re: TODOS_RE },
 };
@@ -79,7 +86,8 @@ function pickForTheme(items: KitItem[], theme: ReturnType<typeof themeOf>, n = 4
   const match = items.filter(
     (it) =>
       theme.cats.includes(canonicalCategory(it.category)) &&
-      theme.re.test(it.title),
+      theme.re.test(it.title) &&
+      !theme.veto?.test(it.title),
   );
   const seen = new Set<string>();
   const diverse = match.filter((it) => {
