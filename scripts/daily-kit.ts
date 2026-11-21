@@ -80,6 +80,41 @@ function familyKey(title: string): string {
     .join(" ");
 }
 
+// Memoria de enviados: produtos que ja sairam no kit nos ultimos
+// N dias nao podem repetir — cada email tem que trazer ofertas novas
+// (sem isso, os mesmos top-clicados sairiam todo dia). Fica em
+// kit-out/sent.json; se o arquivo sumir, recomeça do zero.
+// (SENT_FILE e declarado junto de OUT_DIR, mais abaixo.)
+const SENT_KEEP_DAYS = 14;
+
+function loadSent(): Record<string, number[]> {
+  try {
+    return JSON.parse(readFileSync(SENT_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function idsSentWithin(sent: Record<string, number[]>, days: number): Set<number> {
+  const cutoff = Date.now() - days * 86_400_000;
+  const ids = new Set<number>();
+  for (const [day, list] of Object.entries(sent)) {
+    if (new Date(day).getTime() >= cutoff) list.forEach((id) => ids.add(id));
+  }
+  return ids;
+}
+
+function recordSent(ids: number[]) {
+  const sent = loadSent();
+  const today = new Date().toISOString().slice(0, 10);
+  sent[today] = [...new Set([...(sent[today] ?? []), ...ids])];
+  const cutoff = Date.now() - SENT_KEEP_DAYS * 86_400_000;
+  for (const day of Object.keys(sent)) {
+    if (new Date(day).getTime() < cutoff) delete sent[day];
+  }
+  writeFileSync(SENT_FILE, JSON.stringify(sent));
+}
+
 // Seleciona itens do tema do dia — APENAS os verificados por
 // categoria+titulo (o kit nunca mistura tema com oferta aleatoria).
 // Dedup por familia evita 4 versoes do mesmo produto (ex: meião).
@@ -115,6 +150,7 @@ const W = 1080;
 const H = 1920;
 const CLIP_S = 4;
 const OUT_DIR = join(process.cwd(), "kit-out");
+const SENT_FILE = join(OUT_DIR, "sent.json");
 // siteUrl() cairia em localhost fora da Vercel — forca o dominio real
 // para links dos cards/legendas e download dos PNGs.
 process.env.NEXT_PUBLIC_SITE_URL ??= "https://ofertacoradar.vercel.app";
@@ -543,21 +579,33 @@ async function main() {
     (it) => hasRealDiscount(it) && theme.re.test(it.title),
   );
   const seen = new Set<number>();
-  const combined = [...themed, ...pool.items].filter(
+  const base = [...themed, ...pool.items].filter(
     (it) => hasRealDiscount(it) && !seen.has(it.id) && seen.add(it.id),
   );
-  const picked = pickForTheme(combined, theme, 4);
+
+  // Rotacao: exclui o que ja saiu nos ultimos 14 dias. Se o tema
+  // apertar, relaxa a janela (7 -> 3 -> 0) ate ter 2+ ofertas.
+  const sent = loadSent();
+  let picked = { items: [] as KitItem[], matched: 0 };
+  for (const win of [14, 7, 3, 0]) {
+    const excl = win > 0 ? idsSentWithin(sent, win) : new Set<number>();
+    const poolNow = base.filter((it) => !excl.has(it.id));
+    picked = pickForTheme(poolNow, theme, 4);
+    if (picked.matched >= 2 || win === 0) break;
+  }
   let items = picked.items;
 
   // Se o tema do dia tem menos de 2 ofertas no catalogo, e melhor
   // ser honesto: vira "achadinhos" (maiores descontos) em vez de
-  // rotular almofada como "esporte".
+  // rotular almofada como "esporte". Tambem respeita a rotacao.
   const matched = picked.matched;
   let themeUsed = theme;
   let themeNote = "";
   if (matched < 2) {
     themeUsed = { dia, ...THEMES[0] };
-    items = pool.items.filter(hasRealDiscount).slice(0, 4);
+    const excl = idsSentWithin(sent, SENT_KEEP_DAYS);
+    const fresh = pool.items.filter((it) => hasRealDiscount(it) && !excl.has(it.id));
+    items = (fresh.length >= 2 ? fresh : pool.items.filter(hasRealDiscount)).slice(0, 4);
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
   }
@@ -822,6 +870,7 @@ async function main() {
     console.log(`Kit salvo em ${OUT_DIR} como fallback.`);
     process.exit(1);
   }
+  recordSent(kit.items.map((it) => it.id));
   console.log(`Kit enviado para ${to} — ${kit.items.length} ofertas, reel ${reelName}`);
 }
 
