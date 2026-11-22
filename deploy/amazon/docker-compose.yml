@@ -6,6 +6,7 @@
 #   amz-state.json  → sessao Amazon (storageState do Playwright)
 #   ms-playwright   → browsers do Chromium
 #   chromelibs      → libs extras usadas no WSL (LD_LIBRARY_PATH)
+name: amz
 services:
   scrape:
     build: .
