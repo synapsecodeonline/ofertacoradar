@@ -18,11 +18,11 @@ Além do site, o projeto gera automaticamente um **kit diário de divulgação p
 | Auth | Supabase Auth (somente `/admin` e `/login`) |
 | Deploy | Vercel |
 | Sync 24/7 | cron-job.org → `GET /api/cron/sync?key=$CRON_SECRET` a cada 1min |
-| Rotinas agendadas | **GitHub Actions** (grátis): kit diário 8h BRT + recategorização dom 6h BRT — ver `.github/workflows/` |
+| Rotinas agendadas | **cron-job.org → GitHub Actions** (grátis): kit diário 8h BRT + recategorização dom 6h BRT — ver `.github/workflows/` |
+| Saúde das rotinas | healthchecks.io (`KIT_HEALTHCHECK_URL`) — alerta se o kit não rodar |
 | Parser de feed | `fast-xml-parser` |
 | Vídeo do kit | `ffmpeg-static` (reel 1080×1920 com xfade, Ken Burns, gradiente, legendas ASS) |
 | Email do kit | Resend API (`RESEND_API_KEY`) — domínio verificado `kit@ofertacoradar.com.br` |
-| Healthcheck | healthchecks.io (`KIT_HEALTHCHECK_URL`) — alerta se o kit não rodar |
 | Imagens sociais | `next/og` (`ImageResponse`) — `/api/card/[id]` e `/api/og` |
 | APIs externas | Lomadee, Mercado Livre (OAuth2), Amazon PA-API 5.0 (SigV4), SerpApi |
 | Analytics | GA4 (`NEXT_PUBLIC_GA_ID`) |
@@ -42,6 +42,25 @@ npm run db:push      # aplica o schema no Postgres (pode falhar no pooler — ve
 npm run sync         # opcional: sync manual via scripts/sync.ts
 npm run dev          # http://localhost:3000
 ```
+
+---
+
+## Infraestrutura e serviços externos
+
+| Serviço | Papel |
+|---|---|
+| **Vercel** | Hosting do Next.js + endpoint `/api/cron/sync` |
+| **Supabase** | PostgreSQL (Product, Click, ScriptState…) + Auth `/admin` |
+| **GitHub Actions** | Executa kit diário e recategorização (grátis) |
+| **cron-job.org** | Gatilhos: sync a cada 1min + dispatch dos workflows no horário exato |
+| **Resend** | Email do kit — `kit@ofertacoradar.com.br` (domínio verificado) |
+| **healthchecks.io** | Dead-man's switch do kit (alerta se não pingar) |
+| **Search Console / Merchant Center / GA4** | SEO, Google Shopping feed, analytics |
+| **Lomadee / Mercado Livre / Awin / Amazon / SerpApi** | Fontes de afiliado e dados de produto |
+
+**O que roda local:** apenas `scripts/amz-cron.sh` (scrape Amazon 7h —
+Amazon bloqueia IP de datacenter, então precisa de IP residencial) e
+o ambiente de dev (`npm run dev`). Todo o resto é nuvem.
 
 ---
 
@@ -107,11 +126,15 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ## Kit diário do Instagram (`scripts/daily-kit.ts`)
 
-Automação completa de divulgação: todo dia **08:00** o workflow
-`.github/workflows/kit.yml` (cron `0 11 * * *` UTC = 8h BRT) roda
-`npm run kit:daily` no GitHub Actions e envia um email com tudo
-pronto para postar. `workflow_dispatch` permite disparo manual.
-Healthcheck em healthchecks.io alerta se o run não acontecer.
+Automação completa de divulgação: todo dia **08:00** o cron-job.org
+chama a API do GitHub (`workflow_dispatch`) e o workflow
+`.github/workflows/kit.yml` roda `npm run kit:daily` no GitHub
+Actions, enviando um email com tudo pronto para postar.
+
+> ⚠️ O `schedule:` do próprio GitHub **não é confiável em conta
+> free** (execuções atrasam ou são puladas). O gatilho oficial é o
+> cron-job.org — o schedule do workflow fica só como backup.
+> Healthcheck em healthchecks.io alerta se o run não acontecer.
 
 ### Cronograma semanal de temas
 
