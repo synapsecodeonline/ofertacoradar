@@ -71,6 +71,14 @@ services:
       - INSTALLATION_ENV=docker
     command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
 
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: chatwoot-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://rails:3000 --no-autoupdate
+    depends_on:
+      - rails
+
   caddy:
     image: caddy:2-alpine
     container_name: chatwoot-caddy
