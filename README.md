@@ -61,8 +61,8 @@ npm run dev          # http://localhost:3000
 **O que roda local:** apenas o scrape Amazon 7h — agora em **Docker**
 (`deploy/amazon/`, IP residencial pois a Amazon bloqueia datacenter) —
 o **Chatwoot self-hosted** (`deploy/chatwoot/`, WSL2 + Docker, exposto
-via cloudflared) e o ambiente de dev (`npm run dev`). Todo o resto é
-nuvem.
+em `chat.ofertacoradar.com.br` via Cloudflare Tunnel nomeado) e o
+ambiente de dev (`npm run dev`). Todo o resto é nuvem.
 
 ---
 
