@@ -1,6 +1,6 @@
 # Pendências — Ofertaço Radar
 
-> Atualizado em 21/11/2026. Itens agrupados por o que depende de você,
+> Atualizado em 22/11/2026. Itens agrupados por o que depende de você,
 > de terceiros, ou de código.
 
 ## ⏳ Dependem de ação sua / terceiros
@@ -21,18 +21,21 @@
 - [ ] **Amazon PA-API** — aguarda conta de associado atingir 10
       vendas/30 dias para liberar credenciais `AMZ_API_KEY`/`AMZ_API_SECRET`.
       Até lá o catálogo `amz:` é alimentado por scrape local
-      (`npm run amz:scrape` + verify, cron 7h).
+      (`npm run amz:scrape` + verify, cron 7h — único cron local
+      restante; Amazon bloqueia IP de datacenter).
+- [ ] **Chatwoot no Render** — WhatsApp Business API configurada na
+      Meta; deploy do Chatwoot em andamento (Supabase session pooler
+      `:5432` + Render Key Value). Quando subir: ligar inbox ao
+      número e avaliar Agent Bots para ofertas automáticas.
 
 ## 🔧 Melhorias técnicas pendentes
 
 - [ ] **~600 produtos em "outros"** — maioria banners de campanha sem
       sinal textual. Retorno decrescente; reavaliar só se incomodar.
-- [ ] **Recategorizar periodicamente** — rodar
-      `npm run recategorize` (dry-run) e `--apply` após grandes syncs,
-      pois produtos novos entram com a classificação do momento.
-- [ ] **Auditoria do kit** — log de por que cada produto entrou
-      (categoria, regex do tema, veto, desconto) ajudaria a depurar
-      casos de tema errado sem consultar o banco.
+- [x] ~~**Recategorizar periodicamente**~~ — weekly no GitHub Actions
+      (`.github/workflows/recategorize.yml`, dom 6h BRT via cron-job.org).
+- [x] ~~**Auditoria do kit**~~ — `kit-out/audit-AAAA-MM-DD.json` grava
+      score, cliques, boosts, família, fonte e janela de exclusão.
 - [ ] **Rodízio de música** — já existe via `music/*.mp3`; adicionar
       mais faixas conforme o gosto (todas as do kit usam a mesma
       rotação diária).
@@ -55,6 +58,16 @@
 
 ## ✅ Recentemente concluído (referência)
 
+- **Infra 100% nuvem** — kit diário e recategorização migraram do
+  cron local para GitHub Actions (grátis); gatilho oficial é
+  cron-job.org → `workflow_dispatch` (schedule do GH é só backup —
+  free tier pula execuções). Healthcheck healthchecks.io ativo.
+- Histórico anti-repetição do kit migrado de `sent.json` para
+  `ScriptState`/`kit-sent` (banco) + retry em timeout de statement
+  do pooler + índice `Product_kit_discount_idx`.
+- Kit com **diversidade de fonte** (máx. 2 itens por loja nos 4).
+- `/ofertas` reformulada (link-in-bio com provas sociais ao vivo e
+  seção "terminando em 24h"). GA4 (`G-3MCVT83YZN`) coletando.
 - Kit diário automático 8h → email com reel + cards + legenda combinada
 - Classificação: descrição como fallback, decode de entidades HTML,
   ~900 produtos reclassificados, "outros" 1005 → 602
