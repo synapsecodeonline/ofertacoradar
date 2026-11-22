@@ -58,9 +58,11 @@ npm run dev          # http://localhost:3000
 | **Search Console / Merchant Center / GA4** | SEO, Google Shopping feed, analytics |
 | **Lomadee / Mercado Livre / Awin / Amazon / SerpApi** | Fontes de afiliado e dados de produto |
 
-**O que roda local:** apenas `scripts/amz-cron.sh` (scrape Amazon 7h —
-Amazon bloqueia IP de datacenter, então precisa de IP residencial) e
-o ambiente de dev (`npm run dev`). Todo o resto é nuvem.
+**O que roda local:** apenas o scrape Amazon 7h — agora em **Docker**
+(`deploy/amazon/`, IP residencial pois a Amazon bloqueia datacenter) —
+o **Chatwoot self-hosted** (`deploy/chatwoot/`, WSL2 + Docker, exposto
+via cloudflared) e o ambiente de dev (`npm run dev`). Todo o resto é
+nuvem.
 
 ---
 
@@ -334,7 +336,7 @@ npm run amz:scrape -- --max-new 5  # no maximo 5 produtos NOVOS (resto so atuali
 - **Rate limit**: pausa de 5s entre páginas; se a Amazon devolver página de bloqueio (~4KB) ou HTTP 503, o script tenta **fallback via Chromium logado** (mesma sessão do verify — fingerprint de browser real) e aborta se ambos falharem. Não rode em loop.
 - **Layout mudou?** Se uma página válida retornar "0 produtos extraídos", o parser (`extract()`) precisa de ajuste — os seletores atuais estão comentados no script.
 - Requer `.env` com `DATABASE_URL` (e `AMZ_TAG`, com default `synapsecodeon-20`).
-- **Agendamento local**: `scripts/amz-cron.sh` é o wrapper para cron (resolve o node do nvm e loga em `logs/amz-scrape.log`). Cron instalado: `0 7 * * *` → scrape com `--max-new 5` (**máx. 5 produtos novos/dia**) + verify de elegibilidade — exige a máquina ligada; se a Amazon bloquear, o script aborta e o log mostra.
+- **Agendamento local**: `scripts/amz-cron.sh` é o wrapper para cron (`0 7 * * *` → scrape com `--max-new 5` + verify). Por padrão roda **em Docker** (`deploy/amazon/docker-compose.yml`, profile `scrape`, imagem `mcr.microsoft.com/playwright` + repo/sessão montados) com fallback pra execução local se o Docker estiver desligado; loga em `logs/amz-scrape.log`. Exige a máquina ligada; se a Amazon bloquear, o script aborta e o log mostra.
 
 ### Verificação de elegibilidade de afiliado (`scripts/amz-verify.ts` → `npm run amz:verify`)
 

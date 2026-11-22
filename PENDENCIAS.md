@@ -20,9 +20,9 @@
       (hoje o fluxo é email → postar manual, ~10 min/dia).
 - [ ] **Amazon PA-API** — aguarda conta de associado atingir 10
       vendas/30 dias para liberar credenciais `AMZ_API_KEY`/`AMZ_API_SECRET`.
-      Até lá o catálogo `amz:` é alimentado por scrape local
-      (`npm run amz:scrape` + verify, cron 7h — único cron local
-      restante; Amazon bloqueia IP de datacenter).
+      Até lá o catálogo `amz:` é alimentado por scrape **em Docker**
+      (`deploy/amazon/`, cron 7h via `amz-cron.sh` — precisa PC ligado
+      e IP residencial; Amazon bloqueia IP de datacenter).
 - [ ] **Chatwoot no ar** — stack self-hosted rodando **local** no WSL2
       (`deploy/chatwoot/`: rails+sidekiq+postgres pgvector+redis+caddy).
       Acesso público hoje via **cloudflared Quick Tunnel** (URL

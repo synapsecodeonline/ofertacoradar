@@ -1,0 +1,23 @@
+# Scrape Amazon — roda sob demanda via cron (`docker compose run`),
+# nunca com `up -d` (profile "scrape").
+#
+# Monta:
+#   /app            → repo inteiro (codigo + node_modules + .env via env_file)
+#   amz-state.json  → sessao Amazon (storageState do Playwright)
+#   ms-playwright   → browsers do Chromium
+#   chromelibs      → libs extras usadas no WSL (LD_LIBRARY_PATH)
+services:
+  scrape:
+    build: .
+    image: ofertacoradar-amz-scrape:latest
+    profiles: ["scrape"]
+    volumes:
+      - ../../:/app
+      - ${HOME}/.config/ofertacoradar:/root/.config/ofertacoradar
+      - ${HOME}/.cache/ms-playwright:/ms-playwright
+      - ${HOME}/.local/share/ofertacoradar-chromelibs:/root/.local/share/ofertacoradar-chromelibs
+    env_file: ../../.env
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    working_dir: /app
+    command: ["bash", "deploy/amazon/run-scrape.sh"]
