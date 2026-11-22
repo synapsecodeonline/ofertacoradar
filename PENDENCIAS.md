@@ -23,10 +23,13 @@
       Até lá o catálogo `amz:` é alimentado por scrape local
       (`npm run amz:scrape` + verify, cron 7h — único cron local
       restante; Amazon bloqueia IP de datacenter).
-- [ ] **Chatwoot no Render** — WhatsApp Business API configurada na
-      Meta; deploy do Chatwoot em andamento (Supabase session pooler
-      `:5432` + Render Key Value). Quando subir: ligar inbox ao
-      número e avaliar Agent Bots para ofertas automáticas.
+- [ ] **Chatwoot no ar** — stack self-hosted rodando **local** no WSL2
+      (`deploy/chatwoot/`: rails+sidekiq+postgres pgvector+redis+caddy).
+      Acesso público hoje via **cloudflared Quick Tunnel** (URL
+      `*.trycloudflare.com` temporária — muda a cada restart).
+      Pendente: ativar DNS na Cloudflare (nameservers ainda são
+      Registro.br `e.sec/f.sec.dns.br` — troca não aplicou) e migrar
+      pro túnel nomeado `chat.ofertacoradar.com.br`.
 
 ## 🔧 Melhorias técnicas pendentes
 
@@ -68,6 +71,12 @@
 - Kit com **diversidade de fonte** (máx. 2 itens por loja nos 4).
 - `/ofertas` reformulada (link-in-bio com provas sociais ao vivo e
   seção "terminando em 24h"). GA4 (`G-3MCVT83YZN`) coletando.
+- **Chatwoot self-hosted** — `deploy/chatwoot/docker-compose.yml`
+  (imagem `chatwoot/chatwoot:v4.17.1-ce` + `pgvector/pgvector:pg16` +
+  redis + caddy). Postgres precisa de pgvector (Chatwoot usa extensão
+  `vector` — `postgres:16-alpine` puro falha). Migrations manuais:
+  `docker compose exec rails bundle exec rails db:chatwoot_prepare`.
+  Cloudflare Tunnel (`cloudflared`) instalado em `~/.local/bin`.
 - Kit diário automático 8h → email com reel + cards + legenda combinada
 - Classificação: descrição como fallback, decode de entidades HTML,
   ~900 produtos reclassificados, "outros" 1005 → 602
