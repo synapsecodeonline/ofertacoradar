@@ -213,6 +213,31 @@ async function fetchViaBrowser(url: string): Promise<string | null> {
   }
 }
 
+// statement_timeout do pooler Supabase e transitorio quando o sync
+// compete — mesmo padrao do withRetry do daily-kit.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  tries = 4,
+  waitMs = 10_000,
+): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      console.log(
+        `Query falhou (tentativa ${i + 1}/${tries}):`,
+        String(e).slice(0, 140),
+      );
+      if (i < tries - 1) {
+        await new Promise((r) => setTimeout(r, waitMs * (i + 1)));
+      }
+    }
+  }
+  throw last;
+}
+
 async function main() {
   const urls = SOURCES.filter((u) => !ONLY || u.includes(ONLY)).slice(0, MAX_PAGES);
   console.log(`${urls.length} pagina(s) para raspar.\n`);
@@ -223,10 +248,12 @@ async function main() {
   // (senao cada scrape apagaria o desconto).
   const existing = new Map(
     (
-      await prisma.product.findMany({
-        where: { externalId: { startsWith: "amz:" } },
-        select: { externalId: true, oldPrice: true },
-      })
+      await withRetry(() =>
+        prisma.product.findMany({
+          where: { externalId: { startsWith: "amz:" } },
+          select: { externalId: true, oldPrice: true },
+        }),
+      )
     ).map((p) => [p.externalId!, p.oldPrice] as const),
   );
   // blocklist do verify: {asin: expiresAt} — 0 = permanente (inelegivel),
