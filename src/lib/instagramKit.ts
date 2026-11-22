@@ -7,6 +7,7 @@ import type { Product, Prisma } from "@prisma/client";
 export type KitItem = {
   id: number;
   title: string;
+  source: string;
   imageUrl: string | null;
   merchant: string | null;
   price: number | null;
@@ -35,10 +36,25 @@ const KIT_WHERE: Prisma.ProductWhereInput = {
   ],
 };
 
+// Fonte do produto para diversidade do kit: camp-/prod-lomadee sao
+// a mesma loja para o publico — contam como uma fonte so.
+function sourceOf(externalId: string): string {
+  if (externalId.startsWith("ml:")) return "mercado-livre";
+  if (externalId.startsWith("amz:")) return "amazon";
+  if (externalId.startsWith("aw:")) return "awin";
+  if (
+    externalId.startsWith("prod-lomadee:") ||
+    externalId.startsWith("camp-lomadee:")
+  )
+    return "lomadee";
+  return "outros";
+}
+
 function toKitItem(p: Product, c: number, site: string): KitItem {
   return {
     id: p.id,
     title: p.title,
+    source: sourceOf(p.externalId ?? ""),
     imageUrl: p.imageUrl,
     merchant: p.merchant,
     price: p.price,
