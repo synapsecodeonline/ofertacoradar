@@ -261,7 +261,21 @@ async function main() {
         continue;
       }
     }
-    const items = extract(html);
+    let items = extract(html);
+    // Paginas JS-rendered (ex: /deals -> /blackfriday) vem como shell
+    // de ~1.2MB sem nenhum data-asin no HTML estatico — o fetch puro
+    // nao ve os cards. Se extraiu 0, renderiza via Chromium logado.
+    if (items.length === 0 && html.length > 50_000) {
+      console.log("  0 no HTML estatico — tentando render via browser...");
+      const rendered = await fetchViaBrowser(url);
+      if (rendered) {
+        const renderedItems = extract(rendered);
+        if (renderedItems.length > 0) {
+          console.log(`  browser renderizou ${renderedItems.length} produtos`);
+          items = renderedItems;
+        }
+      }
+    }
     // Detector de mudanca de layout: pagina valida sem nenhum ASIN
     if (items.length === 0) {
       console.log(
