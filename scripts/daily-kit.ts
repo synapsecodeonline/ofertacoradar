@@ -27,6 +27,7 @@ import {
 import { formatPrice } from "../src/lib/format";
 import { canonicalCategory } from "../src/lib/categories";
 import { KNOWN_BRANDS } from "../src/lib/brands";
+import { prisma } from "../src/lib/db";
 
 // Cronograma semanal: cada dia tem um tema que guia a selecao das
 // ofertas e o texto do reel/email. getDay(): 0=dom ... 6=sab.
@@ -83,10 +84,13 @@ function familyKey(title: string): string {
 
 // Memoria de enviados: produtos que ja sairam no kit nos ultimos
 // N dias nao podem repetir — cada email tem que trazer ofertas novas
-// (sem isso, os mesmos top-clicados sairiam todo dia). Fica em
-// kit-out/sent.json; se o arquivo sumir, recomeça do zero.
+// (sem isso, os mesmos top-clicados sairiam todo dia).
+// Persistida em ScriptState (banco) porque o kit roda em ambiente
+// efemero (GitHub Actions) — sent.json local se perderia a cada run.
+// kit-out/sent.json continua como fallback/migracao da era local.
 // (SENT_FILE e declarado junto de OUT_DIR, mais abaixo.)
 const SENT_KEEP_DAYS = 14;
+const SENT_KEY = "kit-sent";
 
 // Formato: { "2026-11-21": { ids: [...], fams: [...] } } — fams sao
 // familyKey() dos titulos. A exclusao por familia impede que o MESMO
@@ -94,23 +98,54 @@ const SENT_KEEP_DAYS = 14;
 // Compat: entradas antigas em array puro [ids] ainda sao lidas.
 type SentEntry = { ids: number[]; fams: string[] };
 type SentBook = Record<string, SentEntry>;
+type SentRaw = Record<string, number[] | { ids?: number[]; fams?: string[] }>;
 
-function loadSent(): SentBook {
+function normalizeSent(raw: SentRaw): SentBook {
+  const out: SentBook = {};
+  for (const [day, v] of Object.entries(raw)) {
+    out[day] = Array.isArray(v)
+      ? { ids: v, fams: [] }
+      : { ids: v.ids ?? [], fams: v.fams ?? [] };
+  }
+  return out;
+}
+
+function readSentFile(): SentBook {
   try {
-    const raw = JSON.parse(readFileSync(SENT_FILE, "utf8")) as Record<
-      string,
-      number[] | { ids?: number[]; fams?: string[] }
-    >;
-    const out: SentBook = {};
-    for (const [day, v] of Object.entries(raw)) {
-      out[day] = Array.isArray(v)
-        ? { ids: v, fams: [] }
-        : { ids: v.ids ?? [], fams: v.fams ?? [] };
-    }
-    return out;
+    return normalizeSent(
+      JSON.parse(readFileSync(SENT_FILE, "utf8")) as SentRaw,
+    );
   } catch {
     return {};
   }
+}
+
+async function loadSent(): Promise<SentBook> {
+  try {
+    const row = await prisma.scriptState.findUnique({
+      where: { key: SENT_KEY },
+    });
+    if (row?.value) {
+      return normalizeSent(row.value as unknown as SentRaw);
+    }
+  } catch {
+    /* banco indisponivel — cai para o arquivo local */
+  }
+  // Sem registro no banco: migra o sent.json local (historico da
+  // era pre-Actions) para nao repetir produtos dos ultimos 14 dias.
+  const file = readSentFile();
+  if (Object.keys(file).length > 0) {
+    try {
+      await prisma.scriptState.upsert({
+        where: { key: SENT_KEY },
+        create: { key: SENT_KEY, value: JSON.parse(JSON.stringify(file)) },
+        update: { value: JSON.parse(JSON.stringify(file)) },
+      });
+    } catch {
+      /* migracao e best-effort */
+    }
+  }
+  return file;
 }
 
 function sentWithin(sent: SentBook, days: number): { ids: Set<number>; fams: Set<string> } {
@@ -129,8 +164,8 @@ function sentWithin(sent: SentBook, days: number): { ids: Set<number>; fams: Set
 const isSent = (excl: { ids: Set<number>; fams: Set<string> }, it: KitItem) =>
   excl.ids.has(it.id) || excl.fams.has(familyKey(it.title));
 
-function recordSent(items: KitItem[]) {
-  const sent = loadSent();
+async function recordSent(items: KitItem[]) {
+  const sent = await loadSent();
   const today = new Date().toISOString().slice(0, 10);
   const prev = sent[today] ?? { ids: [], fams: [] };
   sent[today] = {
@@ -141,7 +176,21 @@ function recordSent(items: KitItem[]) {
   for (const day of Object.keys(sent)) {
     if (new Date(day).getTime() < cutoff) delete sent[day];
   }
-  writeFileSync(SENT_FILE, JSON.stringify(sent));
+  try {
+    await prisma.scriptState.upsert({
+      where: { key: SENT_KEY },
+      create: { key: SENT_KEY, value: JSON.parse(JSON.stringify(sent)) },
+      update: { value: JSON.parse(JSON.stringify(sent)) },
+    });
+  } catch (e) {
+    console.log("Falha ao gravar historico no banco:", String(e).slice(0, 140));
+  }
+  // Arquivo local como backup/legado — nao e mais a fonte da verdade.
+  try {
+    writeFileSync(SENT_FILE, JSON.stringify(sent));
+  } catch {
+    /* kit-out pode nao existir em todos os ambientes */
+  }
 }
 
 // Seleciona itens do tema do dia — APENAS os verificados por
@@ -678,7 +727,7 @@ async function main() {
   // o mesmo produto nao pode voltar por outra fonte/ID. Se o tema
   // apertar, relaxa a janela (14 -> 7 -> 3), mas NUNCA zera: produto
   // repetido queima a confianca do email.
-  const sent = loadSent();
+  const sent = await loadSent();
   let picked = { items: [] as KitItem[], matched: 0 };
   let winUsed = SENT_KEEP_DAYS;
   for (const win of [14, 7, 3]) {
@@ -1006,7 +1055,7 @@ async function main() {
     await hcPing(true);
     process.exit(1);
   }
-  recordSent(kit.items);
+  await recordSent(kit.items);
   await hcPing();
   console.log(`Kit enviado para ${to} — ${kit.items.length} ofertas, reel ${reelName}`);
 }

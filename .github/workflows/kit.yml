@@ -1,0 +1,44 @@
+name: kit diario
+
+on:
+  schedule:
+    # 8h em Brasilia (UTC-3) = 11h UTC
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+jobs:
+  kit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cria .env a partir dos secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          KIT_EMAIL: ${{ secrets.KIT_EMAIL }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          KIT_HEALTHCHECK_URL: ${{ secrets.KIT_HEALTHCHECK_URL }}
+        run: |
+          {
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "RESEND_API_KEY=$RESEND_API_KEY"
+            echo "KIT_EMAIL=$KIT_EMAIL"
+            echo "RESEND_FROM=$RESEND_FROM"
+            echo "CRON_SECRET=$CRON_SECRET"
+            echo "NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL"
+            echo "KIT_HEALTHCHECK_URL=$KIT_HEALTHCHECK_URL"
+          } > .env
+
+      - name: Gera e envia o kit
+        run: npm run kit:daily

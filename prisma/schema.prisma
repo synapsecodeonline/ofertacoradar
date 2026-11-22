@@ -136,3 +136,14 @@ model PriceHistory {
   @@index([productId, recordedAt])
   @@schema("ofertacoradar")
 }
+
+// KV generico para estado de scripts que roda em ambiente efemero
+// (GitHub Actions): o kit diario guarda aqui o historico de enviados
+// (anti-repeticao de 14 dias) — antes ficava em kit-out/sent.json,
+// que se perdia a cada run em maquina nova.
+model ScriptState {
+  key   String @id
+  value Json
+
+  @@schema("ofertacoradar")
+}
