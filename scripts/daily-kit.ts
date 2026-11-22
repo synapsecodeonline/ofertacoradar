@@ -230,6 +230,22 @@ const SITE_HOST = process.env.NEXT_PUBLIC_SITE_URL!.replace(
   "",
 ).replace(/\/$/, "");
 
+// Healthcheck do kit (healthchecks.io): se o cron nao pingar no
+// horario, o servico alerta por email. KIT_HEALTHCHECK_URL no .env
+// recebe "https://hc-ping.com/<uuid>"; "/fail" sinaliza falha.
+// Sem a env, nao faz nada — o kit nunca depende disso.
+const HC_URL = process.env.KIT_HEALTHCHECK_URL;
+async function hcPing(fail = false) {
+  if (!HC_URL) return;
+  try {
+    await fetch(`${HC_URL}${fail ? "/fail" : ""}`, {
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch {
+    /* healthcheck nunca derruba o kit */
+  }
+}
+
 // ASS: cores em &HAABBGGRR. Styles usados nos eventos.
 const STYLES = `
 [V4+ Styles]
@@ -664,7 +680,9 @@ async function main() {
   // repetido queima a confianca do email.
   const sent = loadSent();
   let picked = { items: [] as KitItem[], matched: 0 };
+  let winUsed = SENT_KEEP_DAYS;
   for (const win of [14, 7, 3]) {
+    winUsed = win;
     const excl = sentWithin(sent, win);
     const poolNow = base.filter((it) => !isSent(excl, it));
     picked = pickForTheme(poolNow, theme, 4);
@@ -694,12 +712,45 @@ async function main() {
   }
   if (items.length === 0) {
     console.log("Nenhuma oferta valida hoje — kit vazio.");
+    await hcPing(true);
     return;
   }
   const kit = { ...pool, items };
 
   const dir = mkdtempSync(join(tmpdir(), "kit-"));
   mkdirSync(OUT_DIR, { recursive: true });
+
+  // Auditoria da selecao: por que cada produto entrou — cliques,
+  // boosts de marca/loja, desconto, familia e janela de exclusao
+  // usada. Responde "por que saiu isso hoje?" sem consultar o banco.
+  writeFileSync(
+    join(OUT_DIR, `audit-${new Date().toISOString().slice(0, 10)}.json`),
+    JSON.stringify(
+      {
+        date: new Date().toISOString(),
+        dia,
+        temaPedido: theme.nome,
+        temaUsado: themeUsed.nome,
+        fallbackTema: themeUsed.nome !== theme.nome,
+        matchedNoTema: matched,
+        janelaExclusaoDias: winUsed,
+        itens: kit.items.map((it) => ({
+          id: it.id,
+          titulo: it.title,
+          cliques7d: it.clicks,
+          descontoPct: it.discountPct ?? null,
+          marcaConhecida: isKnownBrand(it),
+          lojaConhecida: isKnownStore(it),
+          score: kitScore(it),
+          familia: familyKey(it.title),
+          categoria: it.category,
+          pageUrl: it.pageUrl,
+        })),
+      },
+      null,
+      2,
+    ),
+  );
 
   // Musica de fundo: cache local -> download -> pad sintetico.
   // Nunca null: o reel sempre sai com faixa de audio. A faixa do dia
@@ -875,6 +926,7 @@ async function main() {
   if (!apiKey || !to) {
     console.log(`Sem RESEND_API_KEY/KIT_EMAIL — kit salvo em ${OUT_DIR}`);
     console.log(`Reel: ${join(OUT_DIR, reelName)} (${kit.items.length} ofertas)`);
+    await hcPing(true);
     return;
   }
 
@@ -951,13 +1003,16 @@ async function main() {
   if (!r.ok) {
     console.error("Resend falhou:", r.status, await r.text());
     console.log(`Kit salvo em ${OUT_DIR} como fallback.`);
+    await hcPing(true);
     process.exit(1);
   }
   recordSent(kit.items);
+  await hcPing();
   console.log(`Kit enviado para ${to} — ${kit.items.length} ofertas, reel ${reelName}`);
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
   console.error(e);
+  await hcPing(true);
   process.exit(1);
 });
