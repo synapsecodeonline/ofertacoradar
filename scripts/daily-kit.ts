@@ -723,6 +723,32 @@ function slug(s: string) {
     .slice(0, 40);
 }
 
+// Timeout de statement do pooler Supabase e transitorio — o sync
+// pesado passa e a query entra. Retry com backoff evita perder o
+// kit inteiro por uma disputa momentanea de banco.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  tries = 3,
+  waitMs = 8_000,
+): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      console.log(
+        `Query falhou (tentativa ${i + 1}/${tries}):`,
+        String(e).slice(0, 140),
+      );
+      if (i < tries - 1) {
+        await new Promise((r) => setTimeout(r, waitMs * (i + 1)));
+      }
+    }
+  }
+  throw last;
+}
+
 async function main() {
   console.log("Gerando kit diario...");
   // KIT_THEME_DAY (0-6) forca um tema — usado em testes para validar
@@ -734,10 +760,9 @@ async function main() {
   const theme = { dia, ...THEMES[themeDay] };
   // Pool tematico busca direto no banco por categoria canonica —
   // o pool geral (top por cliques/desconto) nao alcanca nichos.
-  const [pool, themedRaw] = await Promise.all([
-    getInstagramPool(80),
-    getThemedPool(theme.cats, 40),
-  ]);
+  const [pool, themedRaw] = await withRetry(() =>
+    Promise.all([getInstagramPool(80), getThemedPool(theme.cats, 40)]),
+  );
   // Pool tematico traz falsos positivos do classificador — so
   // entram os que o titulo confirma o tema.
   const themed = themedRaw.filter(
