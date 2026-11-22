@@ -18,11 +18,14 @@ Além do site, o projeto gera automaticamente um **kit diário de divulgação p
 | Auth | Supabase Auth (somente `/admin` e `/login`) |
 | Deploy | Vercel |
 | Sync 24/7 | cron-job.org → `GET /api/cron/sync?key=$CRON_SECRET` a cada 1min |
+| Rotinas agendadas | **GitHub Actions** (grátis): kit diário 8h BRT + recategorização dom 6h BRT — ver `.github/workflows/` |
 | Parser de feed | `fast-xml-parser` |
 | Vídeo do kit | `ffmpeg-static` (reel 1080×1920 com xfade, Ken Burns, gradiente, legendas ASS) |
-| Email do kit | Resend API (`RESEND_API_KEY`) |
+| Email do kit | Resend API (`RESEND_API_KEY`) — domínio verificado `kit@ofertacoradar.com.br` |
+| Healthcheck | healthchecks.io (`KIT_HEALTHCHECK_URL`) — alerta se o kit não rodar |
 | Imagens sociais | `next/og` (`ImageResponse`) — `/api/card/[id]` e `/api/og` |
 | APIs externas | Lomadee, Mercado Livre (OAuth2), Amazon PA-API 5.0 (SigV4), SerpApi |
+| Analytics | GA4 (`NEXT_PUBLIC_GA_ID`) |
 | Scripts | `tsx` |
 | Fontes | Geist via `next/font`; Inter sob demanda nas imagens |
 
@@ -62,7 +65,9 @@ npm run dev          # http://localhost:3000
 | `/api/ml-auth/start\|callback` | route handlers | OAuth do Mercado Livre (bootstrap manual). |
 | `/api/health` | route handler | Health check `{ok:true}`. |
 | `/api/instagram/kit` | route handler | Kit de conteúdo Instagram (login): top produtos + `cardUrl` + caption. |
-| `/sitemap.xml` | metadata route | Home + `/?aba=cupons` + **todos** os produtos ativos (até 45.000). |
+| `/ofertas` | página | **Link-in-bio** estilo Linktree: perfil, provas sociais ao vivo (ofertas ativas + última sync), links rápidos, "terminando em 24h", categorias e destaques. |
+| `/feed/google.xml` | route handler | Feed **Google Shopping** (RSS 2.0 + namespace `g:`): ~21k produtos, `price`/`sale_price` corretos, `brand` extraída do título (`src/lib/brands.ts`), links canônicos. Configurado no Merchant Center com busca programada diária. |
+| `/sitemap.xml` | metadata route | **Índice** de sitemaps: `/sitemaps/pages` (rotas estáticas + categorias) + `/sitemaps/produtos/[page]` (1.000 URLs/produto cada). |
 | `/robots.txt` | metadata route | Libera tudo exceto `/ir/`; aponta para o sitemap. |
 
 ### `/ir/[id]` em detalhe
@@ -102,9 +107,11 @@ Prefixo em `Product.externalId` define a fonte (`src/lib/sources.ts`):
 
 ## Kit diário do Instagram (`scripts/daily-kit.ts`)
 
-Automação completa de divulgação: todo dia **08:00** o cron local
-(`scripts/kit-cron.sh`, entrada `0 8 * * *` no crontab) roda
-`npm run kit:daily` e envia um email com tudo pronto para postar.
+Automação completa de divulgação: todo dia **08:00** o workflow
+`.github/workflows/kit.yml` (cron `0 11 * * *` UTC = 8h BRT) roda
+`npm run kit:daily` no GitHub Actions e envia um email com tudo
+pronto para postar. `workflow_dispatch` permite disparo manual.
+Healthcheck em healthchecks.io alerta se o run não acontecer.
 
 ### Cronograma semanal de temas
 
@@ -131,8 +138,8 @@ Automação completa de divulgação: todo dia **08:00** o cron local
   15/18/21h, 20h feed), cards por produto com link da página e **uma
   legenda combinada** cobrindo todos os itens (reel/feed exibem todos;
   story não tem legenda).
-- `kit-out/` guarda cópia local de tudo (gitignored) + `sent.json`
-  (memória de enviados).
+- `kit-out/` guarda cópia local de tudo (gitignored) + `audit-*.json`
+  (memória de enviados fica em `ScriptState`/`kit-sent` no banco).
 
 ### Regras de seleção (o que garante qualidade)
 
@@ -142,11 +149,18 @@ Automação completa de divulgação: todo dia **08:00** o cron local
 3. **Veto de substantivo-produto** (esporte): "pijama de basquete" é
    roupa, não esporte — o objeto vendido manda.
 4. **Desconto ≥ 10%** (`MIN_DISC`) — markdown de 3-5% não é oferta.
-5. **Sem repetição**: IDs enviados nos últimos 14 dias são excluídos
-   (`kit-out/sent.json`); janela relaxa 14→7→3→0 dias se o tema
+5. **Sem repetição**: IDs e famílias (`familyKey`) enviados nos últimos
+   14 dias são excluídos — persistido em **`ScriptState` (banco,
+   key `kit-sent`)** porque o Actions é efêmero; `kit-out/sent.json`
+   local é só fallback/migração. Janela relaxa 14→7→3 se o tema
    tiver <2 ofertas frescas. Fallback honesto: tema vazio →
-   "achadinhos" com aviso no email.
+   "achadinhos" com aviso no email. Embaralho dentro do top-14 por
+   score (cliques 7d ×3 + marca conhecida +80 + loja conhecida +25 +
+   desconto) para variar sem perder qualidade.
 6. **Família dedup**: variações de cor/tamanho do mesmo produto viram 1.
+7. **Auditoria**: cada run grava `kit-out/audit-AAAA-MM-DD.json` com
+   score, cliques, boosts e janela de exclusão de cada item —
+   responde "por que saiu isso?" sem consultar o banco.
 
 ### Áudio do reel (à prova de falhas)
 
@@ -202,7 +216,7 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 
 ## SEO
 
-- `sitemap.xml` dinâmico: home + `/?aba=cupons` + **todos** os produtos ativos (até 45.000, limite do sitemap é 50k).
+- `sitemap.xml` = **índice** → `/sitemaps/pages` (home, cupons, ofertas, categorias) + `/sitemaps/produtos/[page]` (1.000 URLs/produto, ~23 páginas). Índice evita o erro "não foi possível buscar" do Search Console com sitemap único de ~4MB.
 - `robots.txt`: `allow: /`, `disallow: /ir/`.
 - Metadata global: template `%s | Ofertaço Radar`, keywords pt-BR, OG `pt_BR`, Twitter `summary_large_image`, `og:image` = `/api/og`.
 - Home: JSON-LD `WebSite` + `Organization`.
@@ -219,6 +233,7 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 - **TrackedLink** — cache `sourceUrl → shortUrl` do shortener Lomadee.
 - **AffiliatedOrg** / **Brand** — orgs e marcas Lomadee (logos das lojas).
 - **SyncState** — estado dos syncs: `key`, `phase`, `page`, `lastCycleAt`, `busyAt`. Chaves: `main` (Lomadee), `ml` (ML), `ml-token` (OAuth), `amazon` (PA-API) + auxiliares `${key}:beat` e `${key}:err` (sinal de vida e último erro, sem migração de schema).
+- **ScriptState** — KV genérico (`key`, `value` JSON) para scripts em ambiente efêmero. Hoje: `kit-sent` = histórico anti-repetição do kit diário (14 dias). Criada via `scripts/migration-scriptstate.sql` + `DISABLE ROW LEVEL SECURITY`.
 
 ---
 
@@ -250,6 +265,7 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 | `RESEND_FROM` | não | remetente (default `onboarding@resend.dev`) |
 | `KIT_MUSIC_URL` / `KIT_MUSIC_URLS` | não | faixa(s) remota(s) de música do reel (vírgula separa; `music/*.mp3` locais têm prioridade) |
 | `KIT_THEME_DAY` | não | força tema do kit em testes (0=dom … 6=sáb) |
+| `KIT_HEALTHCHECK_URL` | kit | ping healthchecks.io — alerta se o kit não rodar (Actions) |
 
 \* O sync incremental de Lomadee exige `LOMADEE_API_KEY`; `FEED_URL` só no sync manual.
 
@@ -351,6 +367,8 @@ src/
     admin/page.tsx               # painel: KPIs, sync, form Amazon, export
     admin/kit/                   # preview visual do kit Instagram (login)
     categoria/[slug]/           # paginas de categoria indexaveis
+    ofertas/                    # link-in-bio estilo Linktree
+    feed/google.xml/            # feed Google Shopping (RSS + g:)
     login/                       # login Supabase
     api/
       pv/route.ts                # pageviews (sentinela, ignora bot/admin)
@@ -383,10 +401,15 @@ src/
 scripts/
   sync.ts / checklinks.ts / recheck.ts / recategorize.ts / dedup.ts / ml-auth.ts
   daily-kit.ts                  # kit diario: reel ffmpeg + cards + email Resend
-  kit-cron.sh / amz-cron.sh     # wrappers de cron (node do nvm + log)
+  kit-cron.sh / amz-cron.sh     # wrappers de cron local (so o amz usa hoje)
+  migration-*.sql               # DDL manual p/ Supabase SQL Editor
+.github/workflows/
+  kit.yml                       # kit diario 8h BRT (Actions, gratis)
+  recategorize.yml              # reclassificacao dom 6h BRT
 music/                          # faixas do reel (rotacao diaria, versionadas)
 assets/logo.jpeg                # marca usada no intro/outro do reel
-kit-out/                        # saida do kit (gitignored): reel, PNGs, sent.json
+kit-out/                        # saida local do kit (gitignored): reel, PNGs,
+                                # audit-*.json; sent.json virou ScriptState no banco
 prisma/schema.prisma
 ```
 
@@ -400,8 +423,9 @@ prisma/schema.prisma
 - [ ] Amazon PA-API quando a conta Creators atingir 10 vendas/30 dias (credenciais `AMZ_API_KEY`/`AMZ_API_SECRET`)
 - [ ] Reconciliar conversões via API `/orders` Lomadee (cliques → vendas → receita real)
 - [x] Páginas `/categoria/[slug]` indexáveis (SEO)
-- [ ] Google Shopping feed (Merchant Center)
+- [x] Google Shopping feed — `/feed/google.xml` no Merchant Center (~20k aprovados)
 - [ ] Usar `/api/card/[id]` como `og:image` por produto
 - [ ] Postagem automática no Instagram via API Meta (aguarda app review)
+- [ ] Amazon: scrape local roda em cron da máquina; migrar para API (PA-API/SerpApi) ou cortar quando a conta estiver ociosa
 
 > Pendências detalhadas e priorizadas em [`PENDENCIAS.md`](./PENDENCIAS.md).

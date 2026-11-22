@@ -46,6 +46,12 @@ const LINKS = [
     sub: "Até 90% off todo dia",
   },
   {
+    href: "/ofertas#terminando",
+    icon: "⏰",
+    title: "Terminando hoje",
+    sub: "Corre que acaba",
+  },
+  {
     href: "/?aba=cupons",
     icon: "🎟️",
     title: "Cupons de desconto",
@@ -65,22 +71,53 @@ const LINKS = [
   },
 ];
 
+function timeAgo(d: Date): string {
+  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (s < 90) return "agora mesmo";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
+
 export default async function OfertasPage() {
-  const [products, total] = await Promise.all([
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 3_600_000);
+  const [products, total, endingSoon, syncStates] = await Promise.all([
     prisma.product.findMany({
       where: WHERE,
       orderBy: [{ discountPct: { sort: "desc", nulls: "last" } }, { id: "desc" }],
       take: 8,
     }),
     prisma.product.count({ where: WHERE }),
+    prisma.product.findMany({
+      where: {
+        ...WHERE,
+        endsAt: { gte: now, lte: in24h },
+      },
+      orderBy: [{ endsAt: "asc" }, { discountPct: { sort: "desc", nulls: "last" } }],
+      take: 4,
+    }),
+    prisma.syncState.findMany({
+      where: { key: { in: ["main", "ml", "amazon"] } },
+      select: { lastCycleAt: true },
+    }),
   ]);
+
+  const lastSync = syncStates
+    .map((s) => s.lastCycleAt)
+    .filter((d): d is Date => !!d)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-10">
       {/* ===== Perfil + links (estilo Linktree) ===== */}
       <section className="mx-auto flex w-full max-w-md flex-col items-center pt-8 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-4xl shadow-lg shadow-emerald-600/25">
-          🛸
+        <div className="rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 p-[3px] shadow-lg shadow-emerald-600/25">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-4xl">
+            🛸
+          </div>
         </div>
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
           {SITE_NAME}
@@ -95,6 +132,21 @@ export default async function OfertasPage() {
           </b>{" "}
           conferidas todo dia.
         </p>
+
+        {/* Prova social: numeros ao vivo */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] font-bold">
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            🔥 {total.toLocaleString("pt-BR")} ofertas ativas
+          </span>
+          {lastSync && (
+            <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              🔄 catálogo atualizado {timeAgo(lastSync)}
+            </span>
+          )}
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+            ✓ preços e cupons verificados
+          </span>
+        </div>
 
         {/* Links */}
         <nav aria-label="Links rápidos" className="mt-6 flex w-full flex-col gap-2.5">
@@ -139,6 +191,28 @@ export default async function OfertasPage() {
           Seguir @ofertacoradar
         </a>
       </section>
+
+      {/* ===== Terminando hoje (urgencia real) ===== */}
+      {endingSoon.length > 0 && (
+        <section id="terminando" className="mx-auto mt-10 w-full max-w-3xl scroll-mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+              ⏰ Terminando nas próximas 24h
+            </h2>
+            <Link
+              href="/?ordem=terminando#catalogo"
+              className="text-xs font-bold text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Ver todos →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {endingSoon.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ===== Categorias ===== */}
       <section id="categorias" className="mx-auto mt-10 w-full max-w-3xl scroll-mt-6">
