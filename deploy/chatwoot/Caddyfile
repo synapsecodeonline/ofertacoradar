@@ -1,0 +1,4 @@
+# Troque pelo seu domínio real
+chat.ofertacoradar.com.br {
+	reverse_proxy rails:3000
+}

@@ -1,0 +1,91 @@
+# Chatwoot self-hosted — Ofertaço Radar
+# Stack: Chatwoot (Rails) + Sidekiq + Postgres 16 + Redis 7 + Caddy (SSL)
+# Uso: copie .env.example para .env, preencha, e rode `docker compose up -d`
+
+x-chatwoot-base: &chatwoot-base
+  image: chatwoot/chatwoot:v4.17.1-ce
+  env_file: .env
+  volumes:
+    - chatwoot_storage:/app/storage
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatwoot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME} -d ${POSTGRES_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: chatwoot-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rails:
+    <<: *chatwoot-base
+    container_name: chatwoot-rails
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    entrypoint: docker/entrypoints/rails.sh
+    command: ["bundle", "exec", "rails", "s", "-p", "3000", "-b", "0.0.0.0"]
+    expose:
+      - "3000"
+
+  sidekiq:
+    <<: *chatwoot-base
+    container_name: chatwoot-sidekiq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: chatwoot-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - rails
+
+volumes:
+  postgres_data:
+  redis_data:
+  chatwoot_storage:
+  caddy_data:
+  caddy_config:
