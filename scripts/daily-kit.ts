@@ -821,6 +821,37 @@ async function main() {
     items = await getKitItemsByIds(ids);
     console.log(`Kit forçado por --ids: ${items.length} itens`);
   }
+
+  // Pool de 80 e raso demais para a janela de exclusao de 14 dias —
+  // quando o top ja saiu nos kits anteriores, o kit encolhia (ja saiu
+  // com 1 oferta = 2 imagens). Se faltar item, busca um pool profundo
+  // e completa respeitando a MESMA exclusao de ids/familias.
+  if (!idsArg && items.length < 4) {
+    const excl = sentWithin(sent, winUsed);
+    const deep = await withRetry(() => getInstagramPool(400));
+    const haveIds = new Set(items.map((it) => it.id));
+    const haveFams = new Set(items.map((it) => familyKey(it.title)));
+    const refill = pickDiverse(
+      deep.items
+        .filter(
+          (it) =>
+            hasRealDiscount(it) &&
+            !haveIds.has(it.id) &&
+            !haveFams.has(familyKey(it.title)) &&
+            !isSent(excl, it),
+        )
+        .sort((a, b) => kitScore(b) - kitScore(a)),
+      (it) => it.source,
+      4 - items.length,
+    );
+    if (refill.length > 0) {
+      console.log(
+        `Kit com ${items.length} itens — completando com ${refill.length} do pool profundo.`,
+      );
+      items = [...items, ...refill];
+    }
+  }
+
   if (items.length === 0) {
     console.log("Nenhuma oferta valida hoje — kit vazio.");
     await hcPing(true);
