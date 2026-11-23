@@ -8,8 +8,9 @@
 - [x] ~~Conta Resend~~ — domínio `ofertacoradar.com.br` verificado;
       envio liberado para qualquer destinatário com
       `RESEND_FROM=kit@ofertacoradar.com.br`.
-- [x] ~~Domínio próprio~~ — `ofertacoradar.com.br` + `www` na Vercel
-      com SSL ativo; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
+- [x] ~~Domínio próprio~~ — `ofertacoradar.com.br` + `www` agora
+      self-hosted via Cloudflare Tunnel (Vercel pausada por CPU —
+      ver seção Deploy). SSL automático pelo túnel; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
       verificado e sitemap processado (dividido em índice + 23
       sub-sitemaps de 1000 URLs).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos

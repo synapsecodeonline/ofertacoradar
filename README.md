@@ -16,7 +16,7 @@ Além do site, o projeto gera automaticamente um **kit diário de divulgação p
 | UI | React 19 + Tailwind CSS 4 |
 | Banco | PostgreSQL (Supabase) via Prisma 6 (`prisma-client-js`) |
 | Auth | Supabase Auth (somente `/admin` e `/login`) |
-| Deploy | Vercel |
+| Deploy | **Docker local** (WSL2) + Cloudflare Tunnel — Vercel pausada por CPU (free tier) |
 | Sync 24/7 | cron-job.org → `GET /api/cron/sync?key=$CRON_SECRET` a cada 1min |
 | Rotinas agendadas | **cron-job.org → GitHub Actions** (grátis): kit diário 8h BRT + recategorização dom 6h BRT — ver `.github/workflows/` |
 | Saúde das rotinas | healthchecks.io (`KIT_HEALTHCHECK_URL`) — alerta se o kit não rodar |
@@ -49,7 +49,7 @@ npm run dev          # http://localhost:3000
 
 | Serviço | Papel |
 |---|---|
-| **Vercel** | Hosting do Next.js + endpoint `/api/cron/sync` |
+| **Docker local** (`deploy/site/`) | Hosting do Next.js (standalone) + `/api/cron/sync` — exposto via Cloudflare Tunnel (`ofertacoradar.com.br` → `site-web:3000`) |
 | **Supabase** | PostgreSQL (Product, Click, ScriptState…) + Auth `/admin` |
 | **GitHub Actions** | Executa kit diário e recategorização (grátis) |
 | **cron-job.org** | Gatilhos: sync a cada 1min + dispatch dos workflows no horário exato |
@@ -374,7 +374,7 @@ npm run recategorize         # dry-run da reclassificacao de categorias
 npm run recategorize -- --apply   # aplica (cuidado: reclassifica o banco)
 npm run db:push    # prisma db push
 npx tsc --noEmit   # typecheck
-npx vercel --prod --yes   # deploy manual
+docker compose -f deploy/site/docker-compose.yml up -d --build   # deploy manual (rebuild)
 ```
 
 > `npm run db:push` pode falhar no pooler do Supabase (role sem ownership); alternativa: `ALTER TABLE` via `$executeRawUnsafe` ou linhas auxiliares no `SyncState` (padrão `:beat`/`:err`).
