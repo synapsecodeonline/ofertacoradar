@@ -58,7 +58,7 @@ export default function AdminSyncButton() {
         type="button"
         onClick={run}
         disabled={state.kind === "loading"}
-        className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
+        className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm transition-colors hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
       >
         {label}
       </button>

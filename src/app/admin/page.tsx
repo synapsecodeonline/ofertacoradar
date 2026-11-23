@@ -378,7 +378,7 @@ export default async function AdminPage() {
           </a>
           <Link
             href="/admin/servicos"
-            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
           >
             Serviços
           </Link>
