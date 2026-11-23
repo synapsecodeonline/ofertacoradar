@@ -12,8 +12,34 @@ import { decodeEntities } from "../src/lib/format";
 
 const SKIP = new Set(["outros", "ofertas"]);
 
+// Pooler do Supabase da statement_timeout transitorio quando o sync
+// compete — mesmo padrao do withRetry do daily-kit/amz-scrape.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  tries = 4,
+  waitMs = 8_000,
+): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      console.log(
+        `Query falhou (tentativa ${i + 1}/${tries}):`,
+        String(e).slice(0, 140),
+      );
+      if (i < tries - 1) {
+        await new Promise((r) => setTimeout(r, waitMs * (i + 1)));
+      }
+    }
+  }
+  throw last;
+}
+
 async function main() {
-  const rows = await prisma.product.findMany({
+  const rows = await withRetry(() =>
+    prisma.product.findMany({
     where: { active: true },
     select: {
       id: true,
@@ -23,7 +49,8 @@ async function main() {
       category: true,
       externalId: true,
     },
-  });
+    }),
+  );
   const diff = new Map<string, number>();
   const updates: {
     id: number;
@@ -70,18 +97,43 @@ async function main() {
     console.log("\nDry-run. Rode com --apply para gravar.");
     return;
   }
-  for (const u of updates) {
-    await prisma.product.update({
-      where: { id: u.id },
-      data: {
-        ...(u.title !== undefined ? { title: u.title } : {}),
-        ...(u.cat !== null
-          ? { category: u.cat, subtype: u.sub }
-          : {}),
-      },
-    });
+  // Updates em lotes de 20 com retry por lote — sequencial puro
+  // estourava o tempo do job no GitHub Actions (~10k produtos).
+  const CHUNK = 20;
+  let done = 0;
+  let failed = 0;
+  for (let i = 0; i < updates.length; i += CHUNK) {
+    const chunk = updates.slice(i, i + CHUNK);
+    const results = await withRetry(() =>
+      Promise.allSettled(
+        chunk.map((u) =>
+          prisma.product.update({
+            where: { id: u.id },
+            data: {
+              ...(u.title !== undefined ? { title: u.title } : {}),
+              ...(u.cat !== null
+                ? { category: u.cat, subtype: u.sub }
+                : {}),
+            },
+          }),
+        ),
+      ),
+    ).catch(() => null);
+    if (!results) {
+      failed += chunk.length;
+      continue;
+    }
+    for (const r of results) {
+      if (r.status === "fulfilled") done++;
+      else failed++;
+    }
+    if ((i / CHUNK) % 25 === 0) {
+      console.log(`  ${done}/${updates.length} atualizados...`);
+    }
   }
-  console.log(`\n${updates.length} produtos atualizados.`);
+  console.log(
+    `\n${done} produtos atualizados${failed ? `, ${failed} falhas` : ""}.`,
+  );
 }
 
 main()
