@@ -325,7 +325,7 @@ async function runCycle(apiKey: string, baseUrl: string) {
 // interfere no ciclo Lomadee. Fases: q:{indice da query} com page=offset.
 
 const ML_STATE_KEY = "ml";
-const ML_MAX_OFFSET = 200; // ate 4 paginas de ML_LIMIT por query
+const ML_MAX_OFFSET = 1000; // teto da API de busca ML (~33 paginas de ML_LIMIT por query)
 
 async function runMLCycle() {
   const state = await prisma.syncState.findUnique({

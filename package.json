@@ -17,7 +17,8 @@
     "amz:login": "tsx scripts/amz-login.ts",
     "amz:verify": "tsx --env-file=.env scripts/amz-verify.ts",
     "kit:daily": "tsx --env-file=.env scripts/daily-kit.ts",
-    "db:disk": "tsx --env-file=.env scripts/db-disk-report.ts"
+    "db:disk": "tsx --env-file=.env scripts/db-disk-report.ts",
+    "purge:inactive": "tsx --env-file=.env scripts/purge-inactive.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

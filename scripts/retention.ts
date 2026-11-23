@@ -6,10 +6,13 @@
 //                          historico do produto (pagina usa so _min)
 //   Event       > 90d    → apaga (analytics so precisa do recente)
 //   Click       > 180d   → apaga (prova social conta total, nao periodo)
+//   endsAt vencido      → produto removido (cupom/oferta expirada = obsoleto;
+//                          se a fonte reenviar com nova data, volta pelo upsert)
 //
 // Roda no workflow semanal (recategorize.yml) e manual:
 //   npm run retention
 import { prisma } from "../src/lib/db";
+import { purgeProducts } from "../src/lib/product-purge";
 
 const PRICE_HISTORY_DAYS = 180;
 const EVENT_DAYS = 90;
@@ -30,8 +33,9 @@ async function main() {
   const cl = await prisma.click.deleteMany({
     where: { createdAt: { lt: new Date(Date.now() - CLICK_DAYS * 864e5) } },
   });
+  const exp = await purgeProducts({ endsAt: { lt: new Date() } });
   console.log(
-    `retencao: PriceHistory -${ph} | Event -${ev.count} | Click -${cl.count}`,
+    `retencao: PriceHistory -${ph} | Event -${ev.count} | Click -${cl.count} | expirados -${exp}`,
   );
 }
 

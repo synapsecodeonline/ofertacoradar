@@ -317,6 +317,7 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 
 - Lomadee API (campanhas sempre; catálogo só com `LOMADEE_PRODUCTS=1`) ou `FEED_URL` genérico; ML com credenciais.
 - Upsert por `externalId`; remoção por prefixo de fonte (produto que some do feed é deletado, não desativado — base só tem ativos).
+- Validação dura no upsert: url http(s), preço > 0, imageUrl/affiliateUrl http(s) — produto inválido nem entra. `endsAt` vencido é purgado na retenção semanal. Cotas por fonte no sync completo via `SYNC_QUOTA_*` (catálogo cheio ~22k+).
 
 ### Scraper Amazon local (`scripts/amz-scrape.ts` → `npm run amz:scrape`)
 

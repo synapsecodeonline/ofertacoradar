@@ -34,6 +34,17 @@ export async function upsertByExternalId(
   ) {
     return;
   }
+  // Validacao dura: nunca entra invalido na base — url tem que ser
+  // http(s), preco (quando informado) positivo, imageUrl (quando
+  // informada) http(s). Produto sem imagem passa: cartao tem fallback.
+  if (
+    !p.url.startsWith("http") ||
+    (p.price != null && p.price <= 0) ||
+    (p.imageUrl != null && !p.imageUrl.startsWith("http")) ||
+    (p.affiliateUrl != null && !p.affiliateUrl.startsWith("http"))
+  ) {
+    return;
+  }
   // Link morto nao volta: o validador deleta o produto e grava tombstone
   // em ScriptState — sem isso o feed recriaria a cada ciclo.
   if (p.externalId && (await deadLinkSet()).has(p.externalId)) return;

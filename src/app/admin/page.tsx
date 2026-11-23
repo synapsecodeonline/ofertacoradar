@@ -370,8 +370,14 @@ export default async function AdminPage() {
             Subscribers
           </a>
           <Link
-            href="/admin/kit"
+            href="/admin/servicos"
             className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+          >
+            Serviços
+          </Link>
+          <Link
+            href="/admin/kit"
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold shadow-sm hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900"
           >
             Kit Instagram
           </Link>
