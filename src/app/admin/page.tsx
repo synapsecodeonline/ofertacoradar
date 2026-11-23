@@ -303,9 +303,16 @@ export default async function AdminPage() {
     syncStates.filter((s) => s.key.endsWith(":err")).map((s) => [s.key.slice(0, -4), s]),
   );
 
+  // Fonte sem credenciais esta desligada, nao quebrada — nao vira alerta.
+  const SOURCE_CONFIGURED: Record<string, boolean> = {
+    main: !!(process.env.LOMADEE_API_KEY || process.env.FEED_URL),
+    ml: !!(process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET),
+    awin: !!process.env.AWIN_FEEDS,
+    amazon: !!(process.env.AMZ_API_KEY && process.env.AMZ_API_SECRET),
+  };
   for (const s of syncStates) {
     const cfg = SYNC_SOURCES[s.key];
-    if (!cfg) continue;
+    if (!cfg || SOURCE_CONFIGURED[s.key] === false) continue;
     const busyAge = s.busyAt ? now.getTime() - s.busyAt.getTime() : null;
     const busyFresh = busyAge !== null && busyAge < 3 * 60_000;
     const beatAt = beatMap.get(s.key)?.busyAt ?? null;
@@ -439,22 +446,24 @@ export default async function AdminPage() {
             {syncStates.filter((s) => s.key in SYNC_SOURCES).length === 0 && (
               <p className="text-sm text-zinc-400">Nenhum sync registrado.</p>
             )}
-            {syncStates
-              .filter((s) => s.key in SYNC_SOURCES)
-              .map((s) => {
-              const cfg = SYNC_SOURCES[s.key];
+            {Object.keys(SYNC_SOURCES).map((key) => {
+              const cfg = SYNC_SOURCES[key];
+              const s = syncStates.find((x) => x.key === key);
+              const configured = SOURCE_CONFIGURED[key] !== false;
               const busyFresh =
-                !!s.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000;
-              const beatAt = beatMap.get(s.key)?.busyAt ?? null;
+                !!s?.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000;
+              const beatAt = beatMap.get(key)?.busyAt ?? null;
               const beatAge = beatAt ? now.getTime() - beatAt.getTime() : null;
               const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
-              const err = errMap.get(s.key);
+              const err = errMap.get(key);
               const errRecent = !!err?.busyAt && now.getTime() - err.busyAt.getTime() < 24 * 3_600_000;
-              const prodSrc = s.key === "main" ? "lomadee" : s.key;
+              const prodSrc = key === "main" ? "lomadee" : key;
               const prodLast = lastUpdMap.get(prodSrc) ?? null;
               const prodAge = prodLast ? now.getTime() - prodLast.getTime() : null;
               const catalogFresh = prodAge !== null && prodAge < 24 * 3_600_000;
-              const status = busyFresh
+              const status = !configured
+                ? { label: "não configurado", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" }
+                : busyFresh
                 ? { label: "sincronizando", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" }
                 : !active
                   ? { label: "parado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" }
@@ -464,7 +473,7 @@ export default async function AdminPage() {
                       ? { label: "atualizado", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" }
                       : { label: "desatualizado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" };
               return (
-                <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
+                <div key={key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <span className="font-extrabold">{cfg.name}</span>
                     <span

@@ -13,6 +13,11 @@
       ver seção Deploy). SSL automático pelo túnel; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
       verificado e sitemap processado (dividido em índice + 23
       sub-sitemaps de 1000 URLs).
+- [ ] **Mercado Livre — sem credenciais** — `ML_CLIENT_ID`/`ML_CLIENT_SECRET`
+      não estão no `.env` (sumiram na migração Vercel→local). Sync `ml:`
+      parado desde sempre; admin mostra "não configurado". Pegar no painel
+      Mercado Livre Developers (app existente) ou no env do projeto Vercel
+      antigo, e adicionar ao `.env` + `docker compose up -d` (recreate).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.
@@ -38,12 +43,18 @@
 
 ## 🔧 Melhorias técnicas pendentes
 
-- [ ] **Disco Supabase (500MB free) estourou** — banco caiu por disco
-      cheio. Causa: PriceHistory inseria ~20k linhas/dia. Corrigido no
-      código (só grava em mudança de preço + `npm run retention`
-      semanal). Pendente: rodar `scripts/cleanup-disk.sql` no SQL
-      Editor quando o banco voltar + observar se disco estabiliza.
-      Se crescer de novo → Pro plan ou reter menos.
+- [x] ~~**Disco Supabase (500MB free)**~~ — banco novo (`coqvifdtnvfapcmwtkzp`)
+      com ~40MB. PriceHistory só grava em mudança de preço, `npm run
+      retention` semanal (inclui purge de `endsAt` vencido), base só tem
+      produtos ativos (`src/lib/product-purge.ts` — desativar = deletar,
+      tombstone `dead-links` impede ressurreição). Relatório semanal de
+      disco por email via workflow `db-disk.yml`.
+- [x] ~~**Egress Supabase (5GB/mês) estourou — 63GB no ciclo**~~ —
+      causa: listagens baixavam linha completa (description+urls) por
+      pageview e `/feed/google.xml` (~25MB) sem cache. Corrigido:
+      `CARD_SELECT`/`KIT_SELECT` (só campos do card), `memoTtl`
+      (`src/lib/memo.ts`) cacheia feed 1h e sitemaps 10-30min. Observar
+      Usage do ciclo atual; se seguir alto → cache de borda Cloudflare.
 
 - [ ] **~600 produtos em "outros"** — maioria banners de campanha sem
       sinal textual. Retorno decrescente; reavaliar só se incomodar.
@@ -70,6 +81,13 @@
 - [ ] **Reconciliar conversões** — cliques estão no banco; receita real
       vem das APIs das redes (`src/lib/reports.ts`). Cruzar clique →
       venda exigiria relatórios das plataformas.
+
+- [x] **Base só com produtos ativos** — produto que some do feed, tem
+      link morto, é duplicata ou oferta expirada é DELETADO (não mais
+      `active=false`). `/admin/servicos` monitora serviços internos e
+      externos (site, chat, Supabase, GitHub Actions, syncs, disco).
+      Admin distingue fonte "não configurada" (sem credenciais) de
+      "parada" (com credencial mas sem pulso).
 
 ## ✅ Recentemente concluído (referência)
 

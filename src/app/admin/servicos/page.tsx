@@ -91,10 +91,12 @@ export default async function ServicosPage() {
     httpCheck(`${SITE_URL}/api/health`),
     httpCheck(`${CHAT_URL}/`),
     SUPA_URL ? httpCheck(`${SUPA_URL}/auth/v1/health`) : Promise.resolve(FALLBACK),
+    // /rest/v1/ responde 401 sem tabela/apikey granular — para checar
+    // "esta no ar" qualquer resposta < 500 serve; so erro de rede/5xx e down.
     SUPA_URL && SUPA_KEY
       ? httpCheck(`${SUPA_URL}/rest/v1/`, {
           headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
-        })
+        }).then((r) => ({ ...r, ok: r.status != null ? r.status < 500 : r.ok }))
       : Promise.resolve(FALLBACK),
     fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows`, {
       headers: { Accept: "application/vnd.github+json", "User-Agent": "ofertacoradar-admin" },
@@ -158,7 +160,16 @@ export default async function ServicosPage() {
   const errMap = new Map(
     syncStates.filter((s) => s.key.endsWith(":err")).map((s) => [s.key.slice(0, -4), s]),
   );
+  // Fonte sem credenciais nao esta "parada" — esta desligada. Mostra
+  // "nao configurado" em cinza em vez de alarmar como se tivesse quebrado.
+  const SOURCE_CONFIGURED: Record<string, boolean> = {
+    main: !!(process.env.LOMADEE_API_KEY || process.env.FEED_URL),
+    ml: !!(process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET),
+    awin: !!process.env.AWIN_FEEDS,
+    amazon: !!(process.env.AMZ_API_KEY && process.env.AMZ_API_SECRET),
+  };
   const syncRows = Object.keys(SYNC_SOURCES).map((key) => {
+    const configured = SOURCE_CONFIGURED[key] ?? true;
     const s = syncStates.find((x) => x.key === key);
     const busyFresh = !!s?.busyAt && now.getTime() - s.busyAt.getTime() < 3 * 60_000;
     const beatAt = beatMap.get(key)?.busyAt ?? null;
@@ -166,13 +177,15 @@ export default async function ServicosPage() {
     const active = busyFresh || (beatAge !== null && beatAge < 5 * 60_000);
     const err = errMap.get(key);
     const errRecent = !!err?.busyAt && now.getTime() - err.busyAt.getTime() < 24 * 3_600_000;
-    const status = busyFresh
-      ? { label: "sincronizando", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" }
-      : !active
-        ? { label: "parado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" }
-        : errRecent
-          ? { label: "com erro", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" }
-          : { label: "ativo", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" };
+    const status = !configured
+      ? { label: "não configurado", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" }
+      : busyFresh
+        ? { label: "sincronizando", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" }
+        : !active
+          ? { label: "parado", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" }
+          : errRecent
+            ? { label: "com erro", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300" }
+            : { label: "ativo", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" };
     return { key, name: SYNC_SOURCES[key], status, lastBeat: beatAt, err: errRecent ? err!.phase : null };
   });
 
