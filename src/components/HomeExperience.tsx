@@ -331,7 +331,7 @@ export async function HomeExperience({
         COUNT(*) FILTER (WHERE "externalId" LIKE 'ml:%')   AS ml,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'aw:%')   AS aw,
         COUNT(*) FILTER (WHERE "externalId" LIKE 'amz:%')  AS amz
-      FROM "Product"
+      FROM "ofertacoradar"."Product"
       WHERE active
         AND "merchant" IS NOT NULL
         AND "imageUrl" IS NOT NULL

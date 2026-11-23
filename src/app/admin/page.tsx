@@ -193,13 +193,13 @@ export default async function AdminPage() {
     // series diarias 30d (tabela Click — historico completo)
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', "createdAt") AS day, COUNT(*) AS n
-       FROM "Click" WHERE "productId" = ${pvId} AND "createdAt" >= $1
+       FROM "ofertacoradar"."Click" WHERE "productId" = ${pvId} AND "createdAt" >= $1
        GROUP BY 1 ORDER BY 1`,
       d30,
     ),
     prisma.$queryRawUnsafe<{ day: Date; n: bigint }[]>(
       `SELECT date_trunc('day', c."createdAt") AS day, COUNT(*) AS n
-       FROM "Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
+       FROM "ofertacoradar"."Click" c WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
        GROUP BY 1 ORDER BY 1`,
       d30,
     ),
@@ -230,14 +230,14 @@ export default async function AdminPage() {
     // top produtos / lojas (30d, tabela Click)
     prisma.$queryRawUnsafe<{ id: number; title: string; merchant: string | null; n: bigint }[]>(
       `SELECT p.id, p.title, p.merchant, COUNT(*) AS n
-       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
+       FROM "ofertacoradar"."Click" c JOIN "ofertacoradar"."Product" p ON p.id = c."productId"
        WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1
        GROUP BY p.id, p.title, p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
     ),
     prisma.$queryRawUnsafe<{ merchant: string; n: bigint }[]>(
       `SELECT p.merchant, COUNT(*) AS n
-       FROM "Click" c JOIN "Product" p ON p.id = c."productId"
+       FROM "ofertacoradar"."Click" c JOIN "ofertacoradar"."Product" p ON p.id = c."productId"
        WHERE ${NOT_PV(pvId)} AND c."createdAt" >= $1 AND p.merchant IS NOT NULL
        GROUP BY p.merchant ORDER BY n DESC LIMIT 10`,
       d30,
@@ -250,7 +250,7 @@ export default async function AdminPage() {
          WHEN "externalId" LIKE 'aw:%' THEN 'awin'
          WHEN "externalId" LIKE 'amz:%' THEN 'amazon'
          ELSE 'outros' END AS src, MAX("updatedAt") AS last
-       FROM "Product" GROUP BY 1`,
+       FROM "ofertacoradar"."Product" GROUP BY 1`,
     ),
     prisma.syncState.findMany(),
   ]);

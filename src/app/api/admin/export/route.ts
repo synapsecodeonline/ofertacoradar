@@ -34,7 +34,7 @@ export async function GET() {
               WHEN p."externalId" LIKE 'aw:%' THEN 'awin'
               ELSE 'outros' END AS src,
             c.referer
-     FROM "Click" c JOIN "Product" p ON p.id = c."productId"
+     FROM "ofertacoradar"."Click" c JOIN "ofertacoradar"."Product" p ON p.id = c."productId"
      WHERE c."createdAt" >= $1 AND c."productId" <> $2
      ORDER BY c."createdAt" DESC
      LIMIT 50000`,

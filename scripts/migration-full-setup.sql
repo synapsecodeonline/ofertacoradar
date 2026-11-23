@@ -206,3 +206,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA "ofertacoradar"
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ofertacoradar_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA "ofertacoradar"
   GRANT USAGE, SELECT ON SEQUENCES TO ofertacoradar_app;
+
+-- 5) search_path: queries raw sem schema ("Product") resolvem certo.
+--    Sem isso a home quebra com 42P01 relation "Product" does not exist.
+ALTER ROLE ofertacoradar_app SET search_path TO ofertacoradar, public;
+ALTER ROLE postgres SET search_path TO ofertacoradar, public;
