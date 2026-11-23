@@ -86,7 +86,41 @@ async function main() {
     mlSynced = true;
     console.log(`${ml.length} produtos do Mercado Livre adicionados.`);
   }
-  console.log(`${products.length} itens no total.`);
+  // Cotas por fonte — o catalogo fica balanceado e estavel em ~10k
+  // produtos (disco Supabase free = 500MB). Itens alem da cota nao
+  // entram em `products`, logo nao sao vistos como "presentes" e sao
+  // desativados — a cada sync os mesmos top-N se mantem.
+  // Override por fonte: SYNC_QUOTA_LOMADEE / _ML / _AWIN / _AMAZON
+  const QUOTAS: Record<string, number> = {
+    lomadee: Number(process.env.SYNC_QUOTA_LOMADEE ?? 5000),
+    ml: Number(process.env.SYNC_QUOTA_ML ?? 5000),
+    awin: Number(process.env.SYNC_QUOTA_AWIN ?? 1000),
+    amazon: Number(process.env.SYNC_QUOTA_AMAZON ?? 500),
+  };
+  const familyOf = (p: (typeof products)[number]) => {
+    const id = p.externalId ?? "";
+    if (id.startsWith("ml:")) return "ml";
+    if (id.startsWith("aw:")) return "awin";
+    if (id.startsWith("amz:")) return "amazon";
+    if (id.startsWith("camp-") || id.startsWith("prod-lomadee:")) return "lomadee";
+    return "feed";
+  };
+  const byFamily = new Map<string, typeof products>();
+  for (const p of products) {
+    const f = familyOf(p);
+    const list = byFamily.get(f) ?? [];
+    list.push(p);
+    byFamily.set(f, list);
+  }
+  products = [...byFamily.entries()].flatMap(([f, list]) => {
+    const cap = QUOTAS[f] ?? Number(process.env.SYNC_QUOTA_FEED ?? 2000);
+    if (list.length > cap) {
+      console.log(`[sync] cota ${f}: ${list.length} → ${cap} itens`);
+      return list.slice(0, cap);
+    }
+    return list;
+  });
+  console.log(`${products.length} itens no total (apos cotas).`);
 
   const override = process.env.AFFILIATE_URL_OVERRIDE || undefined;
   let processed = 0;
