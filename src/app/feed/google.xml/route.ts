@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { brandFromTitle } from "@/lib/brands";
+import { memoTtl } from "@/lib/memo";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,10 @@ const esc = (s: string) =>
     .replace(/"/g, "&quot;");
 
 export async function GET() {
+  // Feed inteiro (~25k produtos com descricao) — caro de gerar e de
+  // servir; cache de 1h em memoria evita reconsultar o banco a cada
+  // hit de crawler/Merchant Center.
+  const xml = await memoTtl("feed-google", 60 * 60_000, async () => {
   const products = await prisma.product.findMany({
     where: {
       active: true,
@@ -86,6 +91,8 @@ export async function GET() {
 ${items}
   </channel>
 </rss>`;
+  return xml;
+  });
 
   return new Response(xml, {
     headers: {

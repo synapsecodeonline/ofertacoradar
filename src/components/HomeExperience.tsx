@@ -1,10 +1,10 @@
 import { after } from "next/server";
 import { Prisma } from "@prisma/client";
-import type { Product } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { maybeSyncLomadee, maybeSyncML } from "@/lib/syncer";
 import { maybeSyncAwin } from "@/lib/awin";
 import ProductCard from "@/components/ProductCard";
+import { CARD_SELECT, type CardProduct } from "@/lib/card-select";
 import SearchBar from "@/components/SearchBar";
 import { categoryLabel, canonicalCategory, CATEGORY_ORDER, rawSlugsFor, subtypesFor } from "@/lib/categories";
 import {
@@ -203,9 +203,10 @@ export async function HomeExperience({
               : { discountPct: { sort: "desc", nulls: "last" } },
           skip: (page - 1) * PAGE_SIZE,
           take: PAGE_SIZE,
+          select: CARD_SELECT,
         })
       : // Produtos: intercalado por fonte — ver interleaveConds acima.
-        prisma.$queryRaw<Product[]>`
+        prisma.$queryRaw<CardProduct[]>`
           WITH filtered AS (
             SELECT p.*,
               CASE
@@ -226,7 +227,9 @@ export async function HomeExperience({
             ) - 1 AS rn
             FROM filtered
           )
-          SELECT * FROM ranked
+          SELECT "id", "externalId", "title", "imageUrl", "price", "oldPrice",
+            "discountPct", "currency", "merchant", "couponCode", "endsAt"
+          FROM ranked
           ORDER BY rn, "discountPct" DESC NULLS LAST, id DESC
           LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}
         `,
@@ -283,6 +286,8 @@ export async function HomeExperience({
       },
       orderBy: { endsAt: "asc" },
       take: 12,
+      // so os ids — flashDeals serve apenas p/ deduplicar a lista
+      select: { id: true },
     }),
 
     // Contagem por subtipo dentro da categoria ativa (mesmos filtros da lista)

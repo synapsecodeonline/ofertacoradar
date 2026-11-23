@@ -10,6 +10,7 @@ import {
 } from "@/lib/categories";
 import { siteUrl, SITE_NAME } from "@/lib/site";
 import ProductCard from "@/components/ProductCard";
+import { CARD_SELECT } from "@/lib/card-select";
 import { IconTag } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export default async function CategoryPage({
       orderBy: { discountPct: { sort: "desc", nulls: "last" } },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+      select: CARD_SELECT,
     }),
     prisma.product.count({ where }),
   ]);

@@ -13,6 +13,7 @@ import { siteUrl, SITE_NAME } from "@/lib/site";
 import CopyCoupon from "@/components/CopyCoupon";
 import CountdownTimer from "@/components/CountdownTimer";
 import ProductCard from "@/components/ProductCard";
+import { CARD_SELECT } from "@/lib/card-select";
 import { IconArrowRight, IconCheck, IconFlame, IconShield, IconTag } from "@/components/Icons";
 import ShareButtons from "@/components/ShareButtons";
 import InstagramCaption from "@/components/InstagramCaption";
@@ -156,6 +157,7 @@ export default async function ProductPage({
           where: { ...baseWhere, merchant: product.merchant },
           orderBy: { discountPct: { sort: "desc", nulls: "last" } },
           take: 4,
+          select: CARD_SELECT,
         })
       : Promise.resolve([]),
     product.category
@@ -167,6 +169,7 @@ export default async function ProductPage({
           },
           orderBy: { discountPct: { sort: "desc", nulls: "last" } },
           take: 4,
+          select: CARD_SELECT,
         })
       : Promise.resolve([]),
   ]);

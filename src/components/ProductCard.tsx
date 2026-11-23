@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { Product } from "@prisma/client";
+import type { CardProduct } from "@/lib/card-select";
 import { discountPercent, formatPrice, imgSrc } from "@/lib/format";
 import { urgencyLabel } from "@/lib/urgency";
 import { merchantLogo } from "@/lib/store-logo";
@@ -13,7 +13,7 @@ export default async function ProductCard({
   clicks,
   showSource = false,
 }: {
-  product: Product;
+  product: CardProduct;
   clicks?: number;
   showSource?: boolean;
 }) {

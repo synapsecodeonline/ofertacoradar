@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { instagramCaption } from "@/lib/instagram";
 import { canonicalCategory } from "@/lib/categories";
-import type { Product, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 export type KitItem = {
   id: number;
@@ -22,6 +22,22 @@ export type KitItem = {
   cardStoryUrl: string;
   caption: string;
 };
+
+// Select enxuto p/ listagens do kit — so os campos que viram KitItem.
+const KIT_SELECT = {
+  id: true,
+  externalId: true,
+  title: true,
+  imageUrl: true,
+  price: true,
+  oldPrice: true,
+  discountPct: true,
+  currency: true,
+  merchant: true,
+  couponCode: true,
+  category: true,
+} satisfies Prisma.ProductSelect;
+type KitProduct = Prisma.ProductGetPayload<{ select: typeof KIT_SELECT }>;
 
 // Ofertas elegiveis para kit: ativas, com imagem, desconto > 0,
 // preco valido e sem data de expiracao (post nao pode promover
@@ -50,7 +66,7 @@ function sourceOf(externalId: string): string {
   return "outros";
 }
 
-function toKitItem(p: Product, c: number, site: string): KitItem {
+function toKitItem(p: KitProduct, c: number, site: string): KitItem {
   return {
     id: p.id,
     title: p.title,
@@ -99,6 +115,7 @@ export async function getThemedPool(
     where: KIT_WHERE,
     orderBy: { discountPct: "desc" },
     take: 2500,
+    select: KIT_SELECT,
   });
   const ids = candidates.map((p) => p.id);
   const clicks = await prisma.click.groupBy({
@@ -141,6 +158,7 @@ async function buildKit(count: number, takeMult: number) {
     where: KIT_WHERE,
     orderBy: { discountPct: "desc" },
     take: n * takeMult,
+    select: KIT_SELECT,
   });
 
   const items: KitItem[] = candidates
@@ -165,7 +183,7 @@ export function getInstagramKit(
 // Itens especificos por ID — usado pelo daily-kit --ids para reenviar
 // um kit ja montado (ex.: refazer apos falha de geracao de assets).
 export async function getKitItemsByIds(ids: number[]): Promise<KitItem[]> {
-  const rows = await prisma.product.findMany({ where: { id: { in: ids } } });
+  const rows = await prisma.product.findMany({ where: { id: { in: ids } }, select: KIT_SELECT });
   const order = new Map(ids.map((id, i) => [id, i]));
   const site = siteUrl();
   return rows

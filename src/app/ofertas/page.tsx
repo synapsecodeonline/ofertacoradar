@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
+import { CARD_SELECT } from "@/lib/card-select";
 import { CATEGORY_ORDER, categoryLabel, canonicalCategory } from "@/lib/categories";
 import { SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 
@@ -89,6 +90,7 @@ export default async function OfertasPage() {
       where: WHERE,
       orderBy: [{ discountPct: { sort: "desc", nulls: "last" } }, { id: "desc" }],
       take: 8,
+      select: CARD_SELECT,
     }),
     prisma.product.count({ where: WHERE }),
     prisma.product.findMany({
@@ -98,6 +100,7 @@ export default async function OfertasPage() {
       },
       orderBy: [{ endsAt: "asc" }, { discountPct: { sort: "desc", nulls: "last" } }],
       take: 4,
+      select: CARD_SELECT,
     }),
     prisma.syncState.findMany({
       where: { key: { in: ["main", "ml", "amazon"] } },

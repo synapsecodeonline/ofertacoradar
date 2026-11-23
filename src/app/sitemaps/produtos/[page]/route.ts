@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { SITEMAP_PAGE_SIZE } from "@/lib/sitemap";
+import { memoTtl } from "@/lib/memo";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(
 ) {
   const { page } = await params;
   const n = Math.max(0, Number.parseInt(page, 10) || 0);
+  const xml = await memoTtl(`sitemap-prod:${n}`, 30 * 60_000, async () => {
   const base = siteUrl();
   const products = await prisma.product.findMany({
     where: { active: true },
@@ -37,6 +39,8 @@ ${products
   )
   .join("\n")}
 </urlset>`;
+  return xml;
+  });
   return new Response(xml, {
     headers: { "Content-Type": "application/xml; charset=utf-8" },
   });

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { SITEMAP_PAGE_SIZE } from "@/lib/sitemap";
+import { memoTtl } from "@/lib/memo";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 // sub-sitemaps — paginas estaticas + produtos paginados.
 
 export async function GET() {
+  const xml = await memoTtl("sitemap-index", 10 * 60_000, async () => {
   const base = siteUrl();
   const total = await prisma.product.count({ where: { active: true } });
   const pages = Math.max(1, Math.ceil(total / SITEMAP_PAGE_SIZE));
@@ -20,6 +22,8 @@ export async function GET() {
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${children.map((u) => `  <sitemap><loc>${u}</loc></sitemap>`).join("\n")}
 </sitemapindex>`;
+  return xml;
+  });
   return new Response(xml, {
     headers: { "Content-Type": "application/xml; charset=utf-8" },
   });

@@ -1,5 +1,6 @@
 import { siteUrl } from "@/lib/site";
 import { CATEGORY_ORDER } from "@/lib/categories";
+import { memoTtl } from "@/lib/memo";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ const esc = (s: string) =>
 
 // Sub-sitemap das rotas estaticas + landing pages de categoria.
 export async function GET() {
+  const xml = await memoTtl("sitemap-pages", 60 * 60_000, async () => {
   const base = siteUrl();
   const urls: { loc: string; changefreq: string; priority: number }[] = [
     { loc: `${base}/`, changefreq: "hourly", priority: 0.9 },
@@ -33,6 +35,8 @@ ${urls
   )
   .join("\n")}
 </urlset>`;
+  return xml;
+  });
   return new Response(xml, {
     headers: { "Content-Type": "application/xml; charset=utf-8" },
   });
