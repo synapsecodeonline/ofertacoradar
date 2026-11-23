@@ -44,11 +44,16 @@ async function main() {
     // Atualiza a lista de marcas que o afiliado pode vender (base p/ aba Produtos)
     await prisma.affiliatedOrg.deleteMany();
     if (orgs.length) {
+      // Lomadee repete organizationId entre campanhas — dedup antes do
+      // createMany ou estoura a unique constraint.
+      const seenOrgs = new Set<string>();
       await prisma.affiliatedOrg.createMany({
-        data: orgs.map((o) => ({
-          organizationId: o.organizationId,
-          name: o.name,
-        })),
+        data: orgs
+          .filter((o) => !seenOrgs.has(o.organizationId) && seenOrgs.add(o.organizationId))
+          .map((o) => ({
+            organizationId: o.organizationId,
+            name: o.name,
+          })),
       });
     }
 
