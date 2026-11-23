@@ -106,12 +106,22 @@ export async function upsertByExternalId(
 
   // Historico de preco por produto (tabela PriceHistory apos migracao;
   // fallback: SyncState KV ate la). Leitura na pagina de produto.
+  // So grava quando o preco MUDA vs o ultimo registro — antes cada sync
+  // inseria 1 linha/produto/dia (~20k/dia) e estourou o disco do
+  // Supabase free tier (500MB).
   if (p.price != null && p.externalId) {
     await prisma
       .$executeRaw`
         INSERT INTO "ofertacoradar"."PriceHistory" ("productId", "price")
-        SELECT id, ${p.price} FROM "ofertacoradar"."Product"
-        WHERE "externalId" = ${p.externalId}
+        SELECT p.id, ${p.price}
+        FROM "ofertacoradar"."Product" p
+        WHERE p."externalId" = ${p.externalId}
+          AND (
+            SELECT h.price FROM "ofertacoradar"."PriceHistory" h
+            WHERE h."productId" = p.id
+            ORDER BY h."recordedAt" DESC, h.id DESC
+            LIMIT 1
+          ) IS DISTINCT FROM ${p.price}
       `
       .catch(() => {});
     await prisma

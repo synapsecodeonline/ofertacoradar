@@ -12,6 +12,7 @@
     "postinstall": "prisma generate",
     "recategorize": "tsx --env-file=.env scripts/recategorize.ts",
     "checklinks": "tsx --env-file=.env scripts/checklinks.ts",
+    "retention": "tsx --env-file=.env scripts/retention.ts",
     "amz:scrape": "tsx --env-file=.env scripts/amz-scrape.ts",
     "amz:login": "tsx scripts/amz-login.ts",
     "amz:verify": "tsx --env-file=.env scripts/amz-verify.ts",

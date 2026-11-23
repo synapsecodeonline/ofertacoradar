@@ -27,3 +27,6 @@ jobs:
 
       - name: Reclassifica categorias
         run: npm run recategorize -- --apply
+
+      - name: Retencao de dados (disco Supabase)
+        run: npm run retention

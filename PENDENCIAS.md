@@ -36,6 +36,13 @@
 
 ## 🔧 Melhorias técnicas pendentes
 
+- [ ] **Disco Supabase (500MB free) estourou** — banco caiu por disco
+      cheio. Causa: PriceHistory inseria ~20k linhas/dia. Corrigido no
+      código (só grava em mudança de preço + `npm run retention`
+      semanal). Pendente: rodar `scripts/cleanup-disk.sql` no SQL
+      Editor quando o banco voltar + observar se disco estabiliza.
+      Se crescer de novo → Pro plan ou reter menos.
+
 - [ ] **~600 produtos em "outros"** — maioria banners de campanha sem
       sinal textual. Retorno decrescente; reavaliar só se incomodar.
 - [x] ~~**Recategorizar periodicamente**~~ — weekly no GitHub Actions
