@@ -90,7 +90,13 @@ export default async function ServicosPage() {
   const [site, chat, supaAuth, supaRest, ghWorkflows, ghRuns] = await Promise.all([
     httpCheck(`${SITE_URL}/api/health`),
     httpCheck(`${CHAT_URL}/`),
-    SUPA_URL ? httpCheck(`${SUPA_URL}/auth/v1/health`) : Promise.resolve(FALLBACK),
+    // /auth/v1/health tambem responde 401 sem apikey valida — <500 = no ar.
+    SUPA_URL
+      ? httpCheck(`${SUPA_URL}/auth/v1/health`).then((r) => ({
+          ...r,
+          ok: r.status != null ? r.status < 500 : r.ok,
+        }))
+      : Promise.resolve(FALLBACK),
     // /rest/v1/ responde 401 sem tabela/apikey granular — para checar
     // "esta no ar" qualquer resposta < 500 serve; so erro de rede/5xx e down.
     SUPA_URL && SUPA_KEY
