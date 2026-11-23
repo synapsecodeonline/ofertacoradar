@@ -20,7 +20,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Syncs `maybeSync*` (Lomadee/ML/Awin/Amazon) têm **backoff de 10min após falha** (`errorBackoffActive` em `src/lib/sync-lock.ts`, chave `${key}:err`) — sem isso cada pageview/cron retentava na hora e a retry storm sufocava o pool, travando a home. `force=true` ignora o backoff.
 - `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 - `.env.example` documenta todas as env vars (sem valores). Ao adicionar var nova, registrar lá.
-- Widget Chatwoot: `src/components/ChatwootWidget.tsx` (`next/script` afterInteractive) — **desmontado do layout** a pedido (chat fora do ar por enquanto); componente mantido p/ reativar. URL/token default apontam p/ `chat.ofertacoradar.com.br`; override via `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN`.
+- Widget Chatwoot: `src/components/ChatwootWidget.tsx` (`next/script` afterInteractive, montado no root layout). URL/token via `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN` (default `chat.ofertacoradar.com.br`).
 - **`NEXT_PUBLIC_*` é inlinada no bundle em build-time**: no Docker (`deploy/site/`), rebuild exige `docker compose --env-file .env -f deploy/site/docker-compose.yml up -d --build` — sem isso o bundle sai com Supabase URL vazia e a home quebra no client ("This page couldn't load" com HTTP 200).
 
 ## Notas

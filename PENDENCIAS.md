@@ -33,8 +33,7 @@
       site self-hosted em Docker (`deploy/site/`, container `site-web`)
       exposto pelo mesmo túnel: apex/www → `site-web:3000`,
       `chat.` → `rails:3000`. Widget do site via
-      `ChatwootWidget.tsx` — **widget desmontado do layout** (chat
-      pausado a pedido; componente preservado p/ reativar).
+      `ChatwootWidget.tsx` — **widget reativado no layout**.
       Pendente: terminar inbox WhatsApp Cloud API + webhook Meta.
 
 ## 🔧 Melhorias técnicas pendentes

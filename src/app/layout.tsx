@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import HashLink from "@/components/HashLink";
 import AuthButton from "@/components/AuthButton";
 import PageViewTracker from "@/components/PageViewTracker";
+import ChatwootWidget from "@/components/ChatwootWidget";
 import DbStatusBanner from "@/components/DbStatusBanner";
 import NavProgress from "@/components/NavProgress";
 import SkipLink from "@/components/SkipLink";
@@ -214,6 +215,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </footer>
         <PageViewTracker />
+        <ChatwootWidget />
         <NavProgress />
       </body>
     </html>
