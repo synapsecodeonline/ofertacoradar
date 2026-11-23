@@ -72,6 +72,30 @@ export async function GET(
   });
   if (!product) return new Response("Produto nao encontrado", { status: 404 });
 
+  // imageUrl nem sempre e imagem de verdade — feed ja mandou URL de
+  // pagina HTML (ex.: pcyes.com.br/produto). next/og quebra com 502
+  // ("Unsupported image type"). Valida o content-type antes; se nao
+  // for imagem, o card sai so com o titulo.
+  let imageUrl = product.imageUrl;
+  if (imageUrl) {
+    const isImage = async (method: "HEAD" | "GET") => {
+      const r = await fetch(imageUrl!, {
+        method,
+        redirect: "follow",
+        signal: AbortSignal.timeout(8000),
+      });
+      // corpo nao e consumido — headers bastam
+      return r.ok && (r.headers.get("content-type") ?? "").startsWith("image/");
+    };
+    try {
+      if (!(await isImage("HEAD"))) {
+        if (!(await isImage("GET"))) imageUrl = null;
+      }
+    } catch {
+      imageUrl = null;
+    }
+  }
+
   const isAmazon =
     product.externalId?.startsWith("amz:") ||
     product.merchant?.toLowerCase() === "amazon";
@@ -203,10 +227,10 @@ export async function GET(
             boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
           }}
         >
-          {product.imageUrl ? (
+          {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={product.imageUrl}
+              src={imageUrl}
               alt={product.title}
               style={{
                 maxWidth: "100%",
