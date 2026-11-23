@@ -1,0 +1,22 @@
+# Site Ofertaço Radar — Next.js em Docker (substitui Vercel enquanto
+# a conta free esta pausada). Expoe via Cloudflare Tunnel no compose
+# do chatwoot (rede compartilhada chatwoot_default).
+name: site
+services:
+  web:
+    build:
+      context: ../../
+      dockerfile: deploy/site/Dockerfile
+    image: ofertacoradar-site:latest
+    container_name: site-web
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      - NODE_ENV=production
+    # Sem ports: — acesso so pela rede interna do tunnel
+    networks:
+      - chatwoot_default
+
+networks:
+  chatwoot_default:
+    external: true
