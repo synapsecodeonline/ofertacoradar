@@ -1,4 +1,5 @@
 import { prisma } from "../src/lib/db";
+import { markDeadLinks, purgeProductsByIds } from "../src/lib/product-purge";
 import {
   CHECKABLE_PREFIXES,
   mapLimit,
@@ -41,6 +42,7 @@ async function main() {
   let dead = 0;
   let unknown = 0;
   const deadIds: number[] = [];
+  const deadExts: (string | null)[] = [];
   const deadSamples: string[] = [];
 
   const results = await mapLimit(products, CONCURRENCY, async (p, i) => {
@@ -53,6 +55,7 @@ async function main() {
     if (status === "dead") {
       dead++;
       deadIds.push(p.id);
+      deadExts.push(p.externalId);
       if (deadSamples.length < 30) {
         deadSamples.push(`${p.merchant ?? "?"} — ${p.title.slice(0, 60)}`);
       }
@@ -64,21 +67,16 @@ async function main() {
     return status;
   });
 
-  // Desativa mortos em lotes
-  const CHUNK = 500;
-  for (let i = 0; i < deadIds.length; i += CHUNK) {
-    await prisma.product.updateMany({
-      where: { id: { in: deadIds.slice(i, i + CHUNK) } },
-      data: { active: false },
-    });
-  }
+  // Remove mortos da base + tombstone (feed nao recria link morto)
+  const removed = await purgeProductsByIds(deadIds);
+  await markDeadLinks(deadExts);
 
   console.log("\n=== Resultado ===");
   console.log(`validos:        ${ok}`);
-  console.log(`mortos->off:    ${dead}`);
-  console.log(`inconclusivos:  ${unknown} (mantidos ativos)`);
+  console.log(`mortos->off:    ${dead} (removidos: ${removed})`);
+  console.log(`inconclusivos:  ${unknown} (mantidos)`);
   if (deadSamples.length) {
-    console.log("\nAmostra dos desativados:");
+    console.log("\nAmostra dos removidos:");
     for (const s of deadSamples) console.log(`  - ${s}`);
   }
 }

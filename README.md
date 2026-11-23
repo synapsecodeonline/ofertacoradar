@@ -235,7 +235,7 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 ### Imagens e qualidade do catálogo
 
 - `imgSrc()` codifica URLs com espaços (feeds VTEX).
-- Validador contínuo no sync testa **link + imagem**: 404/410/400 ou HTML no lugar de imagem = produto desativado; 403/429 (rate-limit) é ambíguo e **não** desativa.
+- Validador contínuo no sync testa **link + imagem**: 404/410/400 ou HTML no lugar de imagem = produto removido da base; 403/429 (rate-limit) é ambíguo e **não** remove.
 - Admin reporta "produtos sem imagem" (excluindo o sentinela `internal:pageview`).
 
 ---
@@ -311,12 +311,12 @@ KIT_THEME_DAY=1 npm run kit:daily    # força tema (0=dom ... 6=sáb)
 - **Lomadee** (`maybeSyncLomadee`): fases `brands → campaigns → products → reconciliação → validação de links+imagens`.
 - **Mercado Livre** (`maybeSyncML`): fases `q:{índice}` sobre `ML_QUERIES` (~54 termos).
 - **Amazon** (`maybeSyncAmazon`, em `src/lib/amazon.ts`): `SearchItems` por keywords; reconcilia `amz:` ausentes só em ciclo completo.
-- Validação contínua desativa produto com **link ou imagem** quebrados (ver "Imagens e qualidade").
+- Validação contínua remove produto com **link ou imagem** quebrados (ver "Imagens e qualidade").
 
 ### Manual (`scripts/sync.ts` → `npm run sync`)
 
 - Lomadee API (campanhas sempre; catálogo só com `LOMADEE_PRODUCTS=1`) ou `FEED_URL` genérico; ML com credenciais.
-- Upsert por `externalId`; desativação por prefixo de fonte.
+- Upsert por `externalId`; remoção por prefixo de fonte (produto que some do feed é deletado, não desativado — base só tem ativos).
 
 ### Scraper Amazon local (`scripts/amz-scrape.ts` → `npm run amz:scrape`)
 
@@ -350,10 +350,10 @@ npm run amz:verify    # verifica só os ASINs ainda não verificados
 npm run amz:verify -- --all   # re-verifica tudo
 ```
 
-- Para cada ASIN abre `/dp/{ASIN}` e observa a chamada `data.amazon.com.br/api/.../associate` que a SiteStripe dispara: `shareEligibility.eligible` ou botão "Obter link" → elegível; API sem `eligible` e sem botão → **inelegível (produto desativado)**.
+- Para cada ASIN abre `/dp/{ASIN}` e observa a chamada `data.amazon.com.br/api/.../associate` que a SiteStripe dispara: `shareEligibility.eligible` ou botão "Obter link" → elegível; API sem `eligible` e sem botão → **inelegível (produto removido)**.
 - Conservador: sem sinal (sessão expirada, captcha, página quebrada) → **pula sem desativar**. 3 "sem sinal" seguidos abortam pedindo novo login.
 - Desconto é detectado na página do produto: `.a-text-price` riscado **maior** que o preço atual (fora de `.a-price-range`, que é faixa de variações e não desconto) ou % de economia ("Você economizou…"). Preço e `oldPrice` são atualizados no banco a cada verificação.
-- Rejeições: **inelegível** → desativa + bloqueio **permanente**; **sem preço de tabela** (sem desconto) → desativa + bloqueio de **7 dias** (volta sozinho se entrar em oferta — o scrape reativa e o verify re-julga). Blocklist em `~/.config/ofertacoradar/amz-blocked.json` (`{asin: expiresAt}`, `0` = permanente); scrape pula ASINs bloqueados.
+- Rejeições: **inelegível** → remove + bloqueio **permanente**; **sem preço de tabela** (sem desconto) → remove + bloqueio de **7 dias** (volta sozinho se entrar em oferta — o scrape reativa e o verify re-julga). Blocklist em `~/.config/ofertacoradar/amz-blocked.json` (`{asin: expiresAt}`, `0` = permanente); scrape pula ASINs bloqueados.
 - Conjunto já verificado fica em `~/.config/ofertacoradar/amz-verified.json` — reruns só checam novidades. O cron diário roda scrape → verify em sequência.
 - Sessão expira com o tempo: se o verify logar "sessão expirou", rode `npm run amz:login` de novo.
 - Requer Chromium do Playwright + libs locais em `~/.local/share/ofertacoradar-chromelibs` (instaladas sem sudo via `apt-get download` + `dpkg -x`).

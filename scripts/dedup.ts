@@ -1,10 +1,12 @@
 import { prisma } from "../src/lib/db";
+import { purgeProductsByIds } from "../src/lib/product-purge";
 
 // Remove duplicatas do catalogo: mesmo produto entregue pela fonte com
 // IDs/SKUs diferentes (externalId e URL distintos). Agrupa por
 // familia da fonte + merchant + titulo normalizado e mantem apenas a
-// melhor linha ativa; as demais sao desativadas (nunca deletadas —
-// preserva historico de cliques).
+// melhor linha; as demais sao deletadas (base so tem produtos ativos).
+// O externalId da dup nao vai pro tombstone: se a fonte reenviar, o
+// anti-duplicata do upsert atualiza o keeper em vez de recriar.
 
 function norm(s: string | null | undefined): string {
   return (s ?? "")
@@ -63,18 +65,12 @@ async function main() {
     }
   }
 
-  console.log(`${groupsFound} grupos duplicados, ${toDisable.length} linhas a desativar.`);
+  console.log(`${groupsFound} grupos duplicados, ${toDisable.length} linhas a remover.`);
   if (toDisable.length === 0) return;
 
-  // desativa em lotes
-  for (let i = 0; i < toDisable.length; i += 500) {
-    await prisma.product.updateMany({
-      where: { id: { in: toDisable.slice(i, i + 500) } },
-      data: { active: false },
-    });
-  }
+  const removed = await purgeProductsByIds(toDisable);
   const active = await prisma.product.count({ where: { active: true } });
-  console.log(`Pronto. Ativos agora: ${active}.`);
+  console.log(`Pronto. Removidos: ${removed}. Ativos agora: ${active}.`);
 }
 
 main().finally(() => prisma.$disconnect());

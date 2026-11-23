@@ -30,6 +30,7 @@ import {
 import { startAmazonSync } from "./amazon";
 import { upsertByExternalId } from "./upsert";
 import { startAwinSync } from "./awin";
+import { markDeadLinks, purgeProducts, purgeProductsByIds } from "./product-purge";
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
@@ -55,19 +56,16 @@ async function reconcileLomadeeFeed() {
   const meta = await prisma.syncState.findUnique({ where: { key: META_KEY } });
   const since = meta?.lastCycleAt;
   if (!since) return;
-  const d = await prisma.product.updateMany({
-    where: {
-      active: true,
-      updatedAt: { lt: since },
-      OR: [
-        { externalId: { startsWith: "prod-lomadee:" } },
-        { externalId: { startsWith: "camp-lomadee:" } },
-      ],
-    },
-    data: { active: false },
+  const d = await purgeProducts({
+    active: true,
+    updatedAt: { lt: since },
+    OR: [
+      { externalId: { startsWith: "prod-lomadee:" } },
+      { externalId: { startsWith: "camp-lomadee:" } },
+    ],
   });
-  if (d.count > 0) {
-    console.log(`[syncer] ${d.count} itens Lomadee ausentes do feed desativados`);
+  if (d > 0) {
+    console.log(`[syncer] ${d} itens Lomadee ausentes do feed removidos`);
   }
 }
 
@@ -134,15 +132,19 @@ async function runCycle(apiKey: string, baseUrl: string) {
         break;
       }
       const results = await mapLimit(batch, 6, (p) => validateProductLink(p));
-      let dead = 0;
+      const deadIds: number[] = [];
+      const deadExt: (string | null)[] = [];
       for (let i = 0; i < batch.length; i++) {
         if (results[i] === "dead") {
-          await prisma.product
-            .update({ where: { id: batch[i].id }, data: { active: false } })
-            .then(() => dead++)
-            .catch(() => {});
+          deadIds.push(batch[i].id);
+          deadExt.push(batch[i].externalId);
         }
       }
+      if (deadIds.length > 0) {
+        await purgeProductsByIds(deadIds).catch(() => {});
+        await markDeadLinks(deadExt).catch(() => {});
+      }
+      const dead = deadIds.length;
       page = batch[batch.length - 1].id;
       await save();
       if (dead > 0) {

@@ -25,6 +25,7 @@
 
 import { syncPrisma as prisma } from "./db";
 import { upsertByExternalId } from "./upsert";
+import { purgeProducts } from "./product-purge";
 import type { NormalizedProduct } from "./feed";
 import { XMLParser } from "fast-xml-parser";
 import {
@@ -336,16 +337,13 @@ function normalizeAwinRow(
 // ---------- ciclo de sync ----------
 
 async function reconcileAwin(cycleStart: Date) {
-  const d = await prisma.product.updateMany({
-    where: {
-      active: true,
-      updatedAt: { lt: cycleStart },
-      externalId: { startsWith: "aw:" },
-    },
-    data: { active: false },
+  const d = await purgeProducts({
+    active: true,
+    updatedAt: { lt: cycleStart },
+    externalId: { startsWith: "aw:" },
   });
-  if (d.count > 0) {
-    console.log(`[awin] ${d.count} itens ausentes dos feeds desativados`);
+  if (d > 0) {
+    console.log(`[awin] ${d} itens ausentes dos feeds removidos`);
   }
 }
 

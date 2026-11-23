@@ -1,4 +1,5 @@
 import { syncPrisma as prisma } from "./db";
+import { deadLinkSet } from "./product-purge";
 import { decodeEntities, discountPctOf } from "./format";
 import { resolveCategory, resolveSubtype } from "./categories";
 import type { NormalizedProduct } from "./feed";
@@ -33,6 +34,9 @@ export async function upsertByExternalId(
   ) {
     return;
   }
+  // Link morto nao volta: o validador deleta o produto e grava tombstone
+  // em ScriptState — sem isso o feed recriaria a cada ciclo.
+  if (p.externalId && (await deadLinkSet()).has(p.externalId)) return;
   // Feeds mandam entidades HTML ("Roup&#xE3;o") — decodifica antes de
   // classificar e de exibir, senao a palavra nunca casa e o usuario
   // ve a entidade crua.
@@ -62,9 +66,9 @@ export async function upsertByExternalId(
     active: true,
   };
   if (!p.externalId) return;
-  // active nao vai no update cego: produto desativado pelo validador de
-  // links (link morto) nao pode voltar so porque o feed ainda lista.
-  // So reativa quando a URL muda de verdade (link novo = merece recheck).
+  // active nao vai no update cego: so reativa quando a URL muda de
+  // verdade (link novo = merece recheck). Produto com link morto nem
+  // chega aqui — o tombstone em deadLinkSet barra antes.
   const { active: _active, ...rest } = data;
   // updatedAt explicito: a reconciliacao com o feed depende dele
   const touch = { ...rest, updatedAt: new Date() };

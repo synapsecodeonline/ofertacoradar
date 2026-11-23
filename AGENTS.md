@@ -13,10 +13,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `npm run dev` — dev server
 - `npm run build` / `npm run start` — build e produção
 - `npm run sync` — importa ofertas para o Postgres via Prisma
-- `npm run checklinks` — varredura única: desativa produtos cujo link do parceiro está morto (404/página "não encontrada"); `ml:` não é checado (anti-bot)
+- `npm run checklinks` — varredura única: remove (deleta) produtos cujo link do parceiro está morto (404/página "não encontrada"); `ml:` não é checado (anti-bot)
 - `npm run db:push` — aplica mudanças do `prisma/schema.prisma` (pode travar no Supabase pooler; alternativa: `ALTER TABLE` via `$executeRawUnsafe`)
 - Banco: PostgreSQL no Supabase (`DATABASE_URL`), Prisma 6 `prisma-client-js`
 - `DATABASE_URL` usa `connection_limit=5` (pooler Supabase multiplexa; `=1` estrangulava a home em ~20s). O sync em background usa `syncPrisma` (`src/lib/db.ts`) com pool próprio `connection_limit=2` para não competir com as queries da página — `src/lib/syncer.ts` e `src/lib/mercadolivre.ts` importam `syncPrisma as prisma`.
+- **Base so tem produtos ativos**: "desativar" = deletar a linha via `src/lib/product-purge.ts` (`purgeProducts`/`purgeProductsByIds` — apaga PriceHistory junto; Click sai em cascade). Link morto tambem grava tombstone em `ScriptState` key `dead-links` (cap 20k) para o feed nao recriar — `upsertByExternalId` barra externalId tombado. `scripts/purge-inactive.ts` limpa inativos legados.
 - Syncs `maybeSync*` (Lomadee/ML/Awin/Amazon) têm **backoff de 10min após falha** (`errorBackoffActive` em `src/lib/sync-lock.ts`, chave `${key}:err`) — sem isso cada pageview/cron retentava na hora e a retry storm sufocava o pool, travando a home. `force=true` ignora o backoff.
 - `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 - `.env.example` documenta todas as env vars (sem valores). Ao adicionar var nova, registrar lá.

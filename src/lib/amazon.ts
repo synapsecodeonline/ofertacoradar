@@ -1,5 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { syncPrisma as prisma } from "./db";
+import { purgeProducts } from "./product-purge";
 import { discountPctOf } from "./format";
 import { resolveCategory, resolveSubtype } from "./categories";
 import {
@@ -321,14 +322,12 @@ async function runAmazonCycle(): Promise<void> {
   // Reconciliacao so com ciclo completo: produto amz: que nao veio em
   // nenhuma busca sai do ar (mesma regra das outras fontes).
   if (completed && seen.size > 0) {
-    await prisma.product.updateMany({
-      where: {
-        active: true,
-        externalId: { startsWith: "amz:" },
-        NOT: { externalId: { in: [...seen].map((a) => `amz:${a}`) } },
-      },
-      data: { active: false },
+    const d = await purgeProducts({
+      active: true,
+      externalId: { startsWith: "amz:" },
+      NOT: { externalId: { in: [...seen].map((a) => `amz:${a}`) } },
     });
+    if (d > 0) console.log(`[amazon] ${d} itens fora das buscas removidos`);
   }
 
   await prisma.syncState.update({

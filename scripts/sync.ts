@@ -1,4 +1,5 @@
 import { prisma } from "../src/lib/db";
+import { purgeProducts, deadLinkSet } from "../src/lib/product-purge";
 import { decodeEntities, discountPctOf } from "../src/lib/format";
 import { resolveCategory, resolveSubtype } from "../src/lib/categories";
 import {
@@ -136,7 +137,9 @@ async function main() {
     orgs.filter((o) => o.name).map((o) => [o.organizationId, o.name!]),
   );
 
+  const deadSet = await deadLinkSet();
   const upsertOne = async (p: (typeof products)[number]) => {
+    if (p.externalId && deadSet.has(p.externalId)) return;
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
     const title = decodeEntities(p.title);
@@ -203,47 +206,39 @@ async function main() {
   );
   console.log(`${processed} processados, ${failed} falhas.`);
 
-  // Desativa produtos que sumiram da fonte — cada fonte e a verdade so do
+  // Remove produtos que sumiram da fonte — cada fonte e a verdade so do
   // seu proprio prefixo (ml: nao pode derrubar Lomadee/feed e vice-versa).
   const seenIds = products.map((p) => p.externalId).filter((x): x is string => !!x);
   const seenUrls = products.map((p) => p.url);
-  let deactivatedCount = 0;
+  let removedCount = 0;
 
   if (apiKey || feedUrl) {
     const nonMlSeen = seenIds.filter((id) => !id.startsWith("ml:"));
-    const d = await prisma.product.updateMany({
-      where: {
-        active: true,
-        OR: [
-          {
-            AND: [
-              { externalId: { not: null } },
-              { NOT: { externalId: { startsWith: "ml:" } } },
-              { externalId: { notIn: nonMlSeen } },
-            ],
-          },
-          { externalId: null, url: { notIn: seenUrls } },
-        ],
-      },
-      data: { active: false },
+    removedCount += await purgeProducts({
+      active: true,
+      OR: [
+        {
+          AND: [
+            { externalId: { not: null } },
+            { NOT: { externalId: { startsWith: "ml:" } } },
+            { externalId: { notIn: nonMlSeen } },
+          ],
+        },
+        { externalId: null, url: { notIn: seenUrls } },
+      ],
     });
-    deactivatedCount += d.count;
   }
 
   if (mlSynced) {
     const mlSeen = seenIds.filter((id) => id.startsWith("ml:"));
-    const d = await prisma.product.updateMany({
-      where: {
-        active: true,
-        externalId: { startsWith: "ml:" },
-        NOT: { externalId: { in: mlSeen } },
-      },
-      data: { active: false },
+    removedCount += await purgeProducts({
+      active: true,
+      externalId: { startsWith: "ml:" },
+      NOT: { externalId: { in: mlSeen } },
     });
-    deactivatedCount += d.count;
   }
 
-  console.log(`OK: ${processed} processados, ${failed} falhas, ${deactivatedCount} desativados.`);
+  console.log(`OK: ${processed} processados, ${failed} falhas, ${removedCount} removidos.`);
 }
 
 main()

@@ -15,6 +15,7 @@
 //   --limit N  maximo de produtos nesta execucao
 import { chromium, type Response } from "playwright";
 import { prisma } from "../src/lib/db";
+import { purgeProductsByIds } from "../src/lib/product-purge";
 import { discountPctOf } from "../src/lib/format";
 import { homedir } from "os";
 import { join } from "path";
@@ -218,14 +219,11 @@ async function main() {
     why: string,
     permanent: boolean,
   ) => {
-    await prisma.product.update({
-      where: { id: productId },
-      data: { active: false },
-    });
+    await purgeProductsByIds([productId]);
     blockedMap[`amz:${asin}`] = permanent ? 0 : Date.now() + WEEK;
     blockChanged = true;
     console.log(
-      `  ✗ ${why} (desativado${permanent ? " + bloqueado definitivo" : " + re-check em 7d"}): ${asin}`,
+      `  ✗ ${why} (removido${permanent ? " + bloqueado definitivo" : " + re-check em 7d"}): ${asin}`,
     );
   };
 
