@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   getInstagramPool,
+  getKitItemsByIds,
   getThemedPool,
   type KitItem,
 } from "../src/lib/instagramKit";
@@ -809,6 +810,16 @@ async function main() {
     );
     themeNote = `Hoje havia poucas ofertas de ${theme.nome} — mandamos os maiores descontos gerais. `;
     console.log(`Tema ${theme.nome} com ${matched} ofertas — usando ACHADINHOS.`);
+  }
+  // --ids=1,2,3,4 forca itens especificos (reenvio de kit ja montado,
+  // ignora tema/rotacao — uso manual).
+  const idsArg = process.argv
+    .find((a) => a.startsWith("--ids="))
+    ?.split("=")[1];
+  if (idsArg) {
+    const ids = idsArg.split(",").map(Number).filter(Boolean);
+    items = await getKitItemsByIds(ids);
+    console.log(`Kit forçado por --ids: ${items.length} itens`);
   }
   if (items.length === 0) {
     console.log("Nenhuma oferta valida hoje — kit vazio.");

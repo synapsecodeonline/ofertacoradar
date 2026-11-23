@@ -162,6 +162,17 @@ export function getInstagramKit(
   return buildKit(n, 4);
 }
 
+// Itens especificos por ID — usado pelo daily-kit --ids para reenviar
+// um kit ja montado (ex.: refazer apos falha de geracao de assets).
+export async function getKitItemsByIds(ids: number[]): Promise<KitItem[]> {
+  const rows = await prisma.product.findMany({ where: { id: { in: ids } } });
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const site = siteUrl();
+  return rows
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    .map((p) => toKitItem(p, 0, site));
+}
+
 // Pool amplo para o kit diario: precisa cobrir varias categorias
 // para o cronograma semanal ter ofertas de cada tema.
 export function getInstagramPool(
