@@ -78,7 +78,9 @@ function ProgressBar() {
         .nav-progress-bar{animation:nav-progress 1.1s ease-in-out infinite}
         @keyframes nav-progress{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
       `}</style>
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-1 bg-emerald-500/15">
+      {/* top-8: a faixa de anuncio verde (~30px) fica no topo — a barra
+          em top-0 ficava esmeralda-sobre-esmeralda e sumia. */}
+      <div className="pointer-events-none fixed inset-x-0 top-8 z-[60] h-1 bg-emerald-500/15">
         <div className="nav-progress-bar h-full w-1/3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.55)]" />
       </div>
     </>
