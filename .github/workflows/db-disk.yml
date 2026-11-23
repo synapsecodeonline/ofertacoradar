@@ -1,0 +1,40 @@
+name: disco supabase semanal
+
+on:
+  schedule:
+    # segunda 9h em Brasilia (UTC-3) = 12h UTC
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cria .env a partir dos secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          KIT_EMAIL: ${{ secrets.KIT_EMAIL }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          DB_DISK_LIMIT_MB: ${{ secrets.DB_DISK_LIMIT_MB }}
+        run: |
+          {
+            echo "DATABASE_URL=$DATABASE_URL"
+            [ -n "$RESEND_API_KEY" ] && echo "RESEND_API_KEY=$RESEND_API_KEY"
+            [ -n "$KIT_EMAIL" ] && echo "KIT_EMAIL=$KIT_EMAIL"
+            [ -n "$RESEND_FROM" ] && echo "RESEND_FROM=$RESEND_FROM"
+            [ -n "$DB_DISK_LIMIT_MB" ] && echo "DB_DISK_LIMIT_MB=$DB_DISK_LIMIT_MB"
+          } > .env
+
+      - name: Relatorio de disco
+        run: npm run db:disk
