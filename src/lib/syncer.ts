@@ -22,6 +22,7 @@ import {
   beat,
   busyFresh,
   clearError,
+  errorBackoffActive,
   noteError,
   releaseLock,
   startHeartbeat,
@@ -524,6 +525,7 @@ export async function maybeSyncML(force = false) {
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
   if (lockFresh || cycleFresh) return;
+  if (!force && (await errorBackoffActive(ML_STATE_KEY))) return;
   if (!(await acquireLock(ML_STATE_KEY))) return;
 
   await runMLLocked();
@@ -552,6 +554,7 @@ export async function maybeSyncLomadee(force = false) {
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
   if (lockFresh || cycleFresh) return;
+  if (!force && (await errorBackoffActive(STATE_KEY))) return;
   if (!(await acquireLock(STATE_KEY))) return;
 
   await runLomadeeLocked(apiKey, baseUrl);

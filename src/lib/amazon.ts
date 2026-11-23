@@ -8,6 +8,7 @@ import {
   beat,
   busyFresh,
   clearError,
+  errorBackoffActive,
   noteError,
   releaseLock,
   startHeartbeat,
@@ -372,6 +373,7 @@ export async function maybeSyncAmazon(force = false) {
     state.lastCycleAt &&
     now - state.lastCycleAt.getTime() < CYCLE_TTL_MS;
   if (lockFresh || cycleFresh) return;
+  if (!force && (await errorBackoffActive(STATE_KEY))) return;
   if (!(await acquireLock(STATE_KEY))) return;
 
   await runAmazonLocked();

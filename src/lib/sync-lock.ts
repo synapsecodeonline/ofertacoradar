@@ -56,6 +56,18 @@ export async function clearError(key: string) {
     .catch(() => {});
 }
 
+// Backoff apos falha: sem isso cada pageview/cron retenta na hora,
+// gerando tempestade de retries que sufoca o pool do banco e trava
+// as queries da propria pagina.
+const ERROR_BACKOFF_MS = 10 * 60_000;
+
+export async function errorBackoffActive(key: string): Promise<boolean> {
+  const err = await prisma.syncState
+    .findUnique({ where: { key: errKey(key) } })
+    .catch(() => null);
+  return !!err?.busyAt && Date.now() - err.busyAt.getTime() < ERROR_BACKOFF_MS;
+}
+
 // Heartbeat: mantem busyAt fresco a cada 30s durante TODO o ciclo.
 // Sem isso, fases longas sem checkpoint deixam busyAt velho -> alerta
 // "travado" falso e trava expira permitindo sync duplicado.
