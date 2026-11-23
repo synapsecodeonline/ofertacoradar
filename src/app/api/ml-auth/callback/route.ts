@@ -20,15 +20,21 @@ export async function GET(request: NextRequest) {
   }
 
   const url = request.nextUrl;
+  const errorParam = url.searchParams.get("error");
+  const code = url.searchParams.get("code");
+  // ML devolve error sem state quando a autorizacao falha no lado deles
+  // (client_id invalido, redirect_uri nao cadastrado etc.) — reporta
+  // o erro real antes de validar o state.
+  if (errorParam) {
+    const desc = url.searchParams.get("error_description");
+    return fail(`${errorParam}${desc ? `: ${desc}` : ""}`);
+  }
+  if (!code) return fail("code ausente");
+
   const state = url.searchParams.get("state") ?? "";
   const [stateSecret, codeVerifier] = state.split(".");
   if (stateSecret !== secret) {
     return fail("state invalido");
-  }
-  const error = url.searchParams.get("error");
-  const code = url.searchParams.get("code");
-  if (error || !code) {
-    return fail(error ?? "code ausente");
   }
 
   const redirectUri = `${siteUrl()}/api/ml-auth/callback`;
