@@ -74,22 +74,62 @@ export async function GET(
 
   // imageUrl nem sempre e imagem de verdade — feed ja mandou URL de
   // pagina HTML (ex.: pcyes.com.br/produto). next/og quebra com 502
-  // ("Unsupported image type"). Valida o content-type antes; se nao
-  // for imagem, o card sai so com o titulo.
+  // ("Unsupported image type"). Se nao for imagem, tenta resolver o
+  // og:image da pagina e grava de volta no produto (corrige o card E
+  // o site). Sem imagem resolvida, o card sai so com titulo/preco.
   let imageUrl = product.imageUrl;
   if (imageUrl) {
-    const isImage = async (method: "HEAD" | "GET") => {
-      const r = await fetch(imageUrl!, {
+    const isImage = async (method: "HEAD" | "GET", url = imageUrl!) => {
+      const r = await fetch(url, {
         method,
         redirect: "follow",
         signal: AbortSignal.timeout(8000),
       });
-      // corpo nao e consumido — headers bastam
       return r.ok && (r.headers.get("content-type") ?? "").startsWith("image/");
     };
+    const resolveOgImage = async (pageUrl: string) => {
+      try {
+        const html = await fetch(pageUrl, {
+          redirect: "follow",
+          signal: AbortSignal.timeout(10000),
+          headers: { "User-Agent": "Mozilla/5.0" },
+        }).then((r) => (r.ok ? r.text() : ""));
+        const m =
+          html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+          html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ??
+          html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+        if (!m) return null;
+        // og:image costuma vir com &amp; escapado no HTML
+        const abs = new URL(m[1].replace(/&amp;/g, "&"), pageUrl).toString();
+        // Candidatos: og:image direto + url interna de otimizadores
+        // (_next/image?url=..., /imgproxy/... ) — o otimizador as vezes
+        // rejeita (400) mas a URL de origem responde imagem de verdade.
+        const candidates = [abs];
+        try {
+          const inner = new URL(abs).searchParams.get("url");
+          if (inner) candidates.push(new URL(inner, abs).toString());
+        } catch {}
+        for (const c of candidates) {
+          if ((await isImage("HEAD", c)) || (await isImage("GET", c))) {
+            return c;
+          }
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    };
     try {
-      if (!(await isImage("HEAD"))) {
-        if (!(await isImage("GET"))) imageUrl = null;
+      if (!(await isImage("HEAD")) && !(await isImage("GET"))) {
+        const resolved = await resolveOgImage(imageUrl);
+        if (resolved) {
+          imageUrl = resolved;
+          await prisma.product
+            .update({ where: { id: product.id }, data: { imageUrl: resolved } })
+            .catch(() => {});
+        } else {
+          imageUrl = null;
+        }
       }
     } catch {
       imageUrl = null;
