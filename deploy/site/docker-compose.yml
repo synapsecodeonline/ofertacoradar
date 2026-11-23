@@ -7,6 +7,17 @@ services:
     build:
       context: ../../
       dockerfile: deploy/site/Dockerfile
+      # NEXT_PUBLIC_* sao inlinadas no bundle em build-time; rodar com
+      # --env-file ../../.env para interpolar (ou .env no diretorio do compose)
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_GA_ID: ${NEXT_PUBLIC_GA_ID}
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID}
+        NEXT_PUBLIC_INSTAGRAM_URL: ${NEXT_PUBLIC_INSTAGRAM_URL}
+        NEXT_PUBLIC_CHATWOOT_BASE_URL: ${NEXT_PUBLIC_CHATWOOT_BASE_URL}
+        NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN: ${NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN}
     image: ofertacoradar-site:latest
     container_name: site-web
     restart: unless-stopped

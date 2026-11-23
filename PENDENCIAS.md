@@ -30,10 +30,12 @@
       `chatwoot-tunnel`): `https://chat.ofertacoradar.com.br` fixo,
       credenciais em `deploy/chatwoot/cloudflared/` (gitignored).
       DNS já migrado p/ Cloudflare (nameservers `lilith`/`melnicoff`);
-      registros do site em **DNS only** (proxy OFF — proxy lento c/
-      streaming do Next.js). Widget do site no ar via
-      `ChatwootWidget.tsx`. Pendente: terminar inbox WhatsApp
-      Cloud API + webhook Meta.
+      site self-hosted em Docker (`deploy/site/`, container `site-web`)
+      exposto pelo mesmo túnel: apex/www → `site-web:3000`,
+      `chat.` → `rails:3000`. Widget do site via
+      `ChatwootWidget.tsx` — **widget desmontado do layout** (chat
+      pausado a pedido; componente preservado p/ reativar).
+      Pendente: terminar inbox WhatsApp Cloud API + webhook Meta.
 
 ## 🔧 Melhorias técnicas pendentes
 
