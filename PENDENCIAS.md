@@ -28,8 +28,11 @@
       Acesso público via **cloudflared tunnel nomeado** (container
       `chatwoot-tunnel`): `https://chat.ofertacoradar.com.br` fixo,
       credenciais em `deploy/chatwoot/cloudflared/` (gitignored).
-      DNS já migrado p/ Cloudflare (nameservers `lilith`/`melnicoff`).
-      Pendente: terminar inbox WhatsApp Cloud API + webhook Meta.
+      DNS já migrado p/ Cloudflare (nameservers `lilith`/`melnicoff`);
+      registros do site em **DNS only** (proxy OFF — proxy lento c/
+      streaming do Next.js). Widget do site no ar via
+      `ChatwootWidget.tsx`. Pendente: terminar inbox WhatsApp
+      Cloud API + webhook Meta.
 
 ## 🔧 Melhorias técnicas pendentes
 
