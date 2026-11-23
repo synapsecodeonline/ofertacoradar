@@ -523,11 +523,11 @@ export async function HomeExperience({
 
       {/* Ordenacao fixa por aba: Produtos ranqueia por desconto,
           Cupons pelos que terminam antes. */}
-      <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
-        {isCouponTab
-          ? "Ordenados pelos cupons que terminam primeiro"
-          : "Fontes intercaladas por rodada, maior desconto primeiro"}
-      </p>
+      {isCouponTab && (
+        <p className="mb-5 text-center text-xs font-semibold text-zinc-400">
+          Ordenados pelos cupons que terminam primeiro
+        </p>
+      )}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
