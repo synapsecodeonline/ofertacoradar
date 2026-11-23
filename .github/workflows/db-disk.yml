@@ -30,10 +30,10 @@ jobs:
         run: |
           {
             echo "DATABASE_URL=$DATABASE_URL"
-            [ -n "$RESEND_API_KEY" ] && echo "RESEND_API_KEY=$RESEND_API_KEY"
-            [ -n "$KIT_EMAIL" ] && echo "KIT_EMAIL=$KIT_EMAIL"
-            [ -n "$RESEND_FROM" ] && echo "RESEND_FROM=$RESEND_FROM"
-            [ -n "$DB_DISK_LIMIT_MB" ] && echo "DB_DISK_LIMIT_MB=$DB_DISK_LIMIT_MB"
+            if [ -n "$RESEND_API_KEY" ]; then echo "RESEND_API_KEY=$RESEND_API_KEY"; fi
+            if [ -n "$KIT_EMAIL" ]; then echo "KIT_EMAIL=$KIT_EMAIL"; fi
+            if [ -n "$RESEND_FROM" ]; then echo "RESEND_FROM=$RESEND_FROM"; fi
+            if [ -n "$DB_DISK_LIMIT_MB" ]; then echo "DB_DISK_LIMIT_MB=$DB_DISK_LIMIT_MB"; fi
           } > .env
 
       - name: Relatorio de disco
