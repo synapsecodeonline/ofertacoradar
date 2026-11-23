@@ -306,7 +306,7 @@ export default async function AdminPage() {
   // Fonte sem credenciais esta desligada, nao quebrada — nao vira alerta.
   const SOURCE_CONFIGURED: Record<string, boolean> = {
     main: !!(process.env.LOMADEE_API_KEY || process.env.FEED_URL),
-    ml: !!(process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET),
+    ml: !!(process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET) && process.env.ML_SYNC !== "0",
     awin: !!process.env.AWIN_FEEDS,
     amazon: !!(process.env.AMZ_API_KEY && process.env.AMZ_API_SECRET),
   };

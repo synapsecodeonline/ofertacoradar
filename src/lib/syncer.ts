@@ -507,6 +507,11 @@ export async function startAllSyncs(): Promise<ForcedSyncResult> {
 // Chamado via after() junto do maybeSyncLomadee: nunca bloqueia a resposta
 export async function maybeSyncML(force = false) {
   if (!process.env.ML_CLIENT_ID || !process.env.ML_CLIENT_SECRET) return;
+  // ML_SYNC=0 desliga o loop: a API do ML bloqueia precos/itens de
+  // terceiros (403 PolicyAgent) e nao existe feed de afiliado — o sync
+  // rodava a cada ciclo retornando 0 produtos e queimando rate limit.
+  // Ofertas do ML continuam entrando via Lomadee/Awin.
+  if (process.env.ML_SYNC === "0") return;
 
   await prisma.syncState.upsert({
     where: { key: ML_STATE_KEY },

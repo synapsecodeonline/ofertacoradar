@@ -13,11 +13,15 @@
       ver seção Deploy). SSL automático pelo túnel; `NEXT_PUBLIC_SITE_URL` atualizado; Search Console
       verificado e sitemap processado (dividido em índice + 23
       sub-sitemaps de 1000 URLs).
-- [ ] **Mercado Livre — sem credenciais** — `ML_CLIENT_ID`/`ML_CLIENT_SECRET`
-      não estão no `.env` (sumiram na migração Vercel→local). Sync `ml:`
-      parado desde sempre; admin mostra "não configurado". Pegar no painel
-      Mercado Livre Developers (app existente) ou no env do projeto Vercel
-      antigo, e adicionar ao `.env` + `docker compose up -d` (recreate).
+- [x] ~~**Mercado Livre — sem credenciais**~~ — credenciais configuradas e
+      OAuth concluído (token em `SyncState.ml-token`, cifrado). PORÉM o ML
+      bloqueia preços/itens de terceiros: `/products/{id}/items` e
+      `/sites/*/search` retornam 403 PolicyAgent mesmo com todas as
+      permissões, e scraping é barrado por anti-bot (account-verification).
+      ML não tem API/feed de afiliados. **Sync `ml:` desligado via
+      `ML_SYNC=0`** — ofertas do ML entram via Lomadee/Awin. Para
+      reativar: `ML_SYNC=1` no `.env` + recreate (só vale se o ML liberar
+      a API de catálogo pra apps).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.
