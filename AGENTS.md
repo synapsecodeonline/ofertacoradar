@@ -17,6 +17,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `npm run db:push` — aplica mudanças do `prisma/schema.prisma` (pode travar no Supabase pooler; alternativa: `ALTER TABLE` via `$executeRawUnsafe`)
 - Banco: PostgreSQL no Supabase (`DATABASE_URL`), Prisma 6 `prisma-client-js`
 - `DATABASE_URL` usa `connection_limit=5` (pooler Supabase multiplexa; `=1` estrangulava a home em ~20s). O sync em background usa `syncPrisma` (`src/lib/db.ts`) com pool próprio `connection_limit=2` para não competir com as queries da página — `src/lib/syncer.ts` e `src/lib/mercadolivre.ts` importam `syncPrisma as prisma`.
+- Syncs `maybeSync*` (Lomadee/ML/Awin/Amazon) têm **backoff de 10min após falha** (`errorBackoffActive` em `src/lib/sync-lock.ts`, chave `${key}:err`) — sem isso cada pageview/cron retentava na hora e a retry storm sufocava o pool, travando a home. `force=true` ignora o backoff.
 - `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 - `.env.example` documenta todas as env vars (sem valores). Ao adicionar var nova, registrar lá.
 - Widget Chatwoot: `src/components/ChatwootWidget.tsx` (`next/script` afterInteractive, no root layout). URL/token default apontam p/ `chat.ofertacoradar.com.br`; override via `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN`.
