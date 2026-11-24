@@ -80,6 +80,26 @@ async function askLLM(history) {
   return (msg.content || '').trim();
 }
 
+// Filtros para canal de email: só responde emails RECENTES (o import
+// IMAP inicial trouxe o histórico inteiro da caixa — sem isso o bot
+// responderia newsletters e conversas antigas como se fossem novas).
+function emailSkipReason(payload) {
+  const email = (payload.content_attributes || {}).email;
+  if (!email) return null; // não é mensagem de email
+  const dateStr = email.date;
+  if (dateStr) {
+    const t = Date.parse(dateStr);
+    if (!Number.isNaN(t) && Date.now() - t > 15 * 60 * 1000) return 'email antigo (importação)';
+  }
+  const from = String((email.from || [])[0] || payload.sender?.email || '');
+  if (/@ofertacoradar\.com\.br/i.test(from)) return 'domínio próprio';
+  if (/no-?reply|newsletter|marketing|mailer-daemon|postmaster/i.test(from)) return 'remetente automatizado';
+  if (email.auto_reply === true || payload.additional_attributes?.auto_reply === true) return 'auto-resposta';
+  const subject = String(email.subject || '');
+  if (/automated response|automatic reply|out of office|unmonitored|delivery status|undelivered/i.test(subject)) return 'auto-resposta por assunto';
+  return null;
+}
+
 async function handleIncoming(payload) {
   const conv = payload.conversation || {};
   const displayId = conv.id; // webhook_data usa display_id como id
@@ -157,6 +177,8 @@ const server = http.createServer((req, res) => {
       if (payload.event !== 'message_created') return;
       const isIncoming = payload.message_type === 0 || payload.message_type === 'incoming';
       if (!isIncoming || payload.private) return; // só msgs recebidas de clientes
+      const skip = emailSkipReason(payload);
+      if (skip) { log(`skip: ${skip}`); return; }
       const mid = payload.id;
       if (seen.has(mid)) return;
       seen.add(mid);
