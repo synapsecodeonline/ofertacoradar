@@ -385,10 +385,11 @@ async function main() {
     `\nPronto: ${total} unicos | ${inserted} gravados (${newCount} novos, ${updated} atualizados) | ${skipped} pulados | ${errors} paginas com erro.\n` +
       `Amazon ativos no site: ${ativos}`,
   );
-  await reportScrape("amz", true, {
-    total, gravados: inserted, novos: newCount, atualizados: updated,
-    pulados: skipped, erros: errors, ativos,
-  });
+  if (!DRY)
+    await reportScrape("amz", true, {
+      total, gravados: inserted, novos: newCount, atualizados: updated,
+      pulados: skipped, erros: errors, ativos,
+    });
 }
 
 main()

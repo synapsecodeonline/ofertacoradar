@@ -73,10 +73,12 @@ async function dispatch(src: "ml" | "amz") {
   try {
     if (src === "ml") {
       if (useDocker) {
+        // compose run substitui o command inteiro — precisa repetir
+        // o entrypoint (run-scrape.sh) antes dos args do admin
         await run("docker", [
           "compose", "-f", "deploy/ml/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
-          ...extraArgs,
+          "bash", "deploy/ml/run-scrape.sh", ...extraArgs,
         ]);
       } else {
         await run("npx", [
@@ -89,7 +91,7 @@ async function dispatch(src: "ml" | "amz") {
         await run("docker", [
           "compose", "-f", "deploy/amazon/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
-          ...extraArgs,
+          "bash", "deploy/amazon/run-scrape.sh", ...extraArgs,
         ]);
       } else {
         await run("npx", [

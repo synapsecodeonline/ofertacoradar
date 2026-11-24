@@ -278,10 +278,11 @@ async function run() {
     `\nPronto: ${total} unicos | ${newCount} novos + ${updated} atualizados | ${skipped} pulados | ${errors} erros.\n` +
       `ML ativos no site: ${ativos}`,
   );
-  await reportScrape("ml", true, {
-    total, novos: newCount, atualizados: updated, pulados: skipped,
-    erros: errors, ativos,
-  });
+  if (!DRY)
+    await reportScrape("ml", true, {
+      total, novos: newCount, atualizados: updated, pulados: skipped,
+      erros: errors, ativos,
+    });
 }
 
 run()
