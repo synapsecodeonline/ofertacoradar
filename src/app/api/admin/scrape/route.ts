@@ -15,11 +15,13 @@ export async function POST(req: Request) {
   }
 
   let src = "";
+  let action = "";
   let queries: string[] = [];
   let maxNew: number | null = null;
   try {
     const body = await req.json();
     src = String(body.src ?? "");
+    action = String(body.action ?? "");
     if (Array.isArray(body.queries)) {
       queries = body.queries
         .map((q: unknown) => String(q).trim())
@@ -33,6 +35,39 @@ export async function POST(req: Request) {
   }
   if (src !== "ml" && src !== "amz") {
     return Response.json({ error: "src deve ser ml ou amz" }, { status: 400 });
+  }
+
+  // POST {src, action:"cancel"} — botao "Parar" do admin:
+  //  - pedido "queued": apaga a linha — o dispatcher nunca pega
+  //  - pedido "running": apaga a linha E grava scrape-cancel:{src};
+  //    o dispatcher ve a flag em ate ~4s, mata o processo (e o
+  //    container docker do projeto) e reporta o cancelamento
+  // Nos dois casos grava scrape:{src} na hora para a tela mostrar
+  // "cancelado" sem esperar o dispatcher (que sobrescreve com o
+  // reporte final + log quando concluir a parada).
+  if (action === "cancel") {
+    const key = `scrape-request:${src}`;
+    const existing = await prisma.scriptState.findUnique({ where: { key } });
+    if (!existing) {
+      return Response.json({ ok: true, nothing: true });
+    }
+    const st = existing.value as { status?: string } | undefined;
+    await prisma.scriptState.delete({ where: { key } }).catch(() => {});
+    const at = new Date().toISOString();
+    if (st?.status === "running") {
+      await prisma.scriptState.upsert({
+        where: { key: `scrape-cancel:${src}` },
+        create: { key: `scrape-cancel:${src}`, value: { at } },
+        update: { value: { at } },
+      });
+    }
+    const rep = { at, ok: false, erro: "cancelado pelo usuário" };
+    await prisma.scriptState.upsert({
+      where: { key: `scrape:${src}` },
+      create: { key: `scrape:${src}`, value: rep },
+      update: { value: rep },
+    });
+    return Response.json({ ok: true, cancelled: true });
   }
 
   const key = `scrape-request:${src}`;

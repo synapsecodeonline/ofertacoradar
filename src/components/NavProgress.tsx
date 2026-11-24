@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 // Overlay de carregamento: aparece em QUALQUER navegacao interna
 // (clique, form GET, voltar/avancar, router.push) e so some quando a
@@ -18,7 +18,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 // Failsafe de 20s + watchdog de 25s: nunca fica preso.
 function ProgressBar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const pendingNav = useRef(false); // navegacao em andamento
   const navTarget = useRef<string | null>(null); // "path?search" de destino
@@ -162,6 +161,14 @@ function ProgressBar() {
             f.getAttribute("action") || window.location.href,
             window.location.href,
           );
+          // inclui os campos do form — sem isso o alvo era so o
+          // action ("/") e forms que navegam via router.push com
+          // query (busca!) nao disparavam o inicio na hora
+          const fd = new FormData(f);
+          for (const [k, v] of fd.entries()) {
+            if (typeof v === "string" && v) url.searchParams.set(k, v);
+          }
+          url.searchParams.delete("pagina");
         } catch {
           return;
         }
@@ -237,32 +244,27 @@ function ProgressBar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Commit da navegacao: a partir daqui so esconde quando TUDO
-  // estabilizar de forma SUSTENTADA. Poll a cada 300ms ate 20s.
+  // Commit da navegacao + assentamento — dirigido por `loading`,
+  // NAO pelos hooks do Next: a URL real e a fonte da verdade.
+  // Se o alvo estimado (clique/form) nao bater com a URL final em
+  // ~3s, adota a URL real — alvo errado nunca trava a barra.
   useEffect(() => {
-    if (!pendingNav.current) return;
-    // So consome quando a URL real bate com o alvo — renders
-    // intermediarias podem disparar este efeito antes do commit e
-    // roubar o pendingNav.
-    const cur = window.location.pathname + window.location.search;
-    if (navTarget.current !== null && navTarget.current !== cur) return;
-    pendingNav.current = false;
-    navTarget.current = null;
+    if (!loading) return;
 
+    let matched = false;
+    let matchedAt = 0;
     let lastMut = Date.now();
     const obs = new MutationObserver(() => {
       lastMut = Date.now();
     });
     // documentElement em vez de body: durante a navegacao o router
-    // pode trocar o body e observe(null) derrubava o efeito inteiro
-    // (era o bug do overlay preso — o interval nunca chegava a nascer).
+    // pode trocar o body.
     obs.observe(document.documentElement, {
       childList: true,
       subtree: true,
       characterData: true,
     });
 
-    const minVisible = Math.max(0, 900 - (Date.now() - startedAt.current));
     const t0 = Date.now();
     let readySince = 0;
 
@@ -296,7 +298,24 @@ function ProgressBar() {
         hide();
         return;
       }
-      if (elapsed < minVisible) return;
+      const cur = window.location.pathname + window.location.search;
+      if (!matched) {
+        const waitMs = Date.now() - startedAt.current;
+        if (
+          navTarget.current === null ||
+          navTarget.current === cur ||
+          waitMs > 3000
+        ) {
+          matched = true;
+          matchedAt = Date.now();
+          pendingNav.current = false;
+          navTarget.current = null;
+          lastMut = Date.now(); // DOM quieto conta a partir do commit
+        } else {
+          return; // URL ainda nao commitou no alvo
+        }
+      }
+      if (Date.now() - startedAt.current < 900) return;
       const domQuiet = Date.now() - lastMut > 1000;
       const allReady = domQuiet && pendingNet.current === 0 && contentReady();
       if (!allReady) {
@@ -319,7 +338,7 @@ function ProgressBar() {
       obs.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, searchParams]);
+  }, [loading]);
 
   // trava de seguranca: nunca fica presa se a navegacao abortar
   useEffect(() => {

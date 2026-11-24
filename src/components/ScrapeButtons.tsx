@@ -24,7 +24,7 @@ type Status = {
   last: { ml: LastState; amz: LastState };
 };
 
-type Phase = "idle" | "queued" | "running" | "done" | "fail";
+type Phase = "idle" | "queued" | "running" | "done" | "fail" | "cancelled";
 
 const POLL_MS = 12_000;
 
@@ -39,6 +39,7 @@ export default function ScrapeButtons() {
   const [kw, setKw] = useState("");
   const [maxNew, setMaxNew] = useState("");
   const [phase, setPhase] = useState<Record<string, Phase>>({});
+  const [stopping, setStopping] = useState(false);
   const reqAt = useRef<Record<string, number>>({}); // ts do pedido visto
   const gonePolls = useRef<Record<string, number>>({});
 
@@ -98,11 +99,15 @@ export default function ScrapeButtons() {
           const reqTs = reqAt.current[src];
           const lastTs = last?.at ? new Date(last.at).getTime() : 0;
           if (reqTs && lastTs >= reqTs) {
+            const cancelled =
+              last?.ok === false && /cancelad/i.test(last?.erro ?? "");
             const ok = last?.ok !== false;
-            next = ok ? "done" : "fail";
-            nextMsg = ok
-              ? `concluído — ${summarize(last)}`
-              : `falhou — ${last?.erro?.slice(0, 120) ?? "ver logs"}`;
+            next = cancelled ? "cancelled" : ok ? "done" : "fail";
+            nextMsg = cancelled
+              ? "cancelado"
+              : ok
+                ? `concluído — ${summarize(last)}`
+                : `falhou — ${last?.erro?.slice(0, 120) ?? "ver logs"}`;
             delete reqAt.current[src];
           } else if (reqTs) {
             // pedido sumiu sem reporte ainda — tolera 2 polls (~24s)
@@ -190,8 +195,45 @@ export default function ScrapeButtons() {
     }
   };
 
+  // "Parar" — cancela a fila E a execucao dos dois scrapers:
+  // queued -> pedido apagado (dispatcher nunca pega);
+  // running -> flag scrape-cancel:{src}, dispatcher mata o
+  // processo/container em ate ~4s e reporta "cancelado".
+  const stopAll = async () => {
+    if (!window.confirm("Cancelar os scrapes do ML e da Amazon (fila e execução em andamento)?"))
+      return;
+    setStopping(true);
+    for (const src of ["ml", "amz"] as const) {
+      const cur = phaseRef.current[src];
+      if (cur !== "queued" && cur !== "running") continue;
+      try {
+        await fetch("/api/admin/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ src, action: "cancel" }),
+        });
+      } catch {
+        /* proximo poll mostra o estado real */
+      }
+      phaseRef.current[src] = "cancelled";
+      setPhase((p) => ({ ...p, [src]: "cancelled" }));
+      msgRef.current[src] = "cancelando…";
+      setMsg((m) => ({ ...m, [src]: "cancelando…" }));
+    }
+    setStopping(false);
+    router.refresh();
+  };
+
+  const canStop =
+    phase.ml === "queued" ||
+    phase.ml === "running" ||
+    phase.amz === "queued" ||
+    phase.amz === "running";
+
   const btn =
     "rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+  const btnStop =
+    "rounded-full border border-red-300 px-4 py-1.5 text-xs font-extrabold text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950";
 
   const msgColor = (src: string) =>
     phase[src] === "done"
@@ -217,6 +259,14 @@ export default function ScrapeButtons() {
         </button>
         <button className={btn} disabled={busy !== null} onClick={() => run("amz")}>
           {busy === "amz" ? "…" : "Rodar scrape Amazon"}
+        </button>
+        <button
+          className={btnStop}
+          disabled={!canStop || stopping || busy !== null}
+          onClick={stopAll}
+          title="Cancela scrapes na fila e os que estiverem rodando (ML e Amazon)"
+        >
+          {stopping ? "…" : "Parar scrapes"}
         </button>
         {kw.trim() && (
           <span className="text-xs text-zinc-500">
