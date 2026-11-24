@@ -30,3 +30,6 @@ jobs:
 
       - name: Retencao de dados (disco Supabase)
         run: npm run retention
+
+      - name: Dedup cross-source (base so tem produtos unicos)
+        run: npm run dedup

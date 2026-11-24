@@ -18,10 +18,16 @@
       bloqueia preços/itens de terceiros: `/products/{id}/items` e
       `/sites/*/search` retornam 403 PolicyAgent mesmo com todas as
       permissões, e scraping é barrado por anti-bot (account-verification).
-      ML não tem API/feed de afiliados. **Sync `ml:` desligado via
-      `ML_SYNC=0`** — ofertas do ML entram via Lomadee/Awin. Para
-      reativar: `ML_SYNC=1` no `.env` + recreate (só vale se o ML liberar
-      a API de catálogo pra apps).
+      ML não tem API/feed de afiliados. **API sync desligada via
+      `ML_SYNC=0`** (sem uso — economiza rate limit). **Scraping com
+      sessão logada funciona**: `scripts/ml-login.ts` (login único,
+      perfil `~/.config/ofertacoradar/ml-profile2`) +
+      `scripts/ml-scrape.ts` via cron `ml-cron.sh` (crontab 9h/21h,
+      Docker `deploy/ml/`). ~360 produtos `ml:` importados; comissão
+      via `matt_tool`/`matt_word` no redirect `/ir/`. Se a sessão
+      expirar (log mostra "sessao provavelmente expirou"), refazer o
+      login. Endpoints que respondem sem verificação: `/menu/departments`,
+      `/cupons`, `/social/{word}` (perfil — hoje vazio).
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.

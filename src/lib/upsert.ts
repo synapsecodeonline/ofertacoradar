@@ -112,9 +112,26 @@ export async function upsertByExternalId(
           data: touch,
         });
       } else {
-        await prisma.product.create({
-          data: { ...data, externalId: p.externalId },
+        // Anti-duplicata CROSS-SOURCE: mesmo título (case-insensitive)
+        // já ativo vindo de outra fonte (ex: Lomadee vs ml:). Não cria —
+        // o scripts/dedup.ts consolida os casos que escapam da grafia
+        // exata (acentos/abreviações) na rotina semanal.
+        // Campanhas/cupons (camp-) ficam de fora: "10% de desconto" de
+        // lojas diferentes nao e o mesmo produto.
+        const crossDupe = p.externalId.startsWith("camp-")
+          ? null
+          : await prisma.product.findFirst({
+          where: {
+            active: true,
+            title: { equals: title, mode: "insensitive" },
+          },
+          select: { id: true },
         });
+        if (!crossDupe) {
+          await prisma.product.create({
+            data: { ...data, externalId: p.externalId },
+          });
+        }
       }
     }
   }

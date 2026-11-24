@@ -1,12 +1,18 @@
 import { prisma } from "../src/lib/db";
 import { purgeProductsByIds } from "../src/lib/product-purge";
 
-// Remove duplicatas do catalogo: mesmo produto entregue pela fonte com
-// IDs/SKUs diferentes (externalId e URL distintos). Agrupa por
-// familia da fonte + merchant + titulo normalizado e mantem apenas a
-// melhor linha; as demais sao deletadas (base so tem produtos ativos).
-// O externalId da dup nao vai pro tombstone: se a fonte reenviar, o
-// anti-duplicata do upsert atualiza o keeper em vez de recriar.
+// Remove duplicatas do catalogo INTEIRO — mesma oferta vinda de fontes
+// diferentes (Lomadee prod:/camp:, ml:, aw:, amz:) ou da mesma fonte com
+// IDs/SKUs diferentes. Regra do projeto: a base so tem produtos unicos.
+//
+// Agrupamento: titulo normalizado (sem acento/caixa/pontuacao) + cluster
+// de preco (±20%) — mesmo título com preços muito diferentes pode ser
+// variante/modelo distinto e NAO e deduplicado.
+// Keeper: melhor score (imagem + affiliateUrl + prioridade de fonte com
+// comissao propria) e, em empate, o updatedAt mais recente.
+// As removidas sao deletadas (base so tem ativos); o externalId delas
+// nao vai pro tombstone — se a fonte reenviar, o upsert atualiza o
+// keeper em vez de recriar.
 
 function norm(s: string | null | undefined): string {
   return (s ?? "")
@@ -17,8 +23,12 @@ function norm(s: string | null | undefined): string {
     .trim();
 }
 
-function family(externalId: string | null): string {
-  return externalId?.split(":")[0] ?? "";
+// Fontes com comissao direta valem mais que feed generico da Lomadee.
+function sourceScore(externalId: string | null): number {
+  const f = externalId?.split(":")[0] ?? "";
+  if (f === "ml" || f === "amz") return 3;
+  if (f === "aw" || f === "camp-lomadee") return 2;
+  return 1;
 }
 
 async function main() {
@@ -27,6 +37,7 @@ async function main() {
     select: {
       id: true,
       title: true,
+      price: true,
       merchant: true,
       externalId: true,
       imageUrl: true,
@@ -36,39 +47,81 @@ async function main() {
   });
   console.log(`${rows.length} produtos ativos carregados.`);
 
-  const groups = new Map<string, typeof rows>();
+  const byTitle = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = `${family(r.externalId)}|${(r.merchant ?? "").toLowerCase()}|${norm(r.title)}`;
-    if (!r.title || norm(r.title).length < 10) continue;
-    const g = groups.get(key) ?? [];
+    let key = norm(r.title);
+    if (key.length < 10) continue;
+    // Cupons/campanhas (camp-) so deduplicam dentro da mesma loja —
+    // "10% de desconto" da Loja A e da Loja B sao ofertas diferentes.
+    if (r.externalId?.startsWith("camp-")) {
+      key += `|${norm(r.merchant)}`;
+    }
+    const g = byTitle.get(key) ?? [];
     g.push(r);
-    groups.set(key, g);
+    byTitle.set(key, g);
   }
 
-  const toDisable: number[] = [];
+  const toRemove: number[] = [];
   let groupsFound = 0;
-  for (const g of groups.values()) {
+  let shown = 0;
+
+  for (const g of byTitle.values()) {
     if (g.length < 2) continue;
-    groupsFound++;
-    // Keeper: prefere quem tem imagem E link de afiliado; desempate
-    // pelo updatedAt mais recente (dado mais fresco da fonte)
-    g.sort((a, b) => {
-      const score = (r: (typeof g)[number]) =>
-        (r.imageUrl ? 2 : 0) + (r.affiliateUrl ? 1 : 0);
-      const d = score(b) - score(a);
-      if (d !== 0) return d;
-      return b.updatedAt.getTime() - a.updatedAt.getTime();
-    });
-    for (const r of g.slice(1)) toDisable.push(r.id);
-    if (groupsFound <= 5) {
-      console.log(`dup [${g.length}x] ${g[0].merchant} | ${g[0].title?.slice(0, 70)}`);
+
+    // Cluster por preco: ordena e corta quando o gap passa de 20%.
+    // Itens sem preco entram no maior cluster (titulo identico =
+    // quase certamente o mesmo produto re-listado).
+    const priced = g
+      .filter((r) => r.price != null && r.price > 0)
+      .sort((a, b) => a.price! - b.price!);
+    const clusters: typeof g[] = [];
+    for (const r of priced) {
+      const last = clusters[clusters.length - 1];
+      const lastPrice = last?.[last.length - 1]?.price;
+      if (last && lastPrice != null && r.price! <= lastPrice * 1.2) {
+        last.push(r);
+      } else {
+        clusters.push([r]);
+      }
+    }
+    const noPrice = g.filter((r) => r.price == null || r.price <= 0);
+    if (noPrice.length) {
+      if (clusters.length === 0) clusters.push(noPrice);
+      else {
+        // anexa ao cluster com mais itens
+        clusters.sort((a, b) => b.length - a.length);
+        clusters[0].push(...noPrice);
+      }
+    }
+
+    for (const c of clusters) {
+      if (c.length < 2) continue;
+      groupsFound++;
+      c.sort((a, b) => {
+        const score = (r: (typeof c)[number]) =>
+          (r.imageUrl ? 4 : 0) +
+          (r.affiliateUrl ? 2 : 0) +
+          sourceScore(r.externalId);
+        const d = score(b) - score(a);
+        if (d !== 0) return d;
+        return b.updatedAt.getTime() - a.updatedAt.getTime();
+      });
+      for (const r of c.slice(1)) toRemove.push(r.id);
+      if (shown < 8) {
+        shown++;
+        console.log(
+          `dup [${c.length}x] ${c.map((r) => r.externalId?.split(":")[0]).join("+")} | ${c[0].title?.slice(0, 70)}`,
+        );
+      }
     }
   }
 
-  console.log(`${groupsFound} grupos duplicados, ${toDisable.length} linhas a remover.`);
-  if (toDisable.length === 0) return;
+  console.log(
+    `${groupsFound} grupos duplicados cross-source, ${toRemove.length} linhas a remover.`,
+  );
+  if (toRemove.length === 0) return;
 
-  const removed = await purgeProductsByIds(toDisable);
+  const removed = await purgeProductsByIds(toRemove);
   const active = await prisma.product.count({ where: { active: true } });
   console.log(`Pronto. Removidos: ${removed}. Ativos agora: ${active}.`);
 }

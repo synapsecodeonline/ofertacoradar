@@ -1,0 +1,28 @@
+# Scrape Mercado Livre — roda sob demanda via `docker compose run`
+# (profile "scrape"), nunca com `up -d`.
+#
+# Reusa a imagem Playwright do deploy/amazon (mesma versao do
+# node_modules local). Monta:
+#   /app               → repo inteiro
+#   ~/.config/ofertacoradar → perfil persistente ml-profile2 (sessao ML)
+#   ms-playwright      → browsers do Chromium
+#   chromelibs         → libs extras do WSL (LD_LIBRARY_PATH)
+name: ml
+services:
+  scrape:
+    build:
+      context: ../amazon
+      dockerfile: Dockerfile
+    image: ofertacoradar-ml-scrape:latest
+    profiles: ["scrape"]
+    volumes:
+      - ../../:/app
+      - ${HOME}/.config/ofertacoradar:/root/.config/ofertacoradar
+      - ${HOME}/.cache/ms-playwright:/ms-playwright
+      - ${HOME}/.local/share/ofertacoradar-chromelibs:/root/.local/share/ofertacoradar-chromelibs
+    env_file: ../../.env
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - HOME=/root
+    working_dir: /app
+    command: ["bash", "deploy/ml/run-scrape.sh"]
