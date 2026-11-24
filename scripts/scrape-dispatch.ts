@@ -39,7 +39,7 @@ async function dispatch(src: "ml" | "amz") {
   const key = `scrape-request:${src}`;
   const req = await prisma.scriptState.findUnique({ where: { key } });
   const st = req?.value as
-    | { status?: string; at?: string; queries?: string[] }
+    | { status?: string; at?: string; queries?: string[]; maxNew?: number }
     | undefined;
   if (!st || (st.status !== "queued" && st.status !== "running")) return;
 
@@ -49,15 +49,25 @@ async function dispatch(src: "ml" | "amz") {
   await prisma.scriptState.update({
     where: { key },
     data: {
-      value: { at: new Date().toISOString(), status: "running", queries: st.queries },
+      value: {
+        at: new Date().toISOString(),
+        status: "running",
+        queries: st.queries,
+        maxNew: st.maxNew,
+      },
     },
   });
 
-  // palavras-chave vindas do admin viram --queries "a,b,c"
-  const qArg =
-    Array.isArray(st.queries) && st.queries.length
+  // palavras-chave vindas do admin viram --queries "a,b,c" e
+  // maxNew vira --max-new N (o arg() dos scrapers pega a 1a ocorrencia)
+  const extraArgs = [
+    ...(Array.isArray(st.queries) && st.queries.length
       ? ["--queries", st.queries.join(",")]
-      : [];
+      : []),
+    ...(typeof st.maxNew === "number" && st.maxNew >= 1
+      ? ["--max-new", String(Math.floor(st.maxNew))]
+      : []),
+  ];
 
   const useDocker = await dockerUp();
   try {
@@ -66,11 +76,12 @@ async function dispatch(src: "ml" | "amz") {
         await run("docker", [
           "compose", "-f", "deploy/ml/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
-          ...qArg,
+          ...extraArgs,
         ]);
       } else {
         await run("npx", [
-          "tsx", "--env-file=.env", "scripts/ml-scrape.ts", ...qArg,
+          "tsx", "--env-file=.env", "scripts/ml-scrape.ts",
+          ...extraArgs, "--max-new", "60",
         ]);
       }
     } else {
@@ -78,12 +89,12 @@ async function dispatch(src: "ml" | "amz") {
         await run("docker", [
           "compose", "-f", "deploy/amazon/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
-          ...qArg,
+          ...extraArgs,
         ]);
       } else {
         await run("npx", [
           "tsx", "--env-file=.env", "scripts/amz-scrape.ts",
-          "--max-new", "5", ...qArg,
+          ...extraArgs, "--max-new", "5",
         ]);
         await run("npx", ["tsx", "--env-file=.env", "scripts/amz-verify.ts"]);
       }

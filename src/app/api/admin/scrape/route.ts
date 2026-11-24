@@ -16,6 +16,7 @@ export async function POST(req: Request) {
 
   let src = "";
   let queries: string[] = [];
+  let maxNew: number | null = null;
   try {
     const body = await req.json();
     src = String(body.src ?? "");
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
         .filter((q: string) => q.length > 0 && q.length <= 80)
         .slice(0, 20);
     }
+    const n = Number(body.maxNew);
+    if (Number.isFinite(n) && n >= 1 && n <= 500) maxNew = Math.floor(n);
   } catch {
     /* body vazio */
   }
@@ -44,6 +47,7 @@ export async function POST(req: Request) {
     at: new Date().toISOString(),
     status: "queued",
     ...(queries.length ? { queries } : {}),
+    ...(maxNew ? { maxNew } : {}),
   };
   await prisma.scriptState.upsert({
     where: { key },
