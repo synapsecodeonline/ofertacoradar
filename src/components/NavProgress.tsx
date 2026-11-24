@@ -4,22 +4,37 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 // Barra de progresso indeterminada: aparece ao clicar em link interno
-// ou enviar formulario GET (busca/filtros) e some quando a pagina nova
-// TERMINA de renderizar — nao no commit da navegacao. As paginas sao
-// SSR com streaming: o pathname muda quando o shell commita, mas o
-// HTML do banco continua chegando depois — esconder ali fazia a barra
-// sumir antes do conteudo aparecer.
+// ou enviar formulario GET (busca/filtros) e so some quando a pagina
+// nova CARREGOU TUDO — shell commitado + streaming SSR encerrado +
+// fetches em voo zerados + imagens do conteudo completas. Esconder no
+// commit da navegacao fazia a barra sumir com a pagina ainda vazia.
 function ProgressBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const pendingNav = useRef(false); // clique aconteceu, aguardando commit
   const startedAt = useRef(0);
+  const pendingFetch = useRef(0); // requests fetch() em voo
 
   const hide = () => {
     pendingNav.current = false;
     setLoading(false);
   };
+
+  // Contador de fetches: o router do Next usa fetch() para o payload
+  // RSC — enquanto houver request em voo, a pagina nao terminou.
+  useEffect(() => {
+    const orig = window.fetch;
+    window.fetch = (...args: Parameters<typeof fetch>) => {
+      pendingFetch.current++;
+      return orig(...args).finally(() => {
+        pendingFetch.current--;
+      });
+    };
+    return () => {
+      window.fetch = orig;
+    };
+  }, []);
 
   useEffect(() => {
     const maybeStart = (e: Event) => {
@@ -70,34 +85,64 @@ function ProgressBar() {
     };
   }, []);
 
-  // Commit da navegacao (pathname/search mudou DEPOIS do clique): o
-  // shell novo ja esta no DOM, mas o streaming do SSR pode continuar.
-  // Observa mutacoes e so esconde quando o DOM ficar quieto — assim a
-  // barra cobre o tempo real de renderizacao da pagina.
+  // Commit da navegacao: a partir daqui so esconde quando TUDO
+  // estabilizar — mutacoes do DOM paradas (streaming encerrado),
+  // nenhum fetch em voo (payload RSC completo) e imagens do miolo
+  // carregadas. Poll a cada 300ms ate 20s de failsafe.
   useEffect(() => {
     if (!pendingNav.current) return;
     pendingNav.current = false;
 
-    let settleTimer: ReturnType<typeof setTimeout>;
-    const armSettle = () => {
-      clearTimeout(settleTimer);
-      settleTimer = setTimeout(hide, 500);
+    let lastMut = Date.now();
+    const obs = new MutationObserver(() => {
+      lastMut = Date.now();
+    });
+    obs.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    const minVisible = Math.max(0, 900 - (Date.now() - startedAt.current));
+    const t0 = Date.now();
+
+    const imgsReady = () => {
+      // So conta imagem que deveria estar carregando AGORA: completa,
+      // ou lazy abaixo da dobra (ainda nao comecou — nao e "carregando").
+      // Sem isso a barra ficaria presa esperando imagem de produto
+      // que so carrega quando o usuario rola a pagina.
+      const vh = window.innerHeight;
+      const imgs = document.querySelectorAll("main img, article img");
+      for (const im of imgs) {
+        const el = im as HTMLImageElement;
+        if (el.complete) continue;
+        const rect = el.getBoundingClientRect();
+        const belowFold = el.loading === "lazy" && rect.top > vh + 200;
+        if (!belowFold) return false;
+      }
+      return true;
     };
 
-    // tempo minimo visivel — evita flash em navegacao instantanea
-    const minVisible = Math.max(0, 800 - (Date.now() - startedAt.current));
+    const iv = setInterval(() => {
+      const elapsed = Date.now() - t0;
+      if (elapsed > 20_000) {
+        clearInterval(iv);
+        obs.disconnect();
+        hide();
+        return;
+      }
+      if (elapsed < minVisible) return;
+      const domQuiet = Date.now() - lastMut > 600;
+      if (domQuiet && pendingFetch.current === 0 && imgsReady()) {
+        clearInterval(iv);
+        obs.disconnect();
+        hide();
+      }
+    }, 300);
 
-    const obs = new MutationObserver(() => armSettle());
-    obs.observe(document.body, { childList: true, subtree: true });
-    // se o DOM ja esta quieto, esconde apos minVisible + 500ms de folga
-    const quiet = setTimeout(armSettle, minVisible);
-
-    const failsafe = setTimeout(hide, 20_000);
     return () => {
+      clearInterval(iv);
       obs.disconnect();
-      clearTimeout(settleTimer);
-      clearTimeout(quiet);
-      clearTimeout(failsafe);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
@@ -118,8 +163,7 @@ function ProgressBar() {
         @keyframes nav-progress{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
       `}</style>
       {/* Colada na borda inferior do <header> sticky (position absolute
-          dentro dele) — fica sempre visivel, no topo OU scrollado, sem
-          cair no meio do menu nem sobre a faixa verde. */}
+          dentro dele) — fica sempre visivel, no topo OU scrollado. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-1 bg-emerald-500/15">
         <div className="nav-progress-bar h-full w-1/3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.55)]" />
       </div>
