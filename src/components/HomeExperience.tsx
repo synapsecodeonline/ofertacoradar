@@ -18,6 +18,7 @@ import CategoryNav from "@/components/CategoryNav";
 import HashLink from "@/components/HashLink";
 import CatalogScrollOnNav from "@/components/CatalogScrollOnNav";
 import { Suspense } from "react";
+import { memoTtl } from "@/lib/memo";
 
 const PAGE_SIZE = 48;
 
@@ -89,6 +90,25 @@ export async function HomeExperience({
   const ordemRaw = typeof ordemParam === "string" ? ordemParam : "";
   const ordem: Ordem | "" = ordemRaw in ORDENS ? (ordemRaw as Ordem) : "";
   const cfg = TABS[tab];
+
+  // Total de lojas distintas no catalogo ativo — cache 1h (agregado
+  // em ~16k linhas, nao precisa bater no banco a cada pageview).
+  const storeCount = tab === "produtos"
+    ? Number(
+        await memoTtl("home-store-count", 60 * 60_000, async () => {
+          const rows = await prisma.$queryRaw<{ c: number }[]>`
+            SELECT COUNT(DISTINCT "merchant")::int AS c
+            FROM "Product"
+            WHERE active = true AND "merchant" IS NOT NULL AND "merchant" <> ''
+          `;
+          return String(rows[0]?.c ?? 0);
+        }),
+      )
+    : 0;
+  const eyebrow =
+    tab === "produtos"
+      ? `Mercado Livre · Amazon + ${storeCount.toLocaleString("pt-BR")} lojas`
+      : cfg.eyebrow;
 
   // Produtos: tudo que e item de afiliado vendavel, de todas as fontes,
   // num ranking so. Cupons: todo item de cupom/oferta — couponCode de
@@ -433,7 +453,7 @@ export async function HomeExperience({
           <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 text-center sm:gap-6">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 sm:text-[11px]">
-                {cfg.eyebrow}
+                {eyebrow}
               </p>
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:mt-1.5 sm:text-3xl lg:text-4xl">
                 {cfg.title}
@@ -550,7 +570,7 @@ export async function HomeExperience({
           <div className="mb-4 flex items-end justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                {cfg.eyebrow}
+                {eyebrow}
               </p>
               <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                 {cfg.title}
