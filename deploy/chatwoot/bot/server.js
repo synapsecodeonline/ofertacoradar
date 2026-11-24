@@ -87,11 +87,11 @@ async function handleIncoming(payload) {
 
   const messages = await getMessages(displayId);
   const chat = (messages || [])
-    .filter(m => !m.private && (m.message_type === 0 || m.message_type === 1 || m.message_type === 'incoming' || m.message_type === 'outgoing') && m.content)
+    .filter(m => !m.private && (m.message_type === 0 || m.message_type === 1 || m.message_type === 'incoming' || m.message_type === 'outgoing') && (m.content || (m.attachments && m.attachments.length)))
     .slice(-MAX_HISTORY)
     .map(m => ({
       role: (m.message_type === 0 || m.message_type === 'incoming') ? 'user' : 'assistant',
-      content: String(m.content).slice(0, 2000),
+      content: String(m.content || '[mídia/anexo]').slice(0, 2000),
     }));
 
   if (!chat.length) { log(`conv ${displayId}: sem mensagens de texto`); return; }
@@ -111,6 +111,29 @@ async function handleIncoming(payload) {
     if (!res.ok) throw new Error(`Chatwoot POST ${res.status}: ${(await res.text()).slice(0, 200)}`);
   });
   log(`conv ${displayId}: respondeu (${reply.length} chars)`);
+}
+
+// Conecta o Agent Bot a TODAS as inboxes da conta (widget, whatsapp,
+// telegram, instagram...) — roda no boot e a cada 10min, assim canais
+// novos passam a ser atendidos pelo bot automaticamente.
+async function syncAgentBot() {
+  try {
+    const bots = await cwFetch(`/api/v1/accounts/${ACCOUNT_ID}/agent_bots`);
+    const bot = (Array.isArray(bots) ? bots : []).find(b => b.name === 'Site Ofertaço') || bots[0];
+    if (!bot) { log('sync: nenhum agent bot encontrado'); return; }
+    const inboxes = await cwFetch(`/api/v1/accounts/${ACCOUNT_ID}/inboxes`);
+    const list = Array.isArray(inboxes) ? inboxes : (inboxes.payload || []);
+    for (const inbox of list) {
+      const res = await fetch(`${CW_BASE}/api/v1/accounts/${ACCOUNT_ID}/inboxes/${inbox.id}/set_agent_bot?agent_bot=${bot.id}`, {
+        method: 'POST',
+        headers: { api_access_token: CW_TOKEN },
+        signal: AbortSignal.timeout(15000),
+      });
+      log(`sync: inbox ${inbox.id} (${inbox.name}) -> ${res.status}`);
+    }
+  } catch (e) {
+    log('sync ERRO:', e.message);
+  }
 }
 
 const server = http.createServer((req, res) => {
@@ -145,4 +168,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => log(`bot ouvindo na porta ${PORT} (model=${OR_MODEL})`));
+server.listen(PORT, () => {
+  log(`bot ouvindo na porta ${PORT} (model=${OR_MODEL})`);
+  syncAgentBot();
+  setInterval(syncAgentBot, 10 * 60 * 1000);
+});
