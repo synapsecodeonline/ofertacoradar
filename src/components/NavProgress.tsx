@@ -131,6 +131,12 @@ function ProgressBar() {
   }, []);
 
   useEffect(() => {
+    // Carregamento inicial (F5 / primeira visita / reload): trata como
+    // uma navegacao cujo alvo ja e a URL atual — o efeito de commit
+    // abaixo consome e so esconde quando a pagina assentar de verdade
+    // (DOM quieto + rede zerada + imagens/fontes prontas).
+    begin(window.location.pathname + window.location.search);
+
     const maybeStart = (e: Event) => {
       const me = e as MouseEvent;
       // ctrl/cmd/shift/alt+click abre em nova aba — pagina atual nao navega
