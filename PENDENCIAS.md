@@ -31,6 +31,10 @@
 - [ ] **Awin** — código pronto (`aw:`), mas oculto até aprovação dos
       anunciantes. Depois: configurar `AWIN_FEEDS` + `AWIN_AFFID` no
       `.env` e remover qualquer ocultação pública se houver.
+- [x] ~~**Mercado Livre via scraping**~~ — `ml-scrape.ts` + sessão
+      persistente (`ml-login.ts`) no ar; cron local 9h/21h; ~360
+      produtos `ml:` com comissão `matt_tool`/`matt_word`. Sessão
+      expira → refazer login quando o log avisar.
 - [ ] **Conta Meta/Instagram API** — app review para
       `instagram_content_publish` permitiria postar o kit sozinho
       (hoje o fluxo é email → postar manual, ~10 min/dia).

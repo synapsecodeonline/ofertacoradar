@@ -83,11 +83,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         {/* Barra de loading no carregamento inicial — cobre TODO o site
-            desde o primeiro paint (o NavProgress so assume nas navegacoes
-            client-side seguintes). Some no window.load. */}
+            desde o primeiro paint. Injeta dentro do <header> sticky
+            (position absolute na borda inferior) assim que o HTML o
+            parseia — funciona no topo E scrollado, sem cair no menu.
+            Some no window.load. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var tr=document.createElement("div");tr.setAttribute("data-boot-progress","1");tr.style.cssText="position:fixed;top:32px;left:0;right:0;height:4px;z-index:2147483647;background:rgba(16,185,129,.15);pointer-events:none";var b=document.createElement("div");b.style.cssText="height:100%;width:33%;background:#10b981;border-radius:9999px;box-shadow:0 0 8px rgba(16,185,129,.55)";tr.appendChild(b);document.documentElement.appendChild(tr);try{b.animate([{transform:"translateX(-110%)"},{transform:"translateX(330%)"}],{duration:1100,iterations:Infinity,easing:"ease-in-out"})}catch(e){}var done=function(){tr.parentNode&&tr.parentNode.removeChild(tr)};if(document.readyState==="complete"){done()}else{window.addEventListener("load",done);setTimeout(done,15000)}})()`,
+            __html: `(function(){var done=false,tr=null;var finish=function(){done=true;if(tr&&tr.parentNode)tr.parentNode.removeChild(tr)};var attach=function(){var h=document.querySelector("header");if(!h)return false;tr=document.createElement("div");tr.setAttribute("data-boot-progress","1");tr.style.cssText="position:absolute;left:0;right:0;bottom:0;height:4px;z-index:80;background:rgba(16,185,129,.15);pointer-events:none;overflow:hidden";var b=document.createElement("div");b.style.cssText="height:100%;width:33%;background:#10b981;border-radius:9999px;box-shadow:0 0 8px rgba(16,185,129,.55)";tr.appendChild(b);h.appendChild(tr);try{b.animate([{transform:"translateX(-110%)"},{transform:"translateX(330%)"}],{duration:1100,iterations:Infinity,easing:"ease-in-out"})}catch(e){}return true};var iv=setInterval(function(){if(done)return clearInterval(iv);if(attach())clearInterval(iv)},50);if(document.readyState==="complete")finish();else window.addEventListener("load",finish);setTimeout(finish,15000)})()`,
           }}
         />
         {/* Pixels de remarketing — so carrega se o ID estiver configurado.
@@ -165,6 +167,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Cupons
               </HashLink>
           </nav>
+          {/* Barra de loading colada na borda inferior do header sticky —
+              funciona em qualquer posicao de scroll (a faixa verde rola
+              para fora e o header fixa no topo). */}
+          <NavProgress />
         </header>
         <DbStatusBanner />
         {children}
@@ -224,7 +230,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </footer>
         <PageViewTracker />
         <ChatwootWidget />
-        <NavProgress />
       </body>
     </html>
   );
