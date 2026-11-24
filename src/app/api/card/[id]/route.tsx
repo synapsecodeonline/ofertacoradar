@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { discountPercent, formatPrice } from "@/lib/format";
@@ -13,6 +14,78 @@ export const dynamic = "force-dynamic";
 let fontPromise: Promise<
   { name: string; data: ArrayBuffer; weight: 800; style: "normal" }[]
 > | null = null;
+
+// Cache em memoria url -> data URI (container longevo). Evita
+// re-download a cada card e segura o renderer de depender de CDN
+// que muda de comportamento.
+const imgCache = new Map<string, { uri: string; exp: number }>();
+const IMG_CACHE_TTL = 6 * 3600_000;
+const IMG_CACHE_MAX = 400;
+
+// Baixa a imagem com UA de browser (CDNs de loja bloqueiam fetch
+// "pelado") e devolve data URI num formato que o next/og entende.
+// WebP/AVIF/etc sao convertidos p/ PNG via sharp — o renderer do
+// next/og NAO embute webp (foi a causa dos cards sem foto do ML).
+async function imageToDataUri(url: string): Promise<string | null> {
+  if (url.startsWith("data:image/")) return url;
+  const hit = imgCache.get(url);
+  if (hit && hit.exp > Date.now()) return hit.uri;
+
+  let buf: Buffer | null = null;
+  let ct = "";
+  for (let attempt = 0; attempt < 2 && !buf; attempt++) {
+    try {
+      const r = await fetch(url, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(12000),
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+          Referer: new URL(url).origin + "/",
+        },
+      });
+      if (!r.ok) continue;
+      const len = Number(r.headers.get("content-length") ?? 0);
+      if (len > 15_000_000) continue;
+      const ab = await r.arrayBuffer();
+      if (ab.byteLength > 15_000_000 || ab.byteLength === 0) continue;
+      ct = (r.headers.get("content-type") ?? "").split(";")[0].trim();
+      buf = Buffer.from(ab);
+    } catch {
+      /* retry */
+    }
+  }
+  if (!buf) return null;
+
+  try {
+    const okRaster = /^image\/(png|jpe?g|gif|bmp|webp|avif|tiff?|svg\+xml)$/.test(ct);
+    if (!okRaster && !ct.startsWith("image/")) return null;
+    let out: Buffer;
+    let outCt: string;
+    if (ct === "image/png" || ct === "image/jpeg" || ct === "image/jpg" || ct === "image/gif") {
+      out = buf;
+      outCt = ct === "image/jpg" ? "image/jpeg" : ct;
+    } else {
+      // webp/avif/svg/bmp/tiff -> png (unico formato que o satori
+      // garante em qualquer versao)
+      out = await sharp(buf, { failOn: "none" })
+        .rotate()
+        .png({ compressionLevel: 6 })
+        .toBuffer();
+      outCt = "image/png";
+    }
+    const uri = `data:${outCt};base64,${out.toString("base64")}`;
+    if (imgCache.size >= IMG_CACHE_MAX) {
+      const oldest = imgCache.keys().next().value;
+      if (oldest) imgCache.delete(oldest);
+    }
+    imgCache.set(url, { uri, exp: Date.now() + IMG_CACHE_TTL });
+    return uri;
+  } catch {
+    return null;
+  }
+}
 
 function getFont() {
   fontPromise ??= (async () => {
@@ -136,6 +209,12 @@ export async function GET(
     }
   }
 
+  // Baixa a imagem AQUI (com retry/UA/timeout) e embute como data
+  // URI — o renderer do next/og nunca busca na rede. Se a CDN da
+  // loja bloquear ou o formato for webp, o card sai com a foto
+  // convertida em vez de quebrar ou sair sem imagem.
+  const imageSrc = imageUrl ? await imageToDataUri(imageUrl) : null;
+
   const isAmazon =
     product.externalId?.startsWith("amz:") ||
     product.merchant?.toLowerCase() === "amazon";
@@ -154,6 +233,12 @@ export async function GET(
         new Map(brandRows.map((b) => [b.name ?? "", b.logo])),
       )
     : null;
+  // Logo remoto tambem vira data URI — um <img> que falha derruba o
+  // ImageResponse inteiro (card nao e gerado = anexo some do email)
+  const storeLogoSrc =
+    storeLogoUrl && /^https?:\/\//.test(storeLogoUrl)
+      ? await imageToDataUri(storeLogoUrl)
+      : storeLogoUrl;
 
   const fonts = await getFont().catch(() => []);
 
@@ -206,10 +291,10 @@ export async function GET(
                     <path key={d.slice(0, 24)} d={d} fill="#ff9900" />
                   ))}
                 </svg>
-              ) : storeLogoUrl ? (
+              ) : storeLogoSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={storeLogoUrl}
+                  src={storeLogoSrc}
                   alt=""
                   style={{
                     width: 52,
@@ -267,10 +352,10 @@ export async function GET(
             boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
           }}
         >
-          {imageUrl ? (
+          {imageSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={imageUrl}
+              src={imageSrc}
               alt={product.title}
               style={{
                 maxWidth: "100%",

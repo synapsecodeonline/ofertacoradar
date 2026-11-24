@@ -360,17 +360,23 @@ const run = (args: string[]) =>
   });
 
 async function download(url: string, dest: string): Promise<boolean> {
-  try {
-    const r = await fetch(url, {
-      signal: AbortSignal.timeout(20_000),
-      headers: { "User-Agent": "OfertaçoRadar/1.0 (kit diario; synapsecode.online@gmail.com)" },
-    });
-    if (!r.ok) return false;
-    writeFileSync(dest, Buffer.from(await r.arrayBuffer()));
-    return true;
-  } catch {
-    return false;
+  // 2 tentativas — card/anexo nao pode sumir por timeout transiente
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(url, {
+        signal: AbortSignal.timeout(20_000),
+        headers: { "User-Agent": "OfertaçoRadar/1.0 (kit diario; synapsecode.online@gmail.com)" },
+      });
+      if (!r.ok) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 1000) continue; // resposta vazia/parcial
+      writeFileSync(dest, buf);
+      return true;
+    } catch {
+      /* retry */
+    }
   }
+  return false;
 }
 
 function wrap(text: string, max: number): string[] {
