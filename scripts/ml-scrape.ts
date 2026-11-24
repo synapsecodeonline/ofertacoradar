@@ -15,6 +15,7 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { upsertByExternalId } from "../src/lib/upsert";
 import { reportScrape } from "../src/lib/scrape-state";
+import { purgeProductsByIds } from "../src/lib/product-purge";
 import { prisma } from "../src/lib/db";
 import { homedir } from "os";
 import { join } from "path";
@@ -53,6 +54,21 @@ const CUSTOM_QUERIES = (arg("queries") ?? "")
   .map((s) => s.trim())
   .filter(Boolean);
 const QUERIES_ALL = CUSTOM_QUERIES.length ? CUSTOM_QUERIES : QUERIES;
+
+// Categorias que o Programa de Afiliados do ML exclui — produto
+// cadastrado nelas NUNCA gera comissao. Sem API de elegibilidade,
+// o filtro e por titulo (word boundary p/ nao pegar "farmacia" em "arma").
+const EXCLUDED_RX = [
+  /\barmas?\b/i, /\bmuni[cç][aã]o\b/i, /\bfogos? de artif[ií]cio\b/i,
+  /\bcarros?\b/i, /\bmotos?\b/i, /\bcaminh[oõ]es?\b/i,
+  /\bim[oó]ve(?:l|is)\b/i, /\bterrenos?\b/i,
+  /\busad[oa]s?\b/i, /\brecondicionad[oa]s?\b/i,
+  // conteudo adulto: so termos inequivocos — "adulto" sozinho pega
+  // falso positivo ("videogame para adultos e criancas")
+  /\+18\b/i, /\bnsfw\b/i, /\bporn[oô]\b/i, /\ber[oó]tic[oa]s?\b/i,
+  /\bsexu(?:al|ais)\b/i, /\bconte[uú]do adulto\b/i,
+];
+const isExcluded = (title: string) => EXCLUDED_RX.some((r) => r.test(title));
 
 interface Found {
   catalogId: string;
@@ -201,6 +217,22 @@ async function run() {
     ).map((p) => p.externalId!),
   );
 
+  // Poda continua: remove ml: ativos em categorias excluidas do
+  // programa de afiliados — produto assim NUNCA gera comissao.
+  const allMl = await prisma.product.findMany({
+    where: { active: true, externalId: { startsWith: "ml:" } },
+    select: { id: true, title: true },
+  });
+  const excludedIds = allMl
+    .filter((p) => isExcluded(p.title))
+    .map((p) => p.id);
+  if (excludedIds.length) {
+    await purgeProductsByIds(excludedIds);
+    console.log(
+      `  ${excludedIds.length} ml: removidos (categoria excluida de comissao)`,
+    );
+  }
+
   let total = 0, newCount = 0, updated = 0, skipped = 0, errors = 0, quotaHit = false;
   const seen = new Set<string>();
 
@@ -230,6 +262,10 @@ async function run() {
       total++;
       const ext = `ml:${it.catalogId}`;
       const isNew = !existing.has(ext);
+      if (isExcluded(it.title)) {
+        skipped++; // categoria excluida do programa de afiliados
+        continue;
+      }
       if (!it.price || !it.imageUrl) {
         skipped++;
         continue;

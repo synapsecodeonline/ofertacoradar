@@ -285,22 +285,21 @@ async function main() {
       }
     }
     if (verdict === "eligible") {
-      // elegivel mas SEM preco de tabela na pagina = sem desconto —
-      // a aba Amazon e de ofertas, entao rejeita e bloqueia
+      // Regra: SO COMISSAO importa — elegivel (PA-API) fica no site
+      // mesmo sem desconto detectado. O verify so remove quem NAO
+      // pode gerar comissao (inelegivel = bloqueio permanente).
+      ok++;
+      consecutiveUnknown = 0;
+      newlyVerified.push(p.externalId!);
+      // tinha bloqueio temporario? aprovou -> desbloqueia de vez
+      if (blockedMap[p.externalId!] > 0) {
+        delete blockedMap[p.externalId!];
+        blockChanged = true;
+      }
       if (prices.price != null && prices.oldPrice == null) {
         nodesc++;
-        consecutiveUnknown = 0;
-        newlyVerified.push(p.externalId!);
-        await reject(asin, p.id, "SEM DESCONTO", false);
+        console.log(`  ✓ elegivel sem desconto (mantido): ${asin}`);
       } else {
-        ok++;
-        consecutiveUnknown = 0;
-        newlyVerified.push(p.externalId!);
-        // tinha bloqueio temporario? aprovou -> desbloqueia de vez
-        if (blockedMap[p.externalId!] > 0) {
-          delete blockedMap[p.externalId!];
-          blockChanged = true;
-        }
         console.log(`  ✓ elegivel: ${asin}`);
       }
     } else if (verdict === "ineligible") {
@@ -333,7 +332,7 @@ async function main() {
   if (blockChanged) saveBlocked(blockedMap);
 
   console.log(
-    `\nPronto: ${ok} elegiveis c/ desconto | ${removed} inelegiveis | ${nodesc} sem desconto | ${unknown} sem sinal.`,
+    `\nPronto: ${ok} elegiveis (${nodesc} sem desconto — mantidos) | ${removed} inelegiveis removidos | ${unknown} sem sinal.`,
   );
 }
 
