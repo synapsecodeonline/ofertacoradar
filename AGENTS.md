@@ -23,10 +23,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Syncs `maybeSync*` (Lomadee/ML/Awin/Amazon) têm **backoff de 10min após falha** (`errorBackoffActive` em `src/lib/sync-lock.ts`, chave `${key}:err`) — sem isso cada pageview/cron retentava na hora e a retry storm sufocava o pool, travando a home. `force=true` ignora o backoff.
 - `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 - `.env.example` documenta todas as env vars (sem valores). Ao adicionar var nova, registrar lá.
-- Loading: `NavProgress` fica DENTRO do `<header>` sticky (absolute na
-  borda inferior) e o boot script injeta no header também — a barra
-  cobre o streaming SSR inteiro (some ~500ms após o DOM estabilizar)
-  e funciona em qualquer posição de scroll. Não voltar pra `fixed top-*`.
+- Loading: navegação interna usa `NavProgress` no nível do `<body>`
+  (overlay full-screen: fundo esmaecido + spinner) — NÃO dentro do
+  header porque o `backdrop-blur` dele quebra `position:fixed`.
+  Cobre cliques, forms GET, `popstate` e `pushState/replaceState`.
+  Só esconde após ~1s de prontidão SUSTENTADA (DOM quieto 800ms +
+  zero fetch same-origin + todas as imagens/fontes do conteúdo
+  carregadas); failsafe 20s. O boot (F5) usa script inline no
+  `layout.tsx` (`data-boot-progress`, barra fina no header) até
+  `window.load`.
 - Widget Chatwoot: `src/components/ChatwootWidget.tsx` (`next/script` afterInteractive, montado no root layout). URL/token via `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN` (default `chat.ofertacoradar.com.br`).
 - **`NEXT_PUBLIC_*` é inlinada no bundle em build-time**: no Docker (`deploy/site/`), rebuild exige `docker compose --env-file .env -f deploy/site/docker-compose.yml up -d --build` — sem isso o bundle sai com Supabase URL vazia e a home quebra no client ("This page couldn't load" com HTTP 200).
 
