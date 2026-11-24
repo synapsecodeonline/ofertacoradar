@@ -23,6 +23,7 @@ function ProgressBar() {
   const pendingNav = useRef(false); // navegacao em andamento
   const navTarget = useRef<string | null>(null); // "path?search" de destino
   const startedAt = useRef(0);
+  const pendingNet = useRef(0); // fetch/XHR same-origin com body pendente
 
   const hide = () => {
     pendingNav.current = false;
@@ -36,6 +37,98 @@ function ProgressBar() {
     navTarget.current = target ?? null;
     setLoading(true);
   };
+
+  // Contador de rede same-origin COMPLETA: fetch() resolve nos
+  // headers, mas cliente pode ler o body por segundos (JSON grande,
+  // stream). Drenamos um clone do body — so libera quando o ultimo
+  // byte chega. XHR idem (loadend). Cross-origin (Chatwoot, GA, CDNs)
+  // nao segura a barra.
+  useEffect(() => {
+    const isSame = (u: string) =>
+      !u || u.startsWith("/") || u.startsWith(window.location.origin);
+
+    const origFetch = window.fetch;
+    window.fetch = (...args: Parameters<typeof fetch>) => {
+      const input = args[0];
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (!isSame(url)) return origFetch(...args);
+      pendingNet.current++;
+      const release = () => pendingNet.current--;
+      return origFetch(...args).then(
+        (res) => {
+          try {
+            const body = res.clone().body;
+            if (!body) {
+              release();
+              return res;
+            }
+            const reader = body.getReader();
+            (async () => {
+              try {
+                while (!(await reader.read()).done) {
+                  /* drena ate o fim do stream */
+                }
+              } catch {
+                /* abortado */
+              } finally {
+                try {
+                  reader.releaseLock();
+                } catch {
+                  /* noop */
+                }
+                release();
+              }
+            })();
+          } catch {
+            release();
+          }
+          return res;
+        },
+        (err) => {
+          release();
+          throw err;
+        },
+      );
+    };
+
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+    const pendingXhr = new WeakSet<XMLHttpRequest>();
+    XMLHttpRequest.prototype.open = function (
+      this: XMLHttpRequest,
+      method: string,
+      url: string | URL,
+      ...rest: unknown[]
+    ) {
+      (this as any).__navUrl = String(url);
+      return (origOpen as any).apply(this, [method, url, ...rest]);
+    };
+    XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, ...a: unknown[]) {
+      const u = String((this as any).__navUrl || "");
+      if (isSame(u)) {
+        pendingXhr.add(this);
+        pendingNet.current++;
+        const done = () => {
+          if (pendingXhr.delete(this)) pendingNet.current--;
+        };
+        this.addEventListener("loadend", done, { once: true });
+        this.addEventListener("error", done, { once: true });
+        this.addEventListener("abort", done, { once: true });
+      }
+      return (origSend as any).apply(this, a);
+    };
+
+    return () => {
+      window.fetch = origFetch;
+      XMLHttpRequest.prototype.open = origOpen;
+      XMLHttpRequest.prototype.send = origSend;
+    };
+  }, []);
 
   useEffect(() => {
     const maybeStart = (e: Event) => {
@@ -178,7 +271,7 @@ function ProgressBar() {
       }
       if (elapsed < minVisible) return;
       const domQuiet = Date.now() - lastMut > 1000;
-      const allReady = domQuiet && contentReady();
+      const allReady = domQuiet && pendingNet.current === 0 && contentReady();
       if (!allReady) {
         readySince = 0; // estragou — recomeca a contagem de prontidao
         return;
