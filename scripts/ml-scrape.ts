@@ -19,6 +19,7 @@ import { purgeProductsByIds } from "../src/lib/product-purge";
 import { prisma } from "../src/lib/db";
 import { homedir } from "os";
 import { join } from "path";
+import { sleep } from "../src/lib/sleep";
 
 const PROFILE = join(homedir(), ".config/ofertacoradar/ml-profile2");
 process.env.LD_LIBRARY_PATH = `${join(
@@ -37,7 +38,6 @@ const DEAL_PAGES = [
   "https://www.mercadolivre.com.br/black-friday",
 ];
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const arg = (n: string) => {
   const i = process.argv.indexOf(`--${n}`);
   return i >= 0 ? process.argv[i + 1] : undefined;

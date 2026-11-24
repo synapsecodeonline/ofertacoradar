@@ -1,10 +1,14 @@
 import { prisma } from "@/lib/db";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/search?q=termo — autocomplete da busca: produtos + lojas.
 // Leve: so colunas necessarias, limite pequeno, sem filtros pesados.
 export async function GET(request: Request) {
+  if (!rateLimit(`search:${clientIp(request)}`, 120)) {
+    return Response.json({ products: [], merchants: [] });
+  }
   const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return Response.json({ products: [], merchants: [] });
 

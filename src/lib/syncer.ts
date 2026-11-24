@@ -31,6 +31,7 @@ import { startAmazonSync } from "./amazon";
 import { upsertByExternalId } from "./upsert";
 import { startAwinSync } from "./awin";
 import { markDeadLinks, purgeProducts, purgeProductsByIds } from "./product-purge";
+import { sleep } from "@/lib/sleep";
 
 // Sync incremental disparado pelo trafego: cada pageview processa um pedaco
 // do ciclo em background (apos a resposta), sem atrasar o usuario.
@@ -43,7 +44,6 @@ const STATE_KEY = "main";
 const BUDGET_MS = 45_000; // tempo maximo de trabalho por invocacao
 const CYCLE_TTL_MS = 60_000; // novo ciclo completo a cada 1 minuto
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Upsert compartilhado: ver src/lib/upsert.ts (usado tb pela Awin)
 

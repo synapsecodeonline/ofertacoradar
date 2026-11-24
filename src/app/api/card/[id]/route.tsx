@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import { discountPercent, formatPrice } from "@/lib/format";
 import { siteUrl, SITE_NAME } from "@/lib/site";
 import { featuredStoreFor } from "@/lib/store-logo";
@@ -111,9 +111,7 @@ export async function GET(
     !!process.env.CRON_SECRET && cronKey === process.env.CRON_SECRET;
   if (!isCron) {
     try {
-      const supabase = await createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      if (!(await isAdmin())) {
         return new Response("Login necessário", { status: 401 });
       }
     } catch {

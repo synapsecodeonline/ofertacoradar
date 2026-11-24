@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
+import { isAdmin } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
+import { timeAgo } from "@/lib/timeago";
 import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
 import { getRevenueReport, type SourceRevenue } from "@/lib/reports";
 import AdminSyncButton from "@/components/AdminSyncButton";
@@ -14,16 +16,6 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
 const DAY_MS = 86_400_000;
 
-function timeAgo(d: Date | null | undefined, now: Date): string {
-  if (!d) return "nunca";
-  const s = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 1000));
-  if (s < 60) return `há ${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `há ${m}min`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `há ${h}h`;
-  return `há ${Math.floor(h / 24)}d`;
-}
 
 // Cliques de afiliado = todos menos os pageviews (produto sentinela)
 const NOT_PV = (pvId: number) => `c."productId" <> ${pvId}`;
@@ -157,9 +149,9 @@ function RevenueRow({ r }: { r: SourceRevenue }) {
 }
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
+  if (!(await isAdmin())) redirect("/login");
+  const { data: authData } = await (await createClient()).auth.getUser();
+  const userEmail = authData.user?.email ?? "";
 
   const now = new Date();
   const d1 = new Date(now.getTime() - DAY_MS);
@@ -361,7 +353,7 @@ export default async function AdminPage() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Painel</p>
           <h1 className="text-3xl font-extrabold tracking-tight">Admin</h1>
-          <p className="mt-1 text-sm text-zinc-500">Logado como {data.user.email}</p>
+          <p className="mt-1 text-sm text-zinc-500">Logado como {userEmail}</p>
         </div>
         <div className="flex items-center gap-2">
           <a

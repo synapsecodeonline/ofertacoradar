@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
+import { timeAgo } from "@/lib/timeago";
 import ScrapeButtons from "@/components/ScrapeButtons";
 
 export const dynamic = "force-dynamic";
@@ -15,16 +16,6 @@ const SUPA_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const GH_REPO = "synapsecodeonline/ofertacoradar";
 const DB_LIMIT_MB = Number(process.env.DB_DISK_LIMIT_MB ?? 500);
 
-function timeAgo(d: Date | null | undefined, now: Date): string {
-  if (!d) return "nunca";
-  const s = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 1000));
-  if (s < 60) return `há ${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `há ${m}min`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `há ${h}h`;
-  return `há ${Math.floor(h / 24)}d`;
-}
 
 type HttpCheck = { ok: boolean; ms: number; status?: number; error?: string };
 const FALLBACK: HttpCheck = { ok: false, ms: 0 };
@@ -81,9 +72,7 @@ interface GhRun {
 }
 
 export default async function ServicosPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
+  if (!(await isAdmin())) redirect("/login");
 
   const now = new Date();
 

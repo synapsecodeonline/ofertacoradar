@@ -15,6 +15,7 @@ import {
   startHeartbeat,
 } from "./sync-lock";
 import type { SyncSourceStatus } from "./syncer";
+import { sleep } from "@/lib/sleep";
 
 // Fonte Amazon Associates (PA-API 5.0).
 // Credenciais: AMZ_API_KEY + AMZ_API_SECRET (Product Advertising API),
@@ -226,7 +227,6 @@ function parseSearchItems(json: Record<string, unknown>): AmzItem[] {
 
 // ---- Sync ----
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Mesmo formato de link que o SiteStripe gera (GetLink):
 // tag + linkCode=ogi&th=1&psc=1

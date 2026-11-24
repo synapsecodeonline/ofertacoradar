@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { syncPrisma as prisma } from "./db";
 import type { NormalizedProduct } from "./feed";
+import { sleep } from "@/lib/sleep";
 
 // ---- Mercado Livre (api.mercadolibre.com) ----
 // Auth: OAuth2. Tokens ficam no SyncState (key "ml-token"), cifrados em
@@ -35,7 +36,6 @@ export const ML_QUERIES = [
   "suplemento", "whey protein", "halteres", "bicicleta", "esteira",
 ];
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---- Token OAuth ----
 

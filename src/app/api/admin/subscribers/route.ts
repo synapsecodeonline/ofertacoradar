@@ -1,13 +1,12 @@
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
+import { csvField } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/admin/subscribers — CSV dos emails capturados (admin only).
 export async function GET() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
+  if (!(await isAdmin())) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 
@@ -16,14 +15,10 @@ export async function GET() {
     select: { email: true, productId: true, createdAt: true },
   });
 
-  const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
   const lines = rows.map((r) =>
     [
       r.createdAt.toISOString(),
-      esc(r.email),
+      csvField(r.email),
       r.productId ?? "",
     ].join(","),
   );

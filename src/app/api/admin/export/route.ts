@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/db";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
+import { csvField } from "@/lib/csv";
 import { PV_EXTERNAL_ID } from "@/app/api/pv/route";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/admin/export — CSV dos cliques dos últimos 30 dias (admin only).
 export async function GET() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
+  if (!(await isAdmin())) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 
@@ -42,18 +41,14 @@ export async function GET() {
     pv?.id ?? -1,
   );
 
-  const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
   const header = "data,produto,loja,fonte,referer";
   const lines = rows.map((r) =>
     [
       r.createdAt.toISOString(),
-      esc(r.title),
-      esc(r.merchant),
-      esc(r.src),
-      esc(r.referer),
+      csvField(r.title),
+      csvField(r.merchant),
+      csvField(r.src),
+      csvField(r.referer),
     ].join(","),
   );
 

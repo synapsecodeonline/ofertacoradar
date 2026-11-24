@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import { startAllSyncs } from "@/lib/syncer";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +8,7 @@ export const dynamic = "force-dynamic";
 // Adquire a trava na hora e devolve o status por fonte; o trabalho roda
 // em after() e o card de sync no /admin mostra a fase ao vivo.
 export async function POST() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
+  if (!(await isAdmin())) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 

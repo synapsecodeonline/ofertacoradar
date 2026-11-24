@@ -92,7 +92,16 @@ export const CATEGORY_LABEL: Record<string, string> = {
 export const CATEGORY_ORDER = Object.keys(CATEGORY_LABEL);
 
 // Alias: qualquer slug de origem -> categoria canonica
-const norm = (s: string) => s.trim().toLowerCase().replace(/_/g, "-");
+// norm tira acentos tambem: "Eletrônicos" e "eletronicos" sao a
+// mesma categoria — sem isso o lookup de categoria crua caia em
+// "outros" so por causa do acento.
+const norm = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 const ALIAS_RAW: Record<string, string> = {
   // --- estilo Lomadee campaigns (hifen) ---

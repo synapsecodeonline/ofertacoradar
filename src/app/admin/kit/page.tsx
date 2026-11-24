@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import { getInstagramKit } from "@/lib/instagramKit";
 import { formatPrice } from "@/lib/format";
 import CopyCaption from "@/components/CopyCaption";
@@ -24,9 +24,7 @@ function fileSlug(title: string): string {
 // Painel de conteudo diario: ofertas sem expiracao com imagem e
 // legenda prontas para baixar/copiar e postar no Instagram.
 export default async function AdminKitPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
+  if (!(await isAdmin())) redirect("/login");
 
   const kit = await getInstagramKit(12);
 

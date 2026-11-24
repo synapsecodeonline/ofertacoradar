@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +8,7 @@ export const dynamic = "force-dynamic";
 // ScriptState ("scrape-request:{src}") e o dispatcher local
 // (scripts/scrape-dispatch.sh, cron 1min) executa no host.
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
+  if (!(await isAdmin())) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 
@@ -96,9 +94,7 @@ export async function POST(req: Request) {
 // GET /api/admin/scrape — estado dos pedidos e ultimo resultado,
 // usado pelo botao para mostrar "rodando..." e o resultado final.
 export async function GET() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
+  if (!(await isAdmin())) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 

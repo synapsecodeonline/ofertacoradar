@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import { getInstagramKit } from "@/lib/instagramKit";
 
 export const dynamic = "force-dynamic";
@@ -7,13 +7,7 @@ export const dynamic = "force-dynamic";
 // ranqueadas por cliques 24h + desconto. Requer login (mesmo /api/card).
 // GET /api/instagram/kit?count=10
 export async function GET(req: Request) {
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      return Response.json({ error: "Login necessário" }, { status: 401 });
-    }
-  } catch {
+  if (!(await isAdmin().catch(() => false))) {
     return Response.json({ error: "Login necessário" }, { status: 401 });
   }
 

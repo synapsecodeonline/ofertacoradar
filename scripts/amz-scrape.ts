@@ -20,6 +20,7 @@ import { upsertByExternalId } from "../src/lib/upsert";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { sleep } from "../src/lib/sleep";
 
 const AMZ_STATE = join(homedir(), ".config/ofertacoradar/amz-state.json");
 const AMZ_LIBS = join(
@@ -47,7 +48,6 @@ const SOURCES = [
   "https://www.amazon.com.br/gp/bestsellers/beauty",
 ];
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(`--${name}`);

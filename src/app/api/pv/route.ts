@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { hasAdminSession } from "@/lib/adminSession";
 import { isBot } from "@/lib/bots";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,11 @@ async function pvProductId(): Promise<number> {
 // Registra um pageview como Click no produto sentinela.
 export async function POST(req: Request) {
   try {
+    // flood de pageviews falsos inflaria Click e comeria disco do
+    // Supabase — 60/min por IP e generoso para uso real
+    if (!rateLimit(`pv:${clientIp(req)}`, 60)) {
+      return Response.json({ ok: true });
+    }
     const body = (await req.json().catch(() => null)) as {
       path?: string;
       sid?: string;

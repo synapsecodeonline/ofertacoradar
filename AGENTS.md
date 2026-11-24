@@ -23,6 +23,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Syncs `maybeSync*` (Lomadee/ML/Awin/Amazon) têm **backoff de 10min após falha** (`errorBackoffActive` em `src/lib/sync-lock.ts`, chave `${key}:err`) — sem isso cada pageview/cron retentava na hora e a retry storm sufocava o pool, travando a home. `force=true` ignora o backoff.
 - `NEXT_PUBLIC_SITE_URL` — domínio canônico usado em sitemap/metadata/JSON-LD (fallback: `VERCEL_URL` ou localhost)
 - `.env.example` documenta todas as env vars (sem valores). Ao adicionar var nova, registrar lá.
+- **Admin = allowlist de email** (`ADMIN_EMAILS` csv; fallback `KIT_EMAIL`; fail-closed sem as duas). Toda rota `/api/admin/*`, `/api/card`, `/api/instagram/kit` e as paginas `/admin/*` usam `isAdmin()`/`isAdminEmail()` de `src/lib/admin.ts` — nunca reintroduzir check so de `getUser()`. Endpoints publicos (`/api/pv`, `/api/notify`, `/api/search`) tem rate limit in-memory em `src/lib/ratelimit.ts`.
+- Testes: `npm test` (vitest, `src/**/*.test.ts`).
 - Loading: navegação interna usa `NavProgress` no nível do `<body>`
   (overlay full-screen: fundo esmaecido + spinner) — NÃO dentro do
   header porque o `backdrop-blur` dele quebra `position:fixed`.

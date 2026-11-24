@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { isAdmin } from "@/lib/admin";
 import {
   addAmazonProduct,
   lookupAmazonProduct,
@@ -8,9 +8,7 @@ import {
 export const dynamic = "force-dynamic";
 
 async function requireAdmin() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return Boolean(data.user);
+  return isAdmin();
 }
 
 // POST /api/admin/amz { action: "lookup" | "add", ... }

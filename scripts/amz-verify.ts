@@ -21,6 +21,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
+import { sleep } from "../src/lib/sleep";
 
 const STATE = join(homedir(), ".config", "ofertacoradar", "amz-state.json");
 const VERIFIED_FILE = join(
@@ -69,7 +70,6 @@ const arg = (n: string) => {
 const ALL = process.argv.includes("--all");
 const LIMIT = Number(arg("limit") ?? Infinity);
 const DELAY = Number(arg("delay") ?? 3000);
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Verdict = "eligible" | "ineligible" | "unknown";
 type PagePrices = { price: number | null; oldPrice: number | null };

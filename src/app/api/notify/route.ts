@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { isBot } from "@/lib/bots";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // Captura email para "avise-me quando baixar" / alertas de preco.
 export async function POST(req: Request) {
   try {
+    if (!rateLimit(`notify:${clientIp(req)}`, 10)) {
+      return Response.json({ ok: true });
+    }
     if (isBot(req.headers.get("user-agent"))) {
       return Response.json({ ok: true });
     }
