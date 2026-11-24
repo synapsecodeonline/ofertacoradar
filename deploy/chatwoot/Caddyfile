@@ -1,4 +1,10 @@
-# Troque pelo seu domínio real
 chat.ofertacoradar.com.br {
-	reverse_proxy rails:3000
+	# Webhook do auto-atendente (Agent Bot) — path dedicado pro container bot
+	handle /bot-hook* {
+		uri strip_prefix /bot-hook
+		reverse_proxy bot:3000
+	}
+	handle {
+		reverse_proxy rails:3000
+	}
 }

@@ -74,6 +74,23 @@ services:
       - INSTALLATION_ENV=docker
     command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
 
+  # Auto-atendente 24/7: recebe webhooks do Agent Bot e responde via OpenRouter
+  bot:
+    build: ./bot
+    container_name: chatwoot-bot
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - CHATWOOT_BASE_URL=http://rails:3000
+      - CHATWOOT_ACCOUNT_ID=${CHATWOOT_ACCOUNT_ID:-1}
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
+      - CHATWOOT_BOT_TOKEN=${CHATWOOT_BOT_TOKEN:-}
+      - CHATWOOT_BOT_SECRET=${CHATWOOT_BOT_SECRET:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
+    depends_on:
+      - rails
+
   tunnel:
     image: cloudflare/cloudflared:latest
     container_name: chatwoot-tunnel
