@@ -26,11 +26,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Loading: navegação interna usa `NavProgress` no nível do `<body>`
   (overlay full-screen: fundo esmaecido + spinner) — NÃO dentro do
   header porque o `backdrop-blur` dele quebra `position:fixed`.
-  Cobre cliques, forms GET, `popstate` e `pushState/replaceState`.
-  Só esconde após ~1s de prontidão SUSTENTADA (DOM quieto 800ms +
-  zero fetch same-origin + todas as imagens/fontes do conteúdo
-  carregadas); failsafe 20s. O boot (F5) usa script inline no
-  `layout.tsx` (`data-boot-progress`, barra fina no header) até
+  Cobre cliques, forms GET, `popstate` e `pushState/replaceState`;
+  o início é amarrado à URL de destino (`navTarget`) para não ser
+  consumido por renders intermediárias. O router do Next NÃO passa
+  por `window.fetch` de forma observável — então a prova de "carregou"
+  é o DOM: MutationObserver em `document.documentElement` (NÃO
+  `document.body` — pode ser null durante a troca) deve ficar quieto
+  ~1s + todas as imagens/fontes do conteúdo prontas, sustentado por
+  ~1.5s; failsafe 20s + watchdog 25s. O boot (F5) usa script inline
+  no `layout.tsx` (`data-boot-progress`, barra fina no header) até
   `window.load`.
 - Widget Chatwoot: `src/components/ChatwootWidget.tsx` (`next/script` afterInteractive, montado no root layout). URL/token via `NEXT_PUBLIC_CHATWOOT_BASE_URL`/`NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN` (default `chat.ofertacoradar.com.br`).
 - **`NEXT_PUBLIC_*` é inlinada no bundle em build-time**: no Docker (`deploy/site/`), rebuild exige `docker compose --env-file .env -f deploy/site/docker-compose.yml up -d --build` — sem isso o bundle sai com Supabase URL vazia e a home quebra no client ("This page couldn't load" com HTTP 200).

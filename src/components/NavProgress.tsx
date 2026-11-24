@@ -3,57 +3,39 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-// Barra de progresso indeterminada: aparece em QUALQUER navegacao
-// interna — clique em link, submit de form GET, botao voltar/avancar —
-// e so some quando a pagina nova CARREGOU TUDO: shell commitado +
-// streaming SSR encerrado + fetches same-origin zerados + imagens do
-// conteudo completas. Failsafe de 20s.
+// Overlay de carregamento: aparece em QUALQUER navegacao interna
+// (clique, form GET, voltar/avancar, router.push) e so some quando a
+// pagina nova ASSENTOU de verdade:
+//   - DOM sem mutacoes ha ~1s (streaming SSR encerrado — cada chunk
+//     do RSC gera mutacao, entao silencio = stream terminou)
+//   - todas as imagens do conteudo completas (lazy abaixo da dobra
+//     nao conta — so carrega ao rolar)
+//   - fontes web carregadas
+// E tudo isso sustentado por ~1.5s seguidos — um "vale" entre chunks
+// nao engana. Nao da pra medir o fetch do RSC de forma confiavel
+// (o router nao passa por window.fetch de jeito observavel), entao
+// a fonte da verdade e o DOM: enquanto o stream entrega, o DOM muda.
+// Failsafe de 20s + watchdog de 25s: nunca fica preso.
 function ProgressBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const pendingNav = useRef(false); // navegacao em andamento
+  const navTarget = useRef<string | null>(null); // "path?search" de destino
   const startedAt = useRef(0);
-  const pendingFetch = useRef(0); // fetch() same-origin em voo
 
   const hide = () => {
     pendingNav.current = false;
+    navTarget.current = null;
     setLoading(false);
   };
 
-  const begin = () => {
+  const begin = (target?: string) => {
     startedAt.current = Date.now();
     pendingNav.current = true;
+    navTarget.current = target ?? null;
     setLoading(true);
   };
-
-  // Contador de fetches same-origin: o router do Next usa fetch() para
-  // o payload RSC — enquanto houver request em voo a pagina nao
-  // terminou. Chamadas a outras origens (Chatwoot, analytics, CDNs)
-  // nao seguram a barra.
-  useEffect(() => {
-    const orig = window.fetch;
-    window.fetch = (...args: Parameters<typeof fetch>) => {
-      const input = args[0];
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      const sameOrigin =
-        !url ||
-        url.startsWith("/") ||
-        url.startsWith(window.location.origin);
-      if (sameOrigin) pendingFetch.current++;
-      return orig(...args).finally(() => {
-        if (sameOrigin) pendingFetch.current--;
-      });
-    };
-    return () => {
-      window.fetch = orig;
-    };
-  }, []);
 
   useEffect(() => {
     const maybeStart = (e: Event) => {
@@ -92,12 +74,14 @@ function ProgressBar() {
         url.search === window.location.search
       )
         return;
-      begin();
+      begin(url.pathname + url.search);
     };
     document.addEventListener("click", maybeStart);
     document.addEventListener("submit", maybeStart);
-    // voltar/avancar do navegador nao passa por click — cobre aqui
-    const onPop = () => begin();
+    // voltar/avancar do navegador nao passa por click — a URL ja
+    // mudou quando popstate dispara, entao o alvo e a location atual
+    const onPop = () =>
+      begin(window.location.pathname + window.location.search);
     window.addEventListener("popstate", onPop);
 
     // router.push()/replaceState() programatico (botoes, auth, etc)
@@ -111,7 +95,7 @@ function ProgressBar() {
             u.pathname !== window.location.pathname ||
             u.search !== window.location.search
           ) {
-            begin();
+            begin(u.pathname + u.search);
           }
         } catch {
           begin();
@@ -134,18 +118,25 @@ function ProgressBar() {
   }, []);
 
   // Commit da navegacao: a partir daqui so esconde quando TUDO
-  // estabilizar — mutacoes do DOM paradas (streaming encerrado),
-  // nenhum fetch same-origin em voo (payload RSC completo) e imagens
-  // do miolo carregadas. Poll a cada 300ms ate 20s de failsafe.
+  // estabilizar de forma SUSTENTADA. Poll a cada 300ms ate 20s.
   useEffect(() => {
     if (!pendingNav.current) return;
+    // So consome quando a URL real bate com o alvo — renders
+    // intermediarias podem disparar este efeito antes do commit e
+    // roubar o pendingNav.
+    const cur = window.location.pathname + window.location.search;
+    if (navTarget.current !== null && navTarget.current !== cur) return;
     pendingNav.current = false;
+    navTarget.current = null;
 
     let lastMut = Date.now();
     const obs = new MutationObserver(() => {
       lastMut = Date.now();
     });
-    obs.observe(document.body, {
+    // documentElement em vez de body: durante a navegacao o router
+    // pode trocar o body e observe(null) derrubava o efeito inteiro
+    // (era o bug do overlay preso — o interval nunca chegava a nascer).
+    obs.observe(document.documentElement, {
       childList: true,
       subtree: true,
       characterData: true,
@@ -153,7 +144,7 @@ function ProgressBar() {
 
     const minVisible = Math.max(0, 900 - (Date.now() - startedAt.current));
     const t0 = Date.now();
-    let readySince = 0; // primeira vez que TUDO ficou pronto
+    let readySince = 0;
 
     const contentReady = () => {
       // TODAS as imagens do conteudo tem que estar prontas — nao so as
@@ -186,18 +177,17 @@ function ProgressBar() {
         return;
       }
       if (elapsed < minVisible) return;
-      const domQuiet = Date.now() - lastMut > 800;
-      const allReady =
-        domQuiet && pendingFetch.current === 0 && contentReady();
+      const domQuiet = Date.now() - lastMut > 1000;
+      const allReady = domQuiet && contentReady();
       if (!allReady) {
         readySince = 0; // estragou — recomeca a contagem de prontidao
         return;
       }
-      // So esconde depois de ~1s de prontidao SUSTENTADA: streaming
-      // SSR tem gaps >600ms entre chunks e imagens/fontes chegam
-      // atrasadas — um vale isolado de "tudo pronto" nao e suficiente.
+      // So esconde depois de ~1.5s de prontidao SUSTENTADA: o stream
+      // SSR entrega chunks em rajadas — um vale isolado de "tudo
+      // pronto" entre dois chunks nao e suficiente.
       if (!readySince) readySince = Date.now();
-      if (Date.now() - readySince > 1000) {
+      if (Date.now() - readySince > 1500) {
         clearInterval(iv);
         obs.disconnect();
         hide();
@@ -214,7 +204,9 @@ function ProgressBar() {
   // trava de seguranca: nunca fica presa se a navegacao abortar
   useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(hide, 25_000);
+    const t = setTimeout(() => {
+      hide();
+    }, 25_000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
