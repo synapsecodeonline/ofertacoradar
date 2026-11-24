@@ -247,8 +247,11 @@ async function run() {
       try {
         // upsert tambem nos existentes: preco do ML muda e o card
         // precisa refletir — upsertByExternalId so grava PriceHistory
-        // quando o preco muda de verdade.
-        await upsertByExternalId({
+        // quando o preco muda de verdade. O retorno diz o que
+        // ACONTECEU de verdade: created/updated/skipped (dedup
+        // cross-source, tombstone, dado invalido) — antes o scrape
+        // contava "novo" mesmo quando nada era gravado.
+        const res = await upsertByExternalId({
           externalId: ext,
           title: it.title,
           imageUrl: it.imageUrl,
@@ -257,8 +260,9 @@ async function run() {
           merchant: "Mercado Livre",
           url: it.url,
         });
-        if (isNew) newCount++;
-        else updated++;
+        if (res === "created") newCount++;
+        else if (res === "updated") updated++;
+        else skipped++;
       } catch (e) {
         console.log(
           `   erro ${it.catalogId}: ${e instanceof Error ? e.message.slice(0, 80) : e}`,

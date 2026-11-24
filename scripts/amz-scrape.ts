@@ -15,7 +15,8 @@
 // que deveria ter" — ajuste os regex de extract() abaixo.
 import { prisma } from "../src/lib/db";
 import { reportScrape } from "../src/lib/scrape-state";
-import { addAmazonProduct } from "../src/lib/amazon";
+import { amzUrl, amzAffiliateUrl } from "../src/lib/amazon";
+import { upsertByExternalId } from "../src/lib/upsert";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -353,17 +354,26 @@ async function main() {
         continue;
       }
       try {
-        await addAmazonProduct({
-          asin: p.asin,
+        // upsertByExternalId (mesmo caminho das outras fontes):
+        // dedup cross-source por titulo, validacao de URL/preco e
+        // retorno real created/updated/skipped — antes o
+        // addAmazonProduct contava "gravado" ate quando a dedup
+        // cross-source impedia a criacao de verdade.
+        const res = await upsertByExternalId({
+          externalId: `amz:${p.asin}`,
           title: p.title,
+          imageUrl: p.imageUrl ?? undefined,
           price: p.price,
           // listagem nao tem "De: R$" — preserva o oldPrice que o verify gravou
-          oldPrice: p.oldPrice ?? prevOld ?? null,
-          imageUrl: p.imageUrl,
+          oldPrice: p.oldPrice ?? prevOld ?? undefined,
+          merchant: "Amazon",
+          url: amzUrl(p.asin),
+          affiliateUrl: amzAffiliateUrl(amzUrl(p.asin)),
         });
-        if (isNew) newCount++;
-        else updated++;
-        inserted++;
+        if (res === "created") newCount++;
+        else if (res === "updated") updated++;
+        else skipped++;
+        if (res !== "skipped") inserted++;
       } catch (e) {
         console.log(`   erro ${p.asin}: ${e instanceof Error ? e.message : e}`);
       }

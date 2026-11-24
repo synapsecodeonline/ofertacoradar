@@ -10,7 +10,12 @@
 // Um pedido "running" ha menos de 45min e considerado vivo — se o
 // dispatcher morrer no meio, o proximo ciclo o retoma.
 import { prisma } from "../src/lib/db";
-import { reportScrape, reportScrapeLog, type ScrapeSrc } from "../src/lib/scrape-state";
+import {
+  amendScrape,
+  reportScrape,
+  reportScrapeLog,
+  type ScrapeSrc,
+} from "../src/lib/scrape-state";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { join } from "path";
@@ -229,6 +234,7 @@ async function dispatch(src: ScrapeSrc) {
     project: src === "ml" ? "ml" : "amz",
   };
   let out = "";
+  let succeeded = false;
   try {
     // cancelamento pode ter chegado entre o "running" e o spawn
     if (await isCancelled()) throw new Cancelled("cancelado pelo usuário");
@@ -264,6 +270,7 @@ async function dispatch(src: ScrapeSrc) {
         }
       }
     }
+    succeeded = true;
   } catch (e) {
     out = (e as { out?: string }).out ?? String(e);
     if (e instanceof Cancelled) {
@@ -290,6 +297,36 @@ async function dispatch(src: ScrapeSrc) {
   } finally {
     // log sempre — sucesso ou erro — para diagnostico na tela
     await reportScrapeLog(src, hostLogTail(src, out, useDocker));
+    if (succeeded) {
+      // Lista REAL do que ficou no banco nesta execucao — consulta
+      // DEPOIS do verify (amz remove "sem desconto" em seguida, entao
+      // o numero que o scrape reportou pode estar inflado). A margem
+      // de 60s cobre diferença de relógio host x banco.
+      try {
+        const prefix = src === "ml" ? "ml:" : "amz:";
+        const desde = new Date(new Date(runningAt).getTime() - 60_000);
+        const [criados, ativos] = await Promise.all([
+          prisma.product.findMany({
+            where: {
+              externalId: { startsWith: prefix },
+              createdAt: { gte: desde },
+            },
+            select: { title: true },
+            orderBy: { createdAt: "asc" },
+            take: 30,
+          }),
+          prisma.product.count({
+            where: { active: true, externalId: { startsWith: prefix } },
+          }),
+        ]);
+        await amendScrape(src, {
+          cadastrados: criados.map((p) => p.title.slice(0, 120)),
+          ativos,
+        });
+      } catch (e) {
+        console.error(`[dispatch:${src}] falha ao listar cadastrados:`, e);
+      }
+    }
     // limpa o pedido e a flag de cancel — o resultado fica em scrape:{src}
     await prisma.scriptState.delete({ where: { key } }).catch(() => {});
     await prisma.scriptState.delete({ where: { key: cancelKey } }).catch(() => {});

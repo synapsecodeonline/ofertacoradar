@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import type { Prisma } from "@prisma/client";
 
 // Estado dos scrapers locais (Amazon/ML) em ScriptState — o site roda
 // em container e nao ve os logs do host; o banco e o canal.
@@ -25,6 +26,34 @@ export async function reportScrape(
     });
   } catch (e) {
     console.error(`[scrape-state] falha ao gravar scrape:${src}:`, e);
+  }
+}
+
+// Mescla campos em scrape:{src} sem perder o reporte do scraper —
+// o dispatcher usa depois do verify para corrigir `ativos` (o verify
+// pode ter removido produtos "sem desconto" depois do scrape contar)
+// e gravar `cadastrados` (titulos criados naquela execucao).
+export async function amendScrape(
+  src: ScrapeSrc,
+  patch: Record<string, unknown>,
+) {
+  try {
+    const key = `scrape:${src}`;
+    const cur = await prisma.scriptState.findUnique({ where: { key } });
+    const v = (cur?.value ?? {}) as Record<string, unknown>;
+    const merged = {
+      at: new Date().toISOString(),
+      ok: true,
+      ...v,
+      ...patch,
+    } as Prisma.InputJsonValue;
+    await prisma.scriptState.upsert({
+      where: { key },
+      create: { key, value: merged },
+      update: { value: merged },
+    });
+  } catch (e) {
+    console.error(`[scrape-state] falha ao emendar scrape:${src}:`, e);
   }
 }
 

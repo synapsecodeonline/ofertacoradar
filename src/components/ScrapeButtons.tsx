@@ -18,6 +18,7 @@ type LastState = {
   atualizados?: number;
   ativos?: number;
   total?: number;
+  cadastrados?: string[];
 } | null;
 type Status = {
   requests: { ml: ReqState; amz: ReqState };
@@ -39,6 +40,7 @@ export default function ScrapeButtons() {
   const [kw, setKw] = useState("");
   const [maxNew, setMaxNew] = useState("");
   const [phase, setPhase] = useState<Record<string, Phase>>({});
+  const [cadastrados, setCadastrados] = useState<Record<string, string[]>>({});
   const [stopping, setStopping] = useState(false);
   const reqAt = useRef<Record<string, number>>({}); // ts do pedido visto
   const gonePolls = useRef<Record<string, number>>({});
@@ -108,6 +110,15 @@ export default function ScrapeButtons() {
               : ok
                 ? `concluído — ${summarize(last)}`
                 : `falhou — ${last?.erro?.slice(0, 120) ?? "ver logs"}`;
+            if (Array.isArray(last?.cadastrados) && last.cadastrados.length) {
+              setCadastrados((c) => ({ ...c, [src]: last.cadastrados! }));
+            } else {
+              setCadastrados((c) => {
+                const n = { ...c };
+                delete n[src];
+                return n;
+              });
+            }
             delete reqAt.current[src];
           } else if (reqTs) {
             // pedido sumiu sem reporte ainda — tolera 2 polls (~24s)
@@ -289,6 +300,22 @@ export default function ScrapeButtons() {
           {k === "ml" ? "ML" : "Amazon"}: {v}
         </span>
       ))}
+      {Object.entries(cadastrados).map(([k, list]) =>
+        list.length ? (
+          <div key={k} className="rounded-xl border border-zinc-100 p-2.5 text-xs dark:border-zinc-800">
+            <p className="mb-1 font-bold text-zinc-500">
+              {k === "ml" ? "ML" : "Amazon"} — {list.length} produto(s)
+              cadastrado(s) nesta execução:
+            </p>
+            <ul className="list-disc space-y-0.5 pl-4 text-zinc-600 dark:text-zinc-300">
+              {list.slice(0, 10).map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+              {list.length > 10 && <li>… e mais {list.length - 10}</li>}
+            </ul>
+          </div>
+        ) : null,
+      )}
     </div>
   );
 }

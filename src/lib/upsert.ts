@@ -19,11 +19,17 @@ const BLOCKED_IMAGE_HOSTS = [
   "shopinfo.vteximg.com.br",
 ];
 
+// Retorno para os scrapers mostrarem numeros reais: "created" =
+// linha nova, "updated" = ja existia e foi atualizada, "skipped" =
+// barrado (URL bloqueada, dado invalido, tombstone de link morto,
+// duplicata de titulo de outra fonte).
+export type UpsertResult = "created" | "updated" | "skipped";
+
 export async function upsertByExternalId(
   p: NormalizedProduct,
   merchantFallback?: string,
   segment?: string | null,
-) {
+): Promise<UpsertResult> {
   const merchant = p.merchant ?? merchantFallback ?? null;
   if (
     BLOCKED_URL_PARTS.some(
@@ -32,7 +38,7 @@ export async function upsertByExternalId(
     (merchant ?? "").toLowerCase().includes(BLOCKED_MERCHANTS[0]) ||
     BLOCKED_IMAGE_HOSTS.some((h) => (p.imageUrl ?? "").includes(h))
   ) {
-    return;
+    return "skipped";
   }
   // Validacao dura: nunca entra invalido na base — url tem que ser
   // http(s), preco (quando informado) positivo, imageUrl (quando
@@ -43,11 +49,11 @@ export async function upsertByExternalId(
     (p.imageUrl != null && !p.imageUrl.startsWith("http")) ||
     (p.affiliateUrl != null && !p.affiliateUrl.startsWith("http"))
   ) {
-    return;
+    return "skipped";
   }
   // Link morto nao volta: o validador deleta o produto e grava tombstone
   // em ScriptState — sem isso o feed recriaria a cada ciclo.
-  if (p.externalId && (await deadLinkSet()).has(p.externalId)) return;
+  if (p.externalId && (await deadLinkSet()).has(p.externalId)) return "skipped";
   // Feeds mandam entidades HTML ("Roup&#xE3;o") — decodifica antes de
   // classificar e de exibir, senao a palavra nunca casa e o usuario
   // ve a entidade crua.
@@ -76,23 +82,29 @@ export async function upsertByExternalId(
     endsAt: p.endsAt,
     active: true,
   };
-  if (!p.externalId) return;
+  if (!p.externalId) return "skipped";
   // active nao vai no update cego: so reativa quando a URL muda de
   // verdade (link novo = merece recheck). Produto com link morto nem
   // chega aqui — o tombstone em deadLinkSet barra antes.
   const { active: _active, ...rest } = data;
   // updatedAt explicito: a reconciliacao com o feed depende dele
   const touch = { ...rest, updatedAt: new Date() };
+
+  let result: UpsertResult;
   const urlChanged = await prisma.product.updateMany({
     where: { externalId: p.externalId, url: { not: p.url } },
     data: { ...touch, active: true },
   });
-  if (urlChanged.count === 0) {
+  if (urlChanged.count > 0) {
+    result = "updated";
+  } else {
     const sameUrl = await prisma.product.updateMany({
       where: { externalId: p.externalId, url: p.url },
       data: touch,
     });
-    if (sameUrl.count === 0) {
+    if (sameUrl.count > 0) {
+      result = "updated";
+    } else {
       // Anti-duplicata: a Lomadee entrega o mesmo produto com SKUs/IDs
       // diferentes (externalId novo, URL diferente). Se ja existe produto
       // ativo da mesma fonte+loja+titulo, atualiza ele em vez de criar.
@@ -111,6 +123,7 @@ export async function upsertByExternalId(
           where: { id: dupe.id },
           data: touch,
         });
+        result = "updated";
       } else {
         // Anti-duplicata CROSS-SOURCE: mesmo título (case-insensitive)
         // já ativo vindo de outra fonte (ex: Lomadee vs ml:). Não cria —
@@ -127,10 +140,13 @@ export async function upsertByExternalId(
           },
           select: { id: true },
         });
-        if (!crossDupe) {
+        if (crossDupe) {
+          result = "skipped";
+        } else {
           await prisma.product.create({
             data: { ...data, externalId: p.externalId },
           });
+          result = "created";
         }
       }
     }
@@ -165,4 +181,5 @@ export async function upsertByExternalId(
       `
       .catch(() => {});
   }
+  return result;
 }

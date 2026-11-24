@@ -232,6 +232,9 @@ export default async function ServicosPage() {
           .map((k) => `${lv[k]} ${k}`)
           .join(" · ")
       : "";
+    const cadastrados = Array.isArray(lv?.cadastrados)
+      ? (lv.cadastrados as unknown[]).filter((t): t is string => typeof t === "string")
+      : [];
     return {
       key,
       name,
@@ -241,6 +244,7 @@ export default async function ServicosPage() {
       lastOk: lv?.ok ?? null,
       erro: typeof lv?.erro === "string" ? lv.erro : null,
       stats,
+      cadastrados,
       logTail: (() => {
         const v = log?.value as { at?: string; tail?: string } | undefined;
         return v?.tail ? { at: v.at, tail: v.tail } : null;
@@ -455,6 +459,19 @@ export default async function ServicosPage() {
                 <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">
                   erro: {s.erro.slice(0, 120)}
                 </p>
+              )}
+              {s.cadastrados.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[11px] font-bold text-zinc-400">
+                    cadastrados nesta execução ({s.cadastrados.length}
+                    {s.cadastrados.length >= 30 ? "+" : ""}):
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-zinc-600 dark:text-zinc-300">
+                    {s.cadastrados.slice(0, 8).map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {s.logTail && (
                 <details className="mt-2">

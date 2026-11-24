@@ -230,7 +230,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Mesmo formato de link que o SiteStripe gera (GetLink):
 // tag + linkCode=ogi&th=1&psc=1
-function amzAffiliateUrl(url: string) {
+export function amzAffiliateUrl(url: string) {
   const u = new URL(url);
   u.searchParams.set("tag", PARTNER_TAG());
   u.searchParams.set("linkCode", "ogi");
@@ -239,7 +239,7 @@ function amzAffiliateUrl(url: string) {
   return u.toString();
 }
 
-function amzUrl(asin: string) {
+export function amzUrl(asin: string) {
   return `https://www.amazon.com.br/dp/${asin}`;
 }
 
