@@ -121,6 +121,11 @@ export async function GET(
     }
   }
 
+  // requireImage=1 (kit diario): 404 quando nao ha foto — o kit usa
+  // isso para nunca anexar card sem imagem do produto.
+  const requireImage =
+    new URL(req.url).searchParams.get("requireImage") === "1";
+
   const { id } = await params;
   const size = new URL(req.url).searchParams.get("size") === "story"
     ? "story"
@@ -214,6 +219,9 @@ export async function GET(
   // loja bloquear ou o formato for webp, o card sai com a foto
   // convertida em vez de quebrar ou sair sem imagem.
   const imageSrc = imageUrl ? await imageToDataUri(imageUrl) : null;
+  if (requireImage && !imageSrc) {
+    return new Response("Produto sem imagem utilizavel", { status: 404 });
+  }
 
   const isAmazon =
     product.externalId?.startsWith("amz:") ||

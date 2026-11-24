@@ -832,9 +832,11 @@ async function main() {
   // quando o top ja saiu nos kits anteriores, o kit encolhia (ja saiu
   // com 1 oferta = 2 imagens). Se faltar item, busca um pool profundo
   // e completa respeitando a MESMA exclusao de ids/familias.
+  let deepItems: KitItem[] = [];
   if (!idsArg && items.length < 4) {
     const excl = sentWithin(sent, winUsed);
     const deep = await withRetry(() => getInstagramPool(400));
+    deepItems = deep.items;
     const haveIds = new Set(items.map((it) => it.id));
     const haveFams = new Set(items.map((it) => familyKey(it.title)));
     const refill = pickDiverse(
@@ -855,6 +857,77 @@ async function main() {
         `Kit com ${items.length} itens — completando com ${refill.length} do pool profundo.`,
       );
       items = [...items, ...refill];
+    }
+  }
+
+  // Garantia absoluta: TODO email tem EXATAMENTE 4 produtos e cada
+  // um com card story+feed contendo a foto. Valida cada item contra
+  // /api/card?requireImage=1 (404 = sem foto utilizavel) e repoe
+  // falhas por candidatos do pool. A imagem fica no imgCache da rota
+  // — a geracao dos anexos reutiliza sem refetch. Se nao fechar 4,
+  // NAO envia (melhor pular o dia do que mandar kit incompleto).
+  if (!idsArg && items.length > 0) {
+    const cardKey = process.env.CRON_SECRET ?? "";
+    const excl = sentWithin(sent, winUsed);
+    const seenRes = new Set<number>();
+    const reserve = [...base, ...deepItems]
+      .filter((it) => {
+        if (seenRes.has(it.id)) return false;
+        seenRes.add(it.id);
+        return hasRealDiscount(it) && !isSent(excl, it);
+      })
+      .sort((a, b) => kitScore(b) - kitScore(a));
+
+    const cardHasImage = async (it: KitItem) => {
+      try {
+        const r = await fetch(
+          `${pool.siteUrl}/api/card/${it.id}?size=story&requireImage=1&key=${cardKey}`,
+          { signal: AbortSignal.timeout(30_000) },
+        );
+        return r.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    const good = new Set<number>();
+    const bad = new Set<number>();
+    for (const it of items) {
+      if (await cardHasImage(it)) good.add(it.id);
+      else {
+        bad.add(it.id);
+        console.log(`Kit: #${it.id} sem foto utilizavel — sera substituido.`);
+      }
+    }
+    items = items.filter((it) => good.has(it.id));
+
+    const fams = new Set(items.map((it) => familyKey(it.title)));
+    let tries = 0;
+    for (const cand of reserve) {
+      if (items.length >= 4 || tries >= 15) break;
+      if (
+        good.has(cand.id) ||
+        bad.has(cand.id) ||
+        fams.has(familyKey(cand.title))
+      )
+        continue;
+      tries++;
+      if (await cardHasImage(cand)) {
+        items.push(cand);
+        good.add(cand.id);
+        fams.add(familyKey(cand.title));
+        console.log(`Kit: item reposto por #${cand.id} (com foto).`);
+      } else {
+        bad.add(cand.id);
+      }
+    }
+
+    if (items.length < 4) {
+      console.log(
+        `Kit incompleto: ${items.length}/4 produtos com foto — email NAO enviado.`,
+      );
+      await hcPing(true);
+      return;
     }
   }
 
@@ -940,11 +1013,11 @@ async function main() {
     const storyPath = join(dir, `card-${i}-story.png`);
     const feedPath = join(dir, `card-${i}-feed.png`);
     const hasStory = await download(
-      `${kit.siteUrl}/api/card/${item.id}?size=story&key=${cardKey}`,
+      `${kit.siteUrl}/api/card/${item.id}?size=story&requireImage=1&key=${cardKey}`,
       storyPath,
     );
     const hasFeed = await download(
-      `${kit.siteUrl}/api/card/${item.id}?size=feed&key=${cardKey}`,
+      `${kit.siteUrl}/api/card/${item.id}?size=feed&requireImage=1&key=${cardKey}`,
       feedPath,
     );
     if (hasStory) {
