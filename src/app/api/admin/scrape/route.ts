@@ -57,3 +57,31 @@ export async function POST(req: Request) {
 
   return Response.json({ ok: true });
 }
+
+// GET /api/admin/scrape — estado dos pedidos e ultimo resultado,
+// usado pelo botao para mostrar "rodando..." e o resultado final.
+export async function GET() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return Response.json({ error: "Login necessário" }, { status: 401 });
+  }
+
+  const [reqMl, reqAmz, lastMl, lastAmz] = await Promise.all([
+    prisma.scriptState.findUnique({ where: { key: "scrape-request:ml" } }),
+    prisma.scriptState.findUnique({ where: { key: "scrape-request:amz" } }),
+    prisma.scriptState.findUnique({ where: { key: "scrape:ml" } }),
+    prisma.scriptState.findUnique({ where: { key: "scrape:amz" } }),
+  ]);
+
+  return Response.json({
+    requests: {
+      ml: reqMl?.value ?? null,
+      amz: reqAmz?.value ?? null,
+    },
+    last: {
+      ml: lastMl?.value ?? null,
+      amz: lastAmz?.value ?? null,
+    },
+  });
+}
