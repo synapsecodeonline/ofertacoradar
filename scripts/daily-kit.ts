@@ -990,9 +990,11 @@ async function main() {
       "intro",
       [
         { text: "OFERTAÇO RADAR", y: 800, style: "Big" },
-        { text: themeUsed.nome, y: 980, style: "Sub" },
-        { text: themeUsed.sub.toUpperCase(), y: 1070, style: "Url" },
-        { text: "OFERTAS VERIFICADAS TODO DIA", y: 1160, style: "Url" },
+        { text: wrap(themeUsed.nome, 26).join("\\N"), y: 980, style: "Sub" },
+        // sub pode ter 40+ chars — sem wrap estourava a largura do
+        // story e cortava nas bordas. Quebra em ate 2 linhas.
+        { text: wrap(themeUsed.sub.toUpperCase(), 34).join("\\N"), y: 1060, style: "Url" },
+        { text: "OFERTAS VERIFICADAS TODO DIA", y: 1210, style: "Url" },
       ],
       music,
       0,
