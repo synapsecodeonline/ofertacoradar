@@ -14,6 +14,7 @@
 // Se a Amazon mudar o HTML, o parser avisa "0 produtos numa pagina
 // que deveria ter" — ajuste os regex de extract() abaixo.
 import { prisma } from "../src/lib/db";
+import { reportScrape } from "../src/lib/scrape-state";
 import { addAmazonProduct } from "../src/lib/amazon";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
@@ -372,11 +373,16 @@ async function main() {
     `\nPronto: ${total} unicos | ${inserted} gravados (${newCount} novos, ${updated} atualizados) | ${skipped} pulados | ${errors} paginas com erro.\n` +
       `Amazon ativos no site: ${ativos}`,
   );
+  await reportScrape("amz", true, {
+    total, gravados: inserted, novos: newCount, atualizados: updated,
+    pulados: skipped, erros: errors, ativos,
+  });
 }
 
 main()
-  .catch((e) => {
+  .catch(async (e) => {
     console.error(e);
+    await reportScrape("amz", false, { erro: String(e).slice(0, 200) });
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

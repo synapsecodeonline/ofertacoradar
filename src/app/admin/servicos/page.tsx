@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
+import ScrapeButtons from "@/components/ScrapeButtons";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Serviços — Admin", robots: { index: false } };
@@ -145,12 +146,17 @@ export default async function ServicosPage() {
      FROM "ofertacoradar"."Product" GROUP BY 1 ORDER BY n DESC`,
   )) as { fonte: string; n: bigint; last: Date | null }[];
 
-  const [syncStates, deadLinksRow, kitRow, subsTotal] = await Promise.all([
-    prisma.syncState.findMany(),
-    prisma.scriptState.findUnique({ where: { key: "dead-links" } }).catch(() => null),
-    prisma.scriptState.findUnique({ where: { key: "kit-sent" } }).catch(() => null),
-    prisma.subscriber.count().catch(() => 0),
-  ]);
+  const [syncStates, deadLinksRow, kitRow, subsTotal, scrapeReqMl, scrapeReqAmz, scrapeMl, scrapeAmz] =
+    await Promise.all([
+      prisma.syncState.findMany(),
+      prisma.scriptState.findUnique({ where: { key: "dead-links" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "kit-sent" } }).catch(() => null),
+      prisma.subscriber.count().catch(() => 0),
+      prisma.scriptState.findUnique({ where: { key: "scrape-request:ml" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "scrape-request:amz" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "scrape:ml" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "scrape:amz" } }).catch(() => null),
+    ]);
   const deadLinks = Array.isArray(deadLinksRow?.value) ? (deadLinksRow!.value as string[]).length : 0;
 
   // ---- status dos syncs (mesma lógica do /admin) ----
@@ -197,6 +203,44 @@ export default async function ServicosPage() {
 
   const workflows = (ghWorkflows?.workflows ?? []) as { name: string; state: string; path: string }[];
   const runs = (ghRuns?.workflow_runs ?? []) as GhRun[];
+
+  // ---- scrapers locais (rodam no PC do usuario: IP residencial + sessao) ----
+  type ScrapeVal = {
+    at?: string;
+    ok?: boolean;
+    status?: string;
+    erro?: string;
+    [k: string]: unknown;
+  };
+  const scrapeRows = (
+    [
+      { key: "ml", name: "Mercado Livre", req: scrapeReqMl, last: scrapeMl },
+      { key: "amz", name: "Amazon", req: scrapeReqAmz, last: scrapeAmz },
+    ] as const
+  ).map(({ key, name, req, last }) => {
+    const rv = req?.value as ScrapeVal | undefined;
+    const lv = last?.value as ScrapeVal | undefined;
+    const reqAt = rv?.at ? new Date(rv.at) : null;
+    const reqAge = reqAt ? now.getTime() - reqAt.getTime() : null;
+    const running = rv?.status === "running" && reqAge !== null && reqAge < 45 * 60_000;
+    const queued = rv?.status === "queued";
+    const stats = lv
+      ? (["novos", "gravados", "atualizados", "pulados", "erros", "ativos"] as const)
+          .filter((k) => typeof lv[k] === "number")
+          .map((k) => `${lv[k]} ${k}`)
+          .join(" · ")
+      : "";
+    return {
+      key,
+      name,
+      running,
+      queued,
+      lastAt: lv?.at ? new Date(lv.at) : null,
+      lastOk: lv?.ok ?? null,
+      erro: typeof lv?.erro === "string" ? lv.erro : null,
+      stats,
+    };
+  });
 
   const services = [
     { name: "Site (ofertacoradar.com.br)", check: site, note: `${site.ms}ms` },
@@ -361,6 +405,59 @@ export default async function ServicosPage() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Scrapers locais */}
+      <Card title="Scrapers locais — rodam no PC (IP residencial + sessão logada)">
+        <div className="mb-4">
+          <ScrapeButtons />
+        </div>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {scrapeRows.map((s) => (
+            <div key={s.key} className="rounded-xl border border-zinc-100 p-3 text-sm dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold">{s.name}</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                    s.running
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                      : s.queued
+                        ? "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                        : !s.lastAt
+                          ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                          : s.lastOk === false
+                            ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                  }`}
+                >
+                  {s.running
+                    ? "rodando"
+                    : s.queued
+                      ? "na fila"
+                      : !s.lastAt
+                        ? "nunca rodou"
+                        : s.lastOk === false
+                          ? "falhou"
+                          : "ok"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">
+                último scrape: {timeAgo(s.lastAt, now)}
+                {s.stats && ` · ${s.stats}`}
+              </p>
+              {s.erro && (
+                <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">
+                  erro: {s.erro.slice(0, 120)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-zinc-400">
+          O botão enfileira o pedido — o dispatcher local (cron 1min) executa o
+          scrape no PC em até 1 minuto. Sessão expirada? Rode{" "}
+          <code>npx tsx scripts/ml-login.ts</code> / <code>amz-login.ts</code>.
+        </p>
       </Card>
     </div>
   );

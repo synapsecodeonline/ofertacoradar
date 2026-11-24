@@ -71,6 +71,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   (slug com hífens, offset `_Desde_N` de 48), queries em `QUERIES`.
   `ML_SYNC=0` desliga o loop de API (queima rate limit à toa — sem uso).
   Comissão ML: `/ir/` monta `/p/{catalogId}?matt_tool&matt_word`.
+  Scrapers registram resultado em `ScriptState` `scrape:{ml|amz}`
+  (`reportScrape` em `src/lib/scrape-state.ts`) e o botão no
+  `/admin/servicos` grava `scrape-request:{src}` — o dispatcher
+  local `scripts/scrape-dispatch.sh` (cron 1min, flock) executa no
+  host (Docker ou fallback local) e limpa o pedido. Mesmo esquema
+  pro Amazon (`deploy/amazon/`).
 - Scrape Amazon roda em **Docker** (`deploy/amazon/`, imagem `mcr.microsoft.com/playwright` + repo montado): cron `amz-cron.sh` chama `docker compose run --rm scrape` com fallback local se Docker estiver off. Precisa de IP residencial (Amazon bloqueia datacenter) e sessão em `~/.config/ofertacoradar/amz-state.json` (montada no container). Profile `scrape` — não sobe com `up -d`.
 - **Site self-hosted local** (`deploy/site/`): Next.js `output: standalone` em Docker (`ofertacoradar-site`), container `site-web` na rede `chatwoot_default`, sem porta publicada — acesso só via tunnel. Subir/rebuild: `docker compose --env-file .env -f deploy/site/docker-compose.yml up -d --build` (o `--env-file` alimenta os build args `NEXT_PUBLIC_*`). Vercel pausou a conta free (Fluid CPU 192%) — se voltar pro Pro, é só apontar o DNS de volta (registros A/CNAME na Cloudflare) e remover as rotas do tunnel.
 - **Chatwoot self-hosted local** (`deploy/chatwoot/`, WSL2 + Docker Desktop): compose com `chatwoot/chatwoot:v4.17.1-ce`, **`pgvector/pgvector:pg16`** (obrigatório — schema usa extensão `vector`), redis:7-alpine, caddy. `.env` local (não commitar — tem segredos). Subir: `docker compose up -d`; migrations: `docker compose exec rails bundle exec rails db:chatwoot_prepare`. Exposição pública via container `chatwoot-tunnel` (cloudflared) com **túnel nomeado** `chat.ofertacoradar.com.br` → `rails:3000`; credenciais em `deploy/chatwoot/cloudflared/` (gitignored — gerar com `cloudflared tunnel login` + `tunnel create` + `tunnel route dns`). DNS do domínio já está na Cloudflare (nameservers `lilith`/`melnicoff.ns.cloudflare.com`) — **mas os registros do site ficam "DNS only" (proxy OFF)**: proxy da Cloudflare na frente da Vercel bufferizava o HTML streaming e levava ~20s/página. Só o `chat.` passa pelo túnel. Todo serviço cloud free exige cartão — por isso é local.

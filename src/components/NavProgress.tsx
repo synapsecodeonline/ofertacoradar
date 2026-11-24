@@ -327,7 +327,7 @@ function ProgressBar() {
           style={{ animation: "nav-spin .8s linear infinite" }}
         />
         <p className="text-sm font-semibold text-white/90">
-          Carregando ofertas…
+          {pathname.startsWith("/admin") ? "Carregando…" : "Carregando ofertas…"}
         </p>
       </div>
     </div>

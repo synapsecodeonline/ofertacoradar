@@ -14,6 +14,7 @@
 // account-verification em tudo, refaca scripts/ml-login.ts.
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { upsertByExternalId } from "../src/lib/upsert";
+import { reportScrape } from "../src/lib/scrape-state";
 import { prisma } from "../src/lib/db";
 import { homedir } from "os";
 import { join } from "path";
@@ -267,11 +268,16 @@ async function run() {
     `\nPronto: ${total} unicos | ${newCount} novos + ${updated} atualizados | ${skipped} pulados | ${errors} erros.\n` +
       `ML ativos no site: ${ativos}`,
   );
+  await reportScrape("ml", true, {
+    total, novos: newCount, atualizados: updated, pulados: skipped,
+    erros: errors, ativos,
+  });
 }
 
 run()
-  .catch((e) => {
+  .catch(async (e) => {
     console.error(e);
+    await reportScrape("ml", false, { erro: String(e).slice(0, 200) });
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
