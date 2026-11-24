@@ -153,6 +153,7 @@ function ProgressBar() {
 
     const minVisible = Math.max(0, 900 - (Date.now() - startedAt.current));
     const t0 = Date.now();
+    let readySince = 0; // primeira vez que TUDO ficou pronto
 
     const contentReady = () => {
       // TODAS as imagens do conteudo tem que estar prontas — nao so as
@@ -185,8 +186,18 @@ function ProgressBar() {
         return;
       }
       if (elapsed < minVisible) return;
-      const domQuiet = Date.now() - lastMut > 600;
-      if (domQuiet && pendingFetch.current === 0 && contentReady()) {
+      const domQuiet = Date.now() - lastMut > 800;
+      const allReady =
+        domQuiet && pendingFetch.current === 0 && contentReady();
+      if (!allReady) {
+        readySince = 0; // estragou — recomeca a contagem de prontidao
+        return;
+      }
+      // So esconde depois de ~1s de prontidao SUSTENTADA: streaming
+      // SSR tem gaps >600ms entre chunks e imagens/fontes chegam
+      // atrasadas — um vale isolado de "tudo pronto" nao e suficiente.
+      if (!readySince) readySince = Date.now();
+      if (Date.now() - readySince > 1000) {
         clearInterval(iv);
         obs.disconnect();
         hide();
