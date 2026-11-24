@@ -154,21 +154,26 @@ function ProgressBar() {
     const minVisible = Math.max(0, 900 - (Date.now() - startedAt.current));
     const t0 = Date.now();
 
-    const imgsReady = () => {
-      // So conta imagem que deveria estar carregando AGORA: completa,
-      // ou lazy abaixo da dobra (ainda nao comecou — nao e "carregando").
-      // Sem isso a barra ficaria presa esperando imagem de produto
-      // que so carrega quando o usuario rola a pagina.
+    const contentReady = () => {
+      // TODAS as imagens do conteudo tem que estar prontas — nao so as
+      // de <main>/<article> (variava por pagina e a barra sumia com
+      // imagem ainda carregando). Excecoes:
+      //  - header/nav/footer (logo, icones — nao sao "conteudo")
+      //  - lazy abaixo da dobra: so comeca a carregar quando o usuario
+      //    rola — esperar por ela travaria a barra em toda listagem.
       const vh = window.innerHeight;
-      const imgs = document.querySelectorAll("main img, article img");
+      const imgs = document.querySelectorAll("img");
       for (const im of imgs) {
         const el = im as HTMLImageElement;
+        if (el.closest("header, nav, footer")) continue;
         if (el.complete) continue;
         const rect = el.getBoundingClientRect();
         const belowFold = el.loading === "lazy" && rect.top > vh + 200;
         if (!belowFold) return false;
       }
-      return true;
+      // fontes web (proxima-nova etc) tambem fazem a pagina "piscar"
+      // depois que a barra some
+      return document.fonts.status === "loaded";
     };
 
     const iv = setInterval(() => {
@@ -181,7 +186,7 @@ function ProgressBar() {
       }
       if (elapsed < minVisible) return;
       const domQuiet = Date.now() - lastMut > 600;
-      if (domQuiet && pendingFetch.current === 0 && imgsReady()) {
+      if (domQuiet && pendingFetch.current === 0 && contentReady()) {
         clearInterval(iv);
         obs.disconnect();
         hide();
@@ -205,20 +210,25 @@ function ProgressBar() {
 
   if (!loading) return null;
   return (
-    <>
+    <div
+      role="status"
+      aria-label="Carregando página"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-950/55 backdrop-blur-[3px] animate-[nav-fade-in_.18s_ease-out]"
+    >
       <style>{`
-        .nav-progress-bar{animation:nav-progress 1.1s ease-in-out infinite}
-        .nav-progress-glow{animation:nav-progress-glow 1.1s ease-in-out infinite}
-        @keyframes nav-progress{0%{transform:translateX(-120%)}100%{transform:translateX(340%)}}
-        @keyframes nav-progress-glow{0%,100%{opacity:.5}50%{opacity:1}}
+        @keyframes nav-fade-in{from{opacity:0}to{opacity:1}}
+        @keyframes nav-spin{to{transform:rotate(360deg)}}
       `}</style>
-      {/* Colada na borda inferior do <header> sticky (absolute dentro
-          dele) — visivel no topo E scrollado, em todas as telas. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[3px] bg-emerald-500/10">
-        <div className="nav-progress-bar absolute inset-y-0 w-2/5 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-        <div className="nav-progress-glow absolute inset-y-0 w-full bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className="h-12 w-12 rounded-full border-[3px] border-emerald-400/25 border-t-emerald-400"
+          style={{ animation: "nav-spin .8s linear infinite" }}
+        />
+        <p className="text-sm font-semibold text-white/90">
+          Carregando ofertas…
+        </p>
       </div>
-    </>
+    </div>
   );
 }
 

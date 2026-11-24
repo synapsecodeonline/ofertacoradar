@@ -167,10 +167,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 Cupons
               </HashLink>
           </nav>
-          {/* Barra de loading colada na borda inferior do header sticky —
-              funciona em qualquer posicao de scroll (a faixa verde rola
-              para fora e o header fixa no topo). */}
-          <NavProgress />
         </header>
         <DbStatusBanner />
         {children}
@@ -230,6 +226,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </footer>
         <PageViewTracker />
         <ChatwootWidget />
+        <NavProgress />
       </body>
     </html>
   );
