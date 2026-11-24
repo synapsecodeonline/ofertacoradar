@@ -7,6 +7,9 @@ x-chatwoot-base: &chatwoot-base
   env_file: .env
   volumes:
     - chatwoot_storage:/app/storage
+    # Captain Tasks via OpenRouter: modelo/defaults customizados
+    - ./llm.yml:/app/config/llm.yml:ro
+    - ./llm_models.json:/app/config/llm_models.json:ro
   restart: unless-stopped
 
 services:
