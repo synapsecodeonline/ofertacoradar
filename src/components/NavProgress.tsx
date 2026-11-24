@@ -3,32 +3,51 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-// Barra de progresso indeterminada: aparece ao clicar em link interno
-// ou enviar formulario GET (busca/filtros) e so some quando a pagina
-// nova CARREGOU TUDO — shell commitado + streaming SSR encerrado +
-// fetches em voo zerados + imagens do conteudo completas. Esconder no
-// commit da navegacao fazia a barra sumir com a pagina ainda vazia.
+// Barra de progresso indeterminada: aparece em QUALQUER navegacao
+// interna — clique em link, submit de form GET, botao voltar/avancar —
+// e so some quando a pagina nova CARREGOU TUDO: shell commitado +
+// streaming SSR encerrado + fetches same-origin zerados + imagens do
+// conteudo completas. Failsafe de 20s.
 function ProgressBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const pendingNav = useRef(false); // clique aconteceu, aguardando commit
+  const pendingNav = useRef(false); // navegacao em andamento
   const startedAt = useRef(0);
-  const pendingFetch = useRef(0); // requests fetch() em voo
+  const pendingFetch = useRef(0); // fetch() same-origin em voo
 
   const hide = () => {
     pendingNav.current = false;
     setLoading(false);
   };
 
-  // Contador de fetches: o router do Next usa fetch() para o payload
-  // RSC — enquanto houver request em voo, a pagina nao terminou.
+  const begin = () => {
+    startedAt.current = Date.now();
+    pendingNav.current = true;
+    setLoading(true);
+  };
+
+  // Contador de fetches same-origin: o router do Next usa fetch() para
+  // o payload RSC — enquanto houver request em voo a pagina nao
+  // terminou. Chamadas a outras origens (Chatwoot, analytics, CDNs)
+  // nao seguram a barra.
   useEffect(() => {
     const orig = window.fetch;
     window.fetch = (...args: Parameters<typeof fetch>) => {
-      pendingFetch.current++;
+      const input = args[0];
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      const sameOrigin =
+        !url ||
+        url.startsWith("/") ||
+        url.startsWith(window.location.origin);
+      if (sameOrigin) pendingFetch.current++;
       return orig(...args).finally(() => {
-        pendingFetch.current--;
+        if (sameOrigin) pendingFetch.current--;
       });
     };
     return () => {
@@ -73,22 +92,51 @@ function ProgressBar() {
         url.search === window.location.search
       )
         return;
-      startedAt.current = Date.now();
-      pendingNav.current = true;
-      setLoading(true);
+      begin();
     };
     document.addEventListener("click", maybeStart);
     document.addEventListener("submit", maybeStart);
+    // voltar/avancar do navegador nao passa por click — cobre aqui
+    const onPop = () => begin();
+    window.addEventListener("popstate", onPop);
+
+    // router.push()/replaceState() programatico (botoes, auth, etc)
+    // passa por history — cobre TODA navegacao client-side. Pula
+    // mudanca so de hash/mesma URL (nao ha fetch de servidor).
+    const wrap = (fn: History["pushState"]) =>
+      function (this: History, ...a: Parameters<History["pushState"]>) {
+        try {
+          const u = new URL(String(a[2] ?? ""), window.location.href);
+          if (
+            u.pathname !== window.location.pathname ||
+            u.search !== window.location.search
+          ) {
+            begin();
+          }
+        } catch {
+          begin();
+        }
+        return fn.apply(this, a);
+      };
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    history.pushState = wrap(origPush) as History["pushState"];
+    history.replaceState = wrap(origReplace) as History["replaceState"];
+
     return () => {
       document.removeEventListener("click", maybeStart);
       document.removeEventListener("submit", maybeStart);
+      window.removeEventListener("popstate", onPop);
+      history.pushState = origPush;
+      history.replaceState = origReplace;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Commit da navegacao: a partir daqui so esconde quando TUDO
   // estabilizar — mutacoes do DOM paradas (streaming encerrado),
-  // nenhum fetch em voo (payload RSC completo) e imagens do miolo
-  // carregadas. Poll a cada 300ms ate 20s de failsafe.
+  // nenhum fetch same-origin em voo (payload RSC completo) e imagens
+  // do miolo carregadas. Poll a cada 300ms ate 20s de failsafe.
   useEffect(() => {
     if (!pendingNav.current) return;
     pendingNav.current = false;
@@ -160,12 +208,15 @@ function ProgressBar() {
     <>
       <style>{`
         .nav-progress-bar{animation:nav-progress 1.1s ease-in-out infinite}
-        @keyframes nav-progress{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+        .nav-progress-glow{animation:nav-progress-glow 1.1s ease-in-out infinite}
+        @keyframes nav-progress{0%{transform:translateX(-120%)}100%{transform:translateX(340%)}}
+        @keyframes nav-progress-glow{0%,100%{opacity:.5}50%{opacity:1}}
       `}</style>
-      {/* Colada na borda inferior do <header> sticky (position absolute
-          dentro dele) — fica sempre visivel, no topo OU scrollado. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-1 bg-emerald-500/15">
-        <div className="nav-progress-bar h-full w-1/3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.55)]" />
+      {/* Colada na borda inferior do <header> sticky (absolute dentro
+          dele) — visivel no topo E scrollado, em todas as telas. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[3px] bg-emerald-500/10">
+        <div className="nav-progress-bar absolute inset-y-0 w-2/5 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+        <div className="nav-progress-glow absolute inset-y-0 w-full bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
       </div>
     </>
   );
