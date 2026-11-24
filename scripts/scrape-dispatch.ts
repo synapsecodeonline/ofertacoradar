@@ -38,7 +38,9 @@ async function run(cmd: string, args: string[]) {
 async function dispatch(src: "ml" | "amz") {
   const key = `scrape-request:${src}`;
   const req = await prisma.scriptState.findUnique({ where: { key } });
-  const st = req?.value as { status?: string; at?: string } | undefined;
+  const st = req?.value as
+    | { status?: string; at?: string; queries?: string[] }
+    | undefined;
   if (!st || (st.status !== "queued" && st.status !== "running")) return;
 
   const age = st.at ? Date.now() - new Date(st.at).getTime() : Infinity;
@@ -46,8 +48,16 @@ async function dispatch(src: "ml" | "amz") {
 
   await prisma.scriptState.update({
     where: { key },
-    data: { value: { at: new Date().toISOString(), status: "running" } },
+    data: {
+      value: { at: new Date().toISOString(), status: "running", queries: st.queries },
+    },
   });
+
+  // palavras-chave vindas do admin viram --queries "a,b,c"
+  const qArg =
+    Array.isArray(st.queries) && st.queries.length
+      ? ["--queries", st.queries.join(",")]
+      : [];
 
   const useDocker = await dockerUp();
   try {
@@ -56,18 +66,25 @@ async function dispatch(src: "ml" | "amz") {
         await run("docker", [
           "compose", "-f", "deploy/ml/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
+          ...qArg,
         ]);
       } else {
-        await run("npx", ["tsx", "--env-file=.env", "scripts/ml-scrape.ts"]);
+        await run("npx", [
+          "tsx", "--env-file=.env", "scripts/ml-scrape.ts", ...qArg,
+        ]);
       }
     } else {
       if (useDocker) {
         await run("docker", [
           "compose", "-f", "deploy/amazon/docker-compose.yml",
           "--profile", "scrape", "run", "--rm", "scrape",
+          ...qArg,
         ]);
       } else {
-        await run("npx", ["tsx", "--env-file=.env", "scripts/amz-scrape.ts", "--max-new", "5"]);
+        await run("npx", [
+          "tsx", "--env-file=.env", "scripts/amz-scrape.ts",
+          "--max-new", "5", ...qArg,
+        ]);
         await run("npx", ["tsx", "--env-file=.env", "scripts/amz-verify.ts"]);
       }
     }

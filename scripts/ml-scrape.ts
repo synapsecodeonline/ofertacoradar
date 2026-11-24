@@ -46,6 +46,13 @@ const DELAY = Number(arg("delay") ?? 5000);
 const ONLY = arg("only")?.toLowerCase();
 const DRY = process.argv.includes("--dry");
 const MAX_NEW = Number(arg("max-new") ?? Infinity);
+// --queries "a,b,c" substitui a lista padrao (rodada direcionada
+// pedida pelo botao do admin com palavras-chave do usuario)
+const CUSTOM_QUERIES = (arg("queries") ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const QUERIES_ALL = CUSTOM_QUERIES.length ? CUSTOM_QUERIES : QUERIES;
 
 interface Found {
   catalogId: string;
@@ -167,8 +174,11 @@ async function run() {
 
   // fontes: paginas de oferta + buscas (_Desde_N = offset de 48/pagina)
   const urls: string[] = [];
-  for (const d of DEAL_PAGES) if (!ONLY || d.includes(ONLY)) urls.push(d);
-  for (const q of QUERIES) {
+  // com --queries a rodada e direcionada: so as palavras-chave do
+  // usuario, sem as paginas genericas de ofertas
+  if (!CUSTOM_QUERIES.length)
+    for (const d of DEAL_PAGES) if (!ONLY || d.includes(ONLY)) urls.push(d);
+  for (const q of QUERIES_ALL) {
     if (ONLY && !q.includes(ONLY)) continue;
     for (let p = 0; p < MAX_PAGES; p++) {
       const off = p * 48;

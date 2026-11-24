@@ -52,7 +52,19 @@ const arg = (name: string) => {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : undefined;
 };
-const MAX_PAGES = Number(arg("pages") ?? SOURCES.length);
+// --queries "a,b,c" substitui SOURCES por buscas /s?k= das
+// palavras-chave (rodada direcionada pedida no admin)
+const CUSTOM_QUERIES = (arg("queries") ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const SOURCES_ALL = CUSTOM_QUERIES.length
+  ? CUSTOM_QUERIES.flatMap((q) => [
+      `https://www.amazon.com.br/s?k=${encodeURIComponent(q)}`,
+      `https://www.amazon.com.br/s?k=${encodeURIComponent(q)}&page=2`,
+    ])
+  : SOURCES;
+const MAX_PAGES = Number(arg("pages") ?? SOURCES_ALL.length);
 const DELAY = Number(arg("delay") ?? 5000);
 const ONLY = arg("only")?.toLowerCase();
 const DRY = process.argv.includes("--dry");
@@ -240,7 +252,7 @@ async function withRetry<T>(
 }
 
 async function main() {
-  const urls = SOURCES.filter((u) => !ONLY || u.includes(ONLY)).slice(0, MAX_PAGES);
+  const urls = SOURCES_ALL.filter((u) => !ONLY || u.includes(ONLY)).slice(0, MAX_PAGES);
   console.log(`${urls.length} pagina(s) para raspar.\n`);
 
   const seen = new Set<string>();

@@ -15,8 +15,16 @@ export async function POST(req: Request) {
   }
 
   let src = "";
+  let queries: string[] = [];
   try {
-    src = String((await req.json()).src ?? "");
+    const body = await req.json();
+    src = String(body.src ?? "");
+    if (Array.isArray(body.queries)) {
+      queries = body.queries
+        .map((q: unknown) => String(q).trim())
+        .filter((q: string) => q.length > 0 && q.length <= 80)
+        .slice(0, 20);
+    }
   } catch {
     /* body vazio */
   }
@@ -32,10 +40,15 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, already: true });
   }
 
+  const value = {
+    at: new Date().toISOString(),
+    status: "queued",
+    ...(queries.length ? { queries } : {}),
+  };
   await prisma.scriptState.upsert({
     where: { key },
-    create: { key, value: { at: new Date().toISOString(), status: "queued" } },
-    update: { value: { at: new Date().toISOString(), status: "queued" } },
+    create: { key, value },
+    update: { value },
   });
 
   return Response.json({ ok: true });
