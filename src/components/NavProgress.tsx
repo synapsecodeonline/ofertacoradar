@@ -1,16 +1,25 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-// Barra de progresso indeterminada no topo: aparece ao clicar em link
-// interno ou enviar formulario GET (busca/filtros) e some quando a
-// navegacao commita. As paginas sao SSR e as queries no banco demoram
-// alguns segundos — sem isso parece que o site travou.
+// Barra de progresso indeterminada: aparece ao clicar em link interno
+// ou enviar formulario GET (busca/filtros) e some quando a pagina nova
+// TERMINA de renderizar — nao no commit da navegacao. As paginas sao
+// SSR com streaming: o pathname muda quando o shell commita, mas o
+// HTML do banco continua chegando depois — esconder ali fazia a barra
+// sumir antes do conteudo aparecer.
 function ProgressBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const pendingNav = useRef(false); // clique aconteceu, aguardando commit
+  const startedAt = useRef(0);
+
+  const hide = () => {
+    pendingNav.current = false;
+    setLoading(false);
+  };
 
   useEffect(() => {
     const maybeStart = (e: Event) => {
@@ -49,6 +58,8 @@ function ProgressBar() {
         url.search === window.location.search
       )
         return;
+      startedAt.current = Date.now();
+      pendingNav.current = true;
       setLoading(true);
     };
     document.addEventListener("click", maybeStart);
@@ -59,16 +70,44 @@ function ProgressBar() {
     };
   }, []);
 
-  // navegacao commitou (path ou query mudou) -> esconde
+  // Commit da navegacao (pathname/search mudou DEPOIS do clique): o
+  // shell novo ja esta no DOM, mas o streaming do SSR pode continuar.
+  // Observa mutacoes e so esconde quando o DOM ficar quieto — assim a
+  // barra cobre o tempo real de renderizacao da pagina.
   useEffect(() => {
-    setLoading(false);
+    if (!pendingNav.current) return;
+    pendingNav.current = false;
+
+    let settleTimer: ReturnType<typeof setTimeout>;
+    const armSettle = () => {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(hide, 500);
+    };
+
+    // tempo minimo visivel — evita flash em navegacao instantanea
+    const minVisible = Math.max(0, 800 - (Date.now() - startedAt.current));
+
+    const obs = new MutationObserver(() => armSettle());
+    obs.observe(document.body, { childList: true, subtree: true });
+    // se o DOM ja esta quieto, esconde apos minVisible + 500ms de folga
+    const quiet = setTimeout(armSettle, minVisible);
+
+    const failsafe = setTimeout(hide, 20_000);
+    return () => {
+      obs.disconnect();
+      clearTimeout(settleTimer);
+      clearTimeout(quiet);
+      clearTimeout(failsafe);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams]);
 
   // trava de seguranca: nunca fica presa se a navegacao abortar
   useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(() => setLoading(false), 20_000);
+    const t = setTimeout(hide, 25_000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
   if (!loading) return null;
