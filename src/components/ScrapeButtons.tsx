@@ -55,6 +55,7 @@ export default function ScrapeButtons() {
   const summarize = (l: LastState) => {
     if (!l) return "sem dados";
     const parts: string[] = [];
+    if (typeof l.total === "number") parts.push(`${l.total} encontrado(s)`);
     const novos = l.novos ?? l.gravados;
     if (typeof novos === "number") parts.push(`${novos} novo(s)`);
     if (typeof l.atualizados === "number") parts.push(`${l.atualizados} atualizado(s)`);

@@ -77,6 +77,7 @@ type Found = {
   price: number | null;
   oldPrice: number | null;
   imageUrl: string | null;
+  imageUrls: string[];
 };
 
 const brl = (s: string) =>
@@ -140,25 +141,65 @@ function extract(html: string): Found[] {
     }
 
     // Imagem: ssl-images (best-sellers) ou media-amazon (busca/deals).
-    // Pega a primeira URL de /images/I/ que seja imagem de produto
-    // (ignora assets .css/.js que a Amazon embute na pagina) e amplia
-    // o thumbnail para 640px.
-    const imgCandidates = [
-      ...chunk.matchAll(
-        /https:\/\/(?:images-na\.ssl-images-amazon\.com|m\.media-amazon\.com)\/images\/I\/[^"'\s]+/g,
-      ),
-    ].map((x) => x[0]);
-    let imageUrl =
-      imgCandidates.find((u) => /\.(jpg|jpeg|png|webp)(\?|&|$)/i.test(u) || /\._AC_/.test(u)) ??
-      null;
-    if (imageUrl) {
-      imageUrl = imageUrl.replace(/\._AC_[A-Z0-9_,]*\.(jpg|png)/, "._AC_UL640_.$1");
-      imageUrl = imageUrl.replace(/&amp;/g, "&");
+    // A Amazon tambem serve URLs embrulhadas no DOM renderizado:
+    //   m.media-amazon.com/images/W/BW_.../images/I/<id>._AC_UL320_.jpg
+    // — o /images/I/ NAO fica colado no dominio. Sem aceitar esse
+    // formato, o unico match que sobrava era um placeholder generico
+    // (111mHoVK0kL) compartilhado por varios produtos -> foto errada.
+    // Coleta TODAS as candidatas (dedup por id de imagem) pra resolver
+    // colisao depois: mesma imagem em produtos diferentes = suspeita.
+    const imgCandidates: string[] = [];
+    const seenImgId = new Set<string>();
+    for (const x of chunk.matchAll(
+      /https:\/\/(?:images-na\.ssl-images-amazon\.com|m\.media-amazon\.com)\/(?:images\/W\/[^"'\s]*?\/)?images\/I\/[^"'\s]+/g,
+    )) {
+      const raw = x[0].replace(/&amp;/g, "&");
+      // ignora assets que nao sao foto de produto (sprite, badge etc.)
+      if (
+        !/\.(jpe?g|png|webp|avif)([?#&]|$)/i.test(raw) &&
+        !/\._(AC|SS)\d*_|_FM(webp|png)_/.test(raw)
+      ) {
+        continue;
+      }
+      const id = raw.match(/\/images\/I\/([A-Za-z0-9_-]+)/)?.[1] ?? raw;
+      if (seenImgId.has(id)) continue;
+      seenImgId.add(id);
+      imgCandidates.push(
+        // sobe p/ 640px mantendo sufixos (_FMwebp_QL65_ etc.):
+        // _AC_UL320_FMwebp_QL65_.jpg -> _AC_UL640_FMwebp_QL65_.jpg
+        raw.replace(/_AC_(?:UL|SX|SY|SL)\d+_/, "_AC_UL640_"),
+      );
     }
+    const imageUrl = imgCandidates[0] ?? null;
 
     // Regra: produto precisa de titulo + imagem + preco pra entrar
     if (title && imageUrl && price) {
-      out.push({ asin: marks[i].asin, title, price, oldPrice, imageUrl });
+      out.push({ asin: marks[i].asin, title, price, oldPrice, imageUrl, imageUrls: imgCandidates });
+    }
+  }
+
+  // Colisao de imagem: se a 1a candidata de produtos diferentes e a
+  // mesma, provavelmente e placeholder/widget — cada um tenta a
+  // proxima candidata que seja unica na pagina. Sem alternativa unica
+  // mantem a original (variacoes legitimas compartilham foto da familia).
+  const imgKey = (u: string) =>
+    u.match(/\/images\/I\/([A-Za-z0-9_-]+)/)?.[1] ?? u;
+  const useCount = new Map<string, number>();
+  for (const p of out) {
+    const k = imgKey(p.imageUrls[0] ?? p.imageUrl ?? "");
+    useCount.set(k, (useCount.get(k) ?? 0) + 1);
+  }
+  for (const p of out) {
+    const firstKey = imgKey(p.imageUrls[0] ?? "");
+    if ((useCount.get(firstKey) ?? 0) <= 1) continue;
+    const alt = p.imageUrls
+      .slice(1)
+      .find((u) => (useCount.get(imgKey(u)) ?? 0) <= 1);
+    if (alt) {
+      console.log(
+        `  ⚠️  ${p.asin}: imagem compartilhada — usando candidata alternativa`,
+      );
+      p.imageUrl = alt;
     }
   }
   return out;

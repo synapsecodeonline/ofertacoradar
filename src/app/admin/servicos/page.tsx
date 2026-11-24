@@ -215,10 +215,23 @@ export default async function ServicosPage() {
     const reqAge = reqAt ? now.getTime() - reqAt.getTime() : null;
     const running = rv?.status === "running" && reqAge !== null && reqAge < 45 * 60_000;
     const queued = rv?.status === "queued";
+    // "encontrados" (total) primeiro: sem ele "2 novos" parece divergente
+    // quando a tela de resultado mostrou outro numero — o total explica
+    // quantos produtos unicos o scraper viu na pagina.
     const stats = lv
-      ? (["novos", "gravados", "atualizados", "pulados", "erros", "ativos"] as const)
-          .filter((k) => typeof lv[k] === "number")
-          .map((k) => `${lv[k]} ${k}`)
+      ? (
+          [
+            typeof lv.total === "number" ? `${lv.total} encontrados` : null,
+            typeof (lv.novos ?? lv.gravados) === "number"
+              ? `${lv.novos ?? lv.gravados} novos`
+              : null,
+            lv.atualizados ? `${lv.atualizados} atualizados` : null,
+            lv.pulados ? `${lv.pulados} pulados` : null,
+            lv.erros ? `${lv.erros} erros` : null,
+            typeof lv.ativos === "number" ? `${lv.ativos} ativos` : null,
+          ] as (string | null)[]
+        )
+          .filter(Boolean)
           .join(" · ")
       : "";
     const cadastrados = Array.isArray(lv?.cadastrados)
