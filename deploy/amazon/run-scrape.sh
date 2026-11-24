@@ -12,6 +12,12 @@ echo "===== $(date -Is) [docker] =====" >> "$LOG"
 # "$@" primeiro: --max-new/--queries do dispatcher (admin) tem
 # precedencia — o arg() usa a 1a ocorrencia da flag.
 npx tsx --env-file=.env scripts/amz-scrape.ts "$@" --max-new 5 >> "$LOG" 2>&1
-echo "scrape exit=$? $(date -Is)" >> "$LOG"
+SC=$?
+echo "scrape exit=$SC $(date -Is)" >> "$LOG"
 npx tsx --env-file=.env scripts/amz-verify.ts >> "$LOG" 2>&1
-echo "verify exit=$? $(date -Is)" >> "$LOG"
+VC=$?
+echo "verify exit=$VC $(date -Is)" >> "$LOG"
+# verify roda sempre (limpa produtos pendentes mesmo se o scrape
+# falhou); o exit code reflete so o scrape — verify tem log proprio
+[ $SC -ne 0 ] && exit $SC
+exit 0

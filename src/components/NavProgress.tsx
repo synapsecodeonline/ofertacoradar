@@ -206,12 +206,33 @@ function ProgressBar() {
     history.pushState = wrap(origPush) as History["pushState"];
     history.replaceState = wrap(origReplace) as History["replaceState"];
 
+    // Rede de seguranca final: watcher de URL a cada 200ms. Pega
+    // QUALQUER troca de tela que escape dos listeners acima —
+    // router.push por caminhos internos do Next, location.assign,
+    // submits preventDefault (busca!), redirects. Se a URL mudou e
+    // nao ha nav pendente, comeca a contagem na hora.
+    let lastUrl = window.location.pathname + window.location.search;
+    const urlIv = setInterval(() => {
+      const cur = window.location.pathname + window.location.search;
+      if (cur === lastUrl) return;
+      lastUrl = cur;
+      if (!pendingNav.current) {
+        begin(cur);
+      } else if (navTarget.current && navTarget.current !== cur) {
+        // redirect ou nav nao prevista: reponta o alvo para a URL
+        // real, senao o commit nunca casa e a barra fica ate o
+        // failsafe
+        navTarget.current = cur;
+      }
+    }, 200);
+
     return () => {
       document.removeEventListener("click", maybeStart);
       document.removeEventListener("submit", maybeStart);
       window.removeEventListener("popstate", onPop);
       history.pushState = origPush;
       history.replaceState = origReplace;
+      clearInterval(urlIv);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

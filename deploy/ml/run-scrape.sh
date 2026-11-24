@@ -12,4 +12,8 @@ echo "===== $(date -Is) [docker] =====" >> "$LOG"
 # "$@" primeiro: args do dispatcher (admin) tem precedencia — o arg()
 # dos scrapers usa a 1a ocorrencia da flag.
 npx tsx --env-file=.env scripts/ml-scrape.ts "$@" --pages "${ML_PAGES:-1}" --max-new "${ML_MAX_NEW:-60}" --delay "${ML_DELAY:-5000}" >> "$LOG" 2>&1
-echo "scrape exit=$? $(date -Is)" >> "$LOG"
+SC=$?
+echo "scrape exit=$SC $(date -Is)" >> "$LOG"
+# propaga a falha — sem isso o echo final devolvia exit 0 e o
+# dispatcher achava que tinha dado tudo certo
+exit $SC

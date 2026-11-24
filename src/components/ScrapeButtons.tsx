@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type ReqState = { at?: string; status?: string } | null;
+type ReqState = {
+  at?: string;
+  status?: string;
+  queries?: string[];
+  maxNew?: number;
+} | null;
 type LastState = {
   at?: string;
   ok?: boolean;
@@ -80,10 +85,14 @@ export default function ScrapeButtons() {
           }
           const st = req.status === "running" ? "running" : "queued";
           next = st;
+          const what = [
+            ...(req.queries?.length ? [req.queries.join(", ")] : []),
+            ...(typeof req.maxNew === "number" ? [`máx ${req.maxNew}`] : []),
+          ].join(" · ");
           nextMsg =
             st === "running"
-              ? "rodando… (pode levar vários minutos)"
-              : "na fila — dispatcher pega em até 1min";
+              ? `rodando…${what ? ` (${what})` : ""} — pode levar vários minutos`
+              : `na fila — dispatcher pega em até 1min${what ? ` (${what})` : ""}`;
         } else {
           // pedido sumiu: resultado deve ter chegado em scrape:{src}
           const reqTs = reqAt.current[src];

@@ -27,3 +27,24 @@ export async function reportScrape(
     console.error(`[scrape-state] falha ao gravar scrape:${src}:`, e);
   }
 }
+
+// Tail do log da execucao — o site nao ve logs/ml-scrape.log do host,
+// entao o dispatcher empurra o final do arquivo para ca. O admin
+// mostra em /admin/servicos quando o scrape falha (ou sempre, em
+// <details>).
+export async function reportScrapeLog(src: ScrapeSrc, tail: string) {
+  try {
+    await prisma.scriptState.upsert({
+      where: { key: `scrape-log:${src}` },
+      create: {
+        key: `scrape-log:${src}`,
+        value: { at: new Date().toISOString(), tail: tail.slice(-4000) },
+      },
+      update: {
+        value: { at: new Date().toISOString(), tail: tail.slice(-4000) },
+      },
+    });
+  } catch (e) {
+    console.error(`[scrape-state] falha ao gravar scrape-log:${src}:`, e);
+  }
+}

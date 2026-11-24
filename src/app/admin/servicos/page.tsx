@@ -146,7 +146,7 @@ export default async function ServicosPage() {
      FROM "ofertacoradar"."Product" GROUP BY 1 ORDER BY n DESC`,
   )) as { fonte: string; n: bigint; last: Date | null }[];
 
-  const [syncStates, deadLinksRow, kitRow, subsTotal, scrapeReqMl, scrapeReqAmz, scrapeMl, scrapeAmz] =
+  const [syncStates, deadLinksRow, kitRow, subsTotal, scrapeReqMl, scrapeReqAmz, scrapeMl, scrapeAmz, scrapeLogMl, scrapeLogAmz] =
     await Promise.all([
       prisma.syncState.findMany(),
       prisma.scriptState.findUnique({ where: { key: "dead-links" } }).catch(() => null),
@@ -156,6 +156,8 @@ export default async function ServicosPage() {
       prisma.scriptState.findUnique({ where: { key: "scrape-request:amz" } }).catch(() => null),
       prisma.scriptState.findUnique({ where: { key: "scrape:ml" } }).catch(() => null),
       prisma.scriptState.findUnique({ where: { key: "scrape:amz" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "scrape-log:ml" } }).catch(() => null),
+      prisma.scriptState.findUnique({ where: { key: "scrape-log:amz" } }).catch(() => null),
     ]);
   const deadLinks = Array.isArray(deadLinksRow?.value) ? (deadLinksRow!.value as string[]).length : 0;
 
@@ -214,10 +216,10 @@ export default async function ServicosPage() {
   };
   const scrapeRows = (
     [
-      { key: "ml", name: "Mercado Livre", req: scrapeReqMl, last: scrapeMl },
-      { key: "amz", name: "Amazon", req: scrapeReqAmz, last: scrapeAmz },
+      { key: "ml", name: "Mercado Livre", req: scrapeReqMl, last: scrapeMl, log: scrapeLogMl },
+      { key: "amz", name: "Amazon", req: scrapeReqAmz, last: scrapeAmz, log: scrapeLogAmz },
     ] as const
-  ).map(({ key, name, req, last }) => {
+  ).map(({ key, name, req, last, log }) => {
     const rv = req?.value as ScrapeVal | undefined;
     const lv = last?.value as ScrapeVal | undefined;
     const reqAt = rv?.at ? new Date(rv.at) : null;
@@ -239,6 +241,10 @@ export default async function ServicosPage() {
       lastOk: lv?.ok ?? null,
       erro: typeof lv?.erro === "string" ? lv.erro : null,
       stats,
+      logTail: (() => {
+        const v = log?.value as { at?: string; tail?: string } | undefined;
+        return v?.tail ? { at: v.at, tail: v.tail } : null;
+      })(),
     };
   });
 
@@ -449,6 +455,16 @@ export default async function ServicosPage() {
                 <p className="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">
                   erro: {s.erro.slice(0, 120)}
                 </p>
+              )}
+              {s.logTail && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
+                    log da última execução{s.logTail.at ? ` (${timeAgo(new Date(s.logTail.at), now)})` : ""}
+                  </summary>
+                  <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-zinc-950 p-2 text-[10px] leading-relaxed text-zinc-300">
+                    {s.logTail.tail}
+                  </pre>
+                </details>
               )}
             </div>
           ))}
