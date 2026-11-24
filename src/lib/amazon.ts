@@ -244,6 +244,9 @@ export function amzUrl(asin: string) {
 }
 
 async function upsertAmz(p: AmzItem) {
+  // Produto sem imagem nunca entra — regra do site. Pula o item
+  // inteiro: melhor nao atualizar do que gravar/apagar imagem.
+  if (!p.imageUrl?.startsWith("http")) return;
   const externalId = `amz:${p.asin}`;
   const url = amzUrl(p.asin);
   const affiliateUrl = amzAffiliateUrl(url);
@@ -254,7 +257,7 @@ async function upsertAmz(p: AmzItem) {
       externalId,
       title: p.title,
       description: p.description ?? null,
-      imageUrl: p.imageUrl ?? null,
+      imageUrl: p.imageUrl,
       price: p.price ?? null,
       oldPrice: p.oldPrice ?? null,
       discountPct: discountPctOf({ price: p.price, oldPrice: p.oldPrice }),
@@ -268,7 +271,7 @@ async function upsertAmz(p: AmzItem) {
     update: {
       title: p.title,
       description: p.description ?? null,
-      imageUrl: p.imageUrl ?? null,
+      imageUrl: p.imageUrl,
       price: p.price ?? null,
       oldPrice: p.oldPrice ?? null,
       discountPct: discountPctOf({ price: p.price, oldPrice: p.oldPrice }),
@@ -555,13 +558,18 @@ export async function addAmazonProduct(input: {
     oldPrice: input.oldPrice ?? undefined,
   };
   const category = resolveCategory(undefined, input.title, "Amazon");
+  // Sem imagem nao cadastra — a rota ja valida, mas a funcao tambem
+  // garante (regra: produto sem foto nunca entra na base).
+  if (!input.imageUrl?.startsWith("http")) {
+    throw new Error("imageUrl obrigatória — produto sem imagem não entra");
+  }
   return prisma.product.upsert({
     where: { externalId },
     create: {
       externalId,
       title: input.title,
       description: input.description ?? null,
-      imageUrl: input.imageUrl ?? null,
+      imageUrl: input.imageUrl,
       price: input.price ?? null,
       oldPrice: input.oldPrice ?? null,
       discountPct: discountPctOf(p),

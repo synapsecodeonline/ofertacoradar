@@ -140,6 +140,10 @@ async function main() {
   const deadSet = await deadLinkSet();
   const upsertOne = async (p: (typeof products)[number]) => {
     if (p.externalId && deadSet.has(p.externalId)) return;
+    // Produto sem imagem nunca entra — regra do site (foto e
+    // obrigatoria). Pula o item inteiro: melhor nao atualizar do que
+    // gravar/apagar a imagem de um produto que ja tem uma boa.
+    if (!p.imageUrl?.startsWith("http")) return;
     const merchant =
       p.merchant ?? (p.organizationId ? orgNames.get(p.organizationId) : undefined) ?? null;
     const title = decodeEntities(p.title);

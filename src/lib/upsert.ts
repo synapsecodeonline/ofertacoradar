@@ -42,7 +42,8 @@ export async function upsertByExternalId(
   }
   // Validacao dura: nunca entra invalido na base — url tem que ser
   // http(s), preco (quando informado) positivo, imageUrl (quando
-  // informada) http(s). Produto sem imagem passa: cartao tem fallback.
+  // informada) http(s). Produto sem imagem NUNCA e criado (regra do
+  // site); num update, imageUrl ausente preserva a que ja existe.
   if (
     !p.url.startsWith("http") ||
     (p.price != null && p.price <= 0) ||
@@ -68,7 +69,9 @@ export async function upsertByExternalId(
   const data = {
     title,
     description,
-    imageUrl: p.imageUrl,
+    // imageUrl so entra no payload quando veio valida — num update,
+    // ausente = Prisma nao toca no campo (preserva a imagem atual).
+    ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
     price: p.price,
     oldPrice: p.oldPrice,
     discountPct: discountPctOf(p),
@@ -141,6 +144,9 @@ export async function upsertByExternalId(
           select: { id: true },
         });
         if (crossDupe) {
+          result = "skipped";
+        } else if (!p.imageUrl) {
+          // Produto sem imagem nunca e criado — sem excecao.
           result = "skipped";
         } else {
           await prisma.product.create({
